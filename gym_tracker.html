@@ -1086,7 +1086,66 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
-init();
+// Handle Supabase redirect tokens in URL hash
+async function handleHashParams() {
+  const hash = window.location.hash;
+  if(!hash) { init(); return; }
+  const params = new URLSearchParams(hash.substring(1));
+  const type = params.get('type');
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+
+  if(type === 'recovery' && accessToken) {
+    // Password reset flow
+    await sb.auth.setSession({access_token: accessToken, refresh_token: refreshToken});
+    showResetPasswordUI();
+    return;
+  }
+  if(type === 'signup' && accessToken) {
+    await sb.auth.setSession({access_token: accessToken, refresh_token: refreshToken});
+  }
+  // Clear hash and init
+  window.history.replaceState(null, '', window.location.pathname);
+  init();
+}
+
+function showResetPasswordUI() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'block';
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('registerForm').style.display = 'none';
+  document.querySelector('.auth-tabs').style.display = 'none';
+  document.querySelector('.auth-sub').textContent = 'Yeni şifreni belirle';
+
+  const box = document.querySelector('.auth-box');
+  const resetDiv = document.createElement('div');
+  resetDiv.id = 'resetForm';
+  resetDiv.innerHTML = `
+    <div class="auth-field"><label>Yeni Şifre</label><input class="auth-input" id="newPass" type="password" placeholder="En az 6 karakter"></div>
+    <div class="auth-field"><label>Şifre Tekrar</label><input class="auth-input" id="newPass2" type="password" placeholder="Aynı şifreyi tekrar gir"></div>
+    <button class="auth-btn" onclick="doResetPassword()">Şifreyi Güncelle</button>`;
+  box.appendChild(resetDiv);
+}
+
+async function doResetPassword() {
+  const p1 = document.getElementById('newPass').value;
+  const p2 = document.getElementById('newPass2').value;
+  if(!p1 || p1.length < 6) return showAuthErr('En az 6 karakter olmalı');
+  if(p1 !== p2) return showAuthErr('Şifreler eşleşmiyor');
+  const btn = document.querySelector('#resetForm .auth-btn');
+  btn.disabled = true; btn.textContent = 'Güncelleniyor...';
+  const {error} = await sb.auth.updateUser({password: p1});
+  if(error) { showAuthErr(error.message); btn.disabled=false; btn.textContent='Şifreyi Güncelle'; return; }
+  document.getElementById('resetForm').remove();
+  document.querySelector('.auth-tabs').style.display = 'flex';
+  document.getElementById('loginForm').style.display = 'block';
+  document.querySelector('.auth-sub').textContent = 'Kişisel fitness & beslenme takibi';
+  showAuthErr('✅ Şifre güncellendi! Şimdi giriş yapabilirsin.');
+  document.querySelector('.auth-err').style.color = 'var(--acc)';
+  window.history.replaceState(null, '', window.location.pathname);
+}
+
+handleHashParams();
 </script>
 </body>
 </html>
