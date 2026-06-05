@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GYM TRACKER</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0c0c;--surface:#141414;--surface2:#1a1a1a;--surface3:#202020;
+  --acc:#d4f53c;--acc2:#ff5c38;--acc3:#38b6ff;--acc4:#f7c948;
+  --text:#f2f0e8;--muted:#555;--border:rgba(255,255,255,0.08);--r:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Archivo',sans-serif;min-height:100vh;overflow-x:hidden;padding-bottom:80px}
+input,textarea,select,button{font-family:'Archivo',sans-serif}
+
+/* AUTH SCREEN */
+.auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px 24px}
+.auth-logo{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:1px;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,#f2f0e8,#d4f53c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.auth-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:28px;font-style:italic}
+.auth-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:8px;padding:4px;margin-bottom:24px}
+.auth-tab{flex:1;padding:8px;border-radius:6px;border:none;background:none;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;transition:all .2s}
+.auth-tab.active{background:var(--acc);color:#0c0c0c}
+.auth-field{margin-bottom:14px}
+.auth-field label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:5px}
+.auth-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s}
+.auth-input:focus{border-color:rgba(212,245,60,.4)}
+.auth-btn{width:100%;padding:12px;border-radius:8px;background:var(--acc);border:none;color:#0c0c0c;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s;letter-spacing:.5px}
+.auth-btn:hover{opacity:.85}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-err{font-size:11px;color:var(--acc2);margin-top:8px;text-align:center;padding:8px;background:rgba(255,92,56,.08);border-radius:6px;display:none}
+.auth-err.show{display:block}
+.auth-info{font-size:11px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5}
+
+/* HEADER */
+.app-header{padding:18px 16px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.header-left h1{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;line-height:1;background:linear-gradient(135deg,#f2f0e8,#d4f53c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header-left p{font-size:11px;color:var(--muted);margin-top:3px;font-style:italic}
+.header-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.badge{font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+.streak{background:rgba(212,245,60,0.08);border-color:rgba(212,245,60,0.2);color:var(--acc)}
+.user-badge{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 10px;cursor:pointer}
+.user-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+.user-name{font-size:11px}
+.logout-btn{font-size:10px;color:var(--acc2);background:none;border:none;cursor:pointer;padding:2px 0}
+
+/* ADMIN BANNER */
+.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.admin-banner p{font-size:11px;color:var(--acc4)}
+.admin-tabs{display:flex;gap:4px}
+.admin-tab{padding:4px 10px;border-radius:12px;border:1px solid rgba(247,201,72,.2);background:none;color:var(--acc4);font-size:10px;cursor:pointer;transition:all .2s}
+.admin-tab.active{background:var(--acc4);color:#0c0c0c}
+
+/* PERSON BAR */
+.person-bar{display:flex;gap:6px;padding:14px 16px 0;overflow-x:auto;scrollbar-width:none}
+.person-bar::-webkit-scrollbar{display:none}
+.person-btn{flex-shrink:0;display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:24px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;transition:all .2s}
+.person-btn.active{background:var(--acc);color:#0c0c0c;border-color:var(--acc)}
+.p-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+
+/* WEEK GRID */
+.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:12px 16px 0}
+.wday{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 3px;text-align:center;cursor:pointer}
+.wday.today{border-color:rgba(212,245,60,.4)}
+.wday-name{font-size:8px;color:var(--muted);text-transform:uppercase}
+.wday-dot{width:7px;height:7px;border-radius:50%;margin:5px auto 4px}
+.wday-dot.gym{background:var(--acc)}.wday-dot.rest-d{background:#2a2a2a}.wday-dot.hiit-d{background:var(--acc2)}.wday-dot.today-d{box-shadow:0 0 8px rgba(212,245,60,.5);background:var(--acc)}
+.wday-lbl{font-size:7px;color:var(--muted)}
+
+/* PROFILE */
+.profile-card{margin:12px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;gap:12px;align-items:center}
+.p-av-big{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0}
+.goal-tag{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-size:10px;padding:3px 8px;border-radius:10px}
+.p-stats{margin-left:auto;display:flex;gap:10px}
+.pstat .val{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;color:var(--acc)}
+.pstat .lbl{font-size:8px;color:var(--muted);text-transform:uppercase;margin-top:1px}
+
+/* DAY TABS */
+.day-tabs{display:flex;gap:5px;padding:12px 16px 0;overflow-x:auto;scrollbar-width:none}
+.day-tabs::-webkit-scrollbar{display:none}
+.dtab{flex-shrink:0;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:10px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}
+.dtab.active{background:var(--acc);color:#0c0c0c;border-color:var(--acc)}
+.dtab.rest-day{color:#333;border-color:#1e1e1e}
+.dtab.hiit-day{border-color:rgba(255,92,56,.4);color:var(--acc2)}
+.dtab.done-day::after{content:' ✓';opacity:.5}
+
+/* DAY CONTENT */
+.day-content{padding:12px 16px 0}
+
+/* EDIT BANNER */
+.edit-banner{background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.edit-banner p{font-size:11px;color:var(--acc4);line-height:1.5}
+
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:none;transition:all .2s;letter-spacing:.3px}
+.btn-acc{background:var(--acc);color:#0c0c0c}
+.btn-acc:hover{opacity:.85}
+.btn-outline{background:none;border:1px solid var(--border);color:var(--muted)}
+.btn-outline:hover{border-color:var(--acc);color:var(--acc)}
+.btn-danger{background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.2);color:var(--acc2)}
+.btn-sm{padding:4px 10px;font-size:10px;border-radius:12px}
+
+/* WARMUP */
+.warmup-row{background:rgba(212,245,60,.04);border:1px solid rgba(212,245,60,.1);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(212,245,60,.7);margin-bottom:8px}
+.warmup-row input{background:none;border:none;color:rgba(212,245,60,.9);font-size:11px;flex:1;outline:none;font-style:italic}
+
+/* DAY HEADER */
+.day-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+.day-head-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.day-head-title{background:none;border:none;color:var(--text);font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;flex:1;min-width:0;padding:0;outline:none}
+.day-type-pill{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:10px;white-space:nowrap}
+.day-head-right{display:flex;gap:6px;align-items:center}
+
+/* EXERCISE CARD */
+.ex-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;overflow:hidden;transition:border-color .2s}
+.ex-card.completed{border-color:rgba(212,245,60,.22);background:rgba(212,245,60,.015)}
+.ex-header{padding:11px 13px;display:flex;align-items:center;gap:9px;cursor:pointer}
+.ex-num-badge{width:22px;height:22px;border-radius:5px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--muted);flex-shrink:0}
+.ex-info{flex:1;min-width:0}
+.ex-name-display{font-size:13px;font-weight:600}
+.ex-muscle-display{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-meta{display:flex;gap:5px;align-items:center;flex-shrink:0}
+.meta-pill{font-size:9px;padding:2px 7px;border-radius:7px;background:var(--surface3);color:var(--muted)}
+.meta-pill.done-pill{background:rgba(212,245,60,.1);color:var(--acc)}
+.expand-arr{color:var(--muted);font-size:13px;transition:transform .2s;flex-shrink:0}
+.ex-card.open .expand-arr{transform:rotate(180deg)}
+
+/* SET AREA */
+.set-area{display:none;border-top:1px solid var(--border)}
+.ex-card.open .set-area{display:block}
+.set-grid-head{display:grid;grid-template-columns:22px 80px 70px 1fr 28px;gap:5px;padding:7px 13px;font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.set-row{display:grid;grid-template-columns:22px 80px 70px 1fr 28px;gap:5px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
+.set-row.sdone{background:rgba(212,245,60,.025)}
+.snum{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);line-height:1;text-align:center}
+.sdone .snum{color:var(--acc)}
+.sinput{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 7px;color:var(--text);font-family:'Archivo',monospace;font-size:12px;font-weight:500;text-align:center;width:100%;outline:none;transition:border-color .2s}
+.sinput:focus{border-color:rgba(212,245,60,.35)}
+.sinput::placeholder{color:#2e2e2e}
+.note-sinput{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 7px;color:var(--muted);font-family:'Archivo',sans-serif;font-size:10px;width:100%;outline:none;transition:border-color .2s;font-style:italic}
+.note-sinput:focus{border-color:rgba(212,245,60,.2);color:var(--text)}
+.note-sinput::placeholder{color:#262626}
+.chk-btn{width:24px;height:24px;border-radius:6px;border:1.5px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .2s;color:var(--muted);margin:0 auto}
+.chk-btn.chk{background:var(--acc);border-color:var(--acc);color:#0c0c0c}
+
+/* EDIT AREA */
+.ex-edit-area{padding:10px 13px;border-top:1px solid rgba(247,201,72,.1);background:rgba(247,201,72,.03)}
+.edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.edit-field label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:4px}
+.edit-input{width:100%;background:var(--surface2);border:1px solid rgba(247,201,72,.15);border-radius:6px;padding:7px 9px;color:var(--text);font-size:12px;outline:none}
+.edit-input:focus{border-color:rgba(247,201,72,.4)}
+
+/* NOTES */
+.ex-notes{padding:9px 13px;border-top:1px solid rgba(255,255,255,.04)}
+.ex-notes label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:5px}
+.ex-notes textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);font-size:11px;outline:none;resize:none;font-style:italic}
+.ex-notes textarea::placeholder{color:#282828}
+
+/* TIP */
+.ex-tip{padding:7px 13px;border-top:1px solid rgba(56,182,255,.08);background:rgba(56,182,255,.03);font-size:10px;color:rgba(56,182,255,.7);display:flex;gap:6px;align-items:flex-start;line-height:1.5}
+.tip-input{background:none;border:none;color:rgba(56,182,255,.7);font-size:10px;width:100%;outline:none;font-style:italic}
+
+/* ADD EX */
+.add-ex-form{background:var(--surface);border:1px dashed rgba(212,245,60,.2);border-radius:var(--r);padding:14px;margin-bottom:6px}
+.add-ex-form h4{font-size:11px;color:var(--acc);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.aef-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.aef-field label{font-size:9px;color:var(--muted);display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px}
+.aef-input{width:100%;background:var(--surface2);border:1px solid rgba(212,245,60,.15);border-radius:6px;padding:7px 9px;color:var(--text);font-size:12px;outline:none}
+.aef-input:focus{border-color:rgba(212,245,60,.4)}
+
+/* REST TIMER */
+.rest-timer{position:fixed;bottom:90px;right:16px;background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 15px;display:none;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.6);min-width:150px}
+.rest-timer.show{display:block}
+.rt-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px}
+.rt-time{font-family:'Bebas Neue',sans-serif;font-size:38px;color:var(--acc);line-height:1}
+.rt-btns{display:flex;gap:5px;margin-top:7px}
+.rt-btn{flex:1;padding:4px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:10px;cursor:pointer}
+
+/* HIIT */
+.hiit-card{background:rgba(255,92,56,.04);border:1px solid rgba(255,92,56,.15);border-radius:var(--r);overflow:hidden}
+.hiit-head{padding:14px 15px;border-bottom:1px solid rgba(255,92,56,.1);display:flex;align-items:center;justify-content:space-between}
+.hiit-head h3{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--acc2);letter-spacing:1px}
+.hiit-body{padding:14px 15px}
+.hiit-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.hg{background:var(--surface);border:1px solid rgba(255,92,56,.1);border-radius:8px;padding:10px;text-align:center}
+.hg .v{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--acc2);line-height:1}
+.hg .l{font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:2px}
+.hiit-start-btn{width:100%;padding:11px;border-radius:8px;background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.25);color:var(--acc2);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;cursor:pointer;transition:all .2s}
+.hiit-start-btn:hover{background:var(--acc2);color:#fff}
+.hiit-live{display:none;text-align:center;padding:12px 0}
+.hiit-live.show{display:block}
+.hiit-phase{font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-bottom:3px}
+.hiit-cd{font-family:'Bebas Neue',sans-serif;font-size:60px;line-height:1}
+.hiit-round{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* REST DAY */
+.rest-card{text-align:center;padding:30px 20px}
+.rest-card .emoji{font-size:44px;margin-bottom:10px}
+.rest-card h3{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--muted);letter-spacing:1px}
+.rest-card p{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.6}
+
+/* FINISH BTN */
+.finish-day-btn{padding:8px 15px;border-radius:20px;background:rgba(212,245,60,.08);border:1px solid rgba(212,245,60,.2);color:var(--acc);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
+.finish-day-btn:hover{background:var(--acc);color:#0c0c0c}
+
+/* NUTRITION */
+.nut-header{padding:18px 16px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.nut-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px}
+.macro-circle-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 0}
+.macro-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
+.macro-box .mv{font-family:'Bebas Neue',sans-serif;font-size:28px;line-height:1}
+.macro-box .ml{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-top:2px}
+.macro-box .mp{font-size:10px;color:var(--muted);margin-top:3px}
+.nut-bar{height:4px;border-radius:2px;margin-top:6px;background:var(--surface3);overflow:hidden}
+.nut-bar-fill{height:100%;border-radius:2px;transition:width .4s}
+.cal-total{margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;align-items:center;justify-content:space-between}
+.cal-total .cv{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1}
+.nut-targets{margin:10px 16px 0}
+.nt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.nt-head h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+.target-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.target-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+.target-box label{font-size:8px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:4px}
+.target-box input{background:none;border:none;color:var(--text);font-family:'Bebas Neue',sans-serif;font-size:20px;text-align:center;outline:none;width:100%}
+.target-box .tu{font-size:9px;color:var(--muted)}
+.meals-section{margin:10px 16px 0}
+.ms-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ms-head h3{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+.meal-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;overflow:hidden}
+.meal-head{padding:10px 13px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.meal-time-inp{font-size:10px;color:var(--muted);background:var(--surface3);padding:2px 8px;border-radius:8px;border:none;outline:none;width:56px;text-align:center}
+.meal-name-inp{background:none;border:none;color:var(--text);font-size:13px;font-weight:600;flex:1;outline:none}
+.meal-name-inp::placeholder{color:var(--muted)}
+.meal-cals{font-size:12px;font-weight:500;color:var(--acc);flex-shrink:0;font-family:'Archivo',monospace}
+.meal-arr{color:var(--muted);font-size:12px;transition:transform .2s;flex-shrink:0}
+.meal-card.open .meal-arr{transform:rotate(180deg)}
+.meal-items{display:none;border-top:1px solid var(--border)}
+.meal-card.open .meal-items{display:block}
+.food-row{display:grid;grid-template-columns:1fr 58px 52px 52px 52px 26px;gap:4px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
+.food-inp{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 6px;color:var(--text);font-size:11px;outline:none;width:100%}
+.food-inp:focus{border-color:rgba(212,245,60,.3)}
+.food-inp::placeholder{color:#282828}
+.food-inp.num{text-align:center;font-family:'Archivo',monospace}
+.food-grid-head{display:grid;grid-template-columns:1fr 58px 52px 52px 52px 26px;gap:4px;padding:5px 13px}
+.fh{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
+.fh:first-child{text-align:left}
+.add-food-btn{margin:8px 13px;padding:6px 12px;border-radius:8px;background:rgba(212,245,60,.06);border:1px dashed rgba(212,245,60,.15);color:rgba(212,245,60,.5);font-size:10px;cursor:pointer;width:calc(100% - 26px);transition:all .2s;text-align:center}
+.add-food-btn:hover{color:var(--acc);border-color:rgba(212,245,60,.3)}
+.del-btn{background:none;border:none;color:#2e2e2e;cursor:pointer;font-size:13px;padding:2px;transition:color .2s}
+.del-btn:hover{color:var(--acc2)}
+.daily-note{margin:10px 16px 0}
+.daily-note label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:5px}
+.daily-note textarea{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-size:12px;outline:none;resize:none;font-style:italic}
+.daily-note textarea::placeholder{color:#282828}
+.water-track{margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.water-track label{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:8px}
+.water-cups{display:flex;gap:6px;flex-wrap:wrap}
+.wcup{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s}
+.wcup.filled{background:rgba(56,182,255,.15);border-color:rgba(56,182,255,.4)}
+.water-lbl{font-size:11px;color:var(--muted);margin-top:7px}
+
+/* HISTORY / STATS */
+.history-header,.stats-header{padding:18px 16px 0}
+.history-header h2,.stats-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;margin-bottom:10px}
+.empty-state{text-align:center;padding:36px 20px;color:var(--muted);font-size:12px;font-style:italic}
+.hist-card{margin:0 16px 6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px}
+.hc-day{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:.3px}
+.hc-date{font-size:10px;color:var(--muted)}
+.hc-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.hcs{font-size:11px;color:var(--muted)}
+.hcs strong{color:var(--text);font-weight:500}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:0 16px;margin-bottom:14px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px}
+.sc-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:5px}
+.sc-val{font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:1;color:var(--acc)}
+.sc-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.pr-section{padding:0 16px}
+.pr-section h3{font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.3px;margin-bottom:8px}
+.pr-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.pr-item:last-child{border-bottom:none}
+.pr-ex{font-size:12px;font-weight:500;flex:1}
+.pr-v{font-family:'Bebas Neue',sans-serif;font-size:17px;color:var(--acc2)}
+.pr-d{font-size:10px;color:var(--muted)}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:12px}
+.loading-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading p{font-size:12px;color:var(--muted);font-style:italic}
+
+/* SYNC INDICATOR */
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--acc);display:inline-block;margin-left:4px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(12,12,12,.97);backdrop-filter:blur(12px);border-top:1px solid var(--border);display:flex;padding:8px 16px 14px;gap:4px;z-index:100}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px;border-radius:8px;cursor:pointer;border:none;background:none;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.4px;transition:all .2s}
+.nav-btn:hover,.nav-btn.active{color:var(--acc)}
+.nav-icon{font-size:17px}
+
+/* SCREENS */
+.screen{display:none}
+.screen.active{display:block}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading" id="loadingScreen">
+  <div class="loading-spinner"></div>
+  <p>Yükleniyor...</p>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen" style="display:none">
+  <div class="auth-screen">
+    <div class="auth-box">
+      <div class="auth-logo">GYM TRACKER</div>
+      <div class="auth-sub">Kişisel fitness & beslenme takibi</div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchAuthTab('login')">Giriş Yap</button>
+        <button class="auth-tab" onclick="switchAuthTab('register')">Kayıt Ol</button>
+      </div>
+      <div id="loginForm">
+        <div class="auth-field"><label>E-posta</label><input class="auth-input" id="loginEmail" type="email" placeholder="ornek@email.com"></div>
+        <div class="auth-field"><label>Şifre</label><input class="auth-input" id="loginPassword" type="password" placeholder="••••••••"></div>
+        <button class="auth-btn" onclick="login()">Giriş Yap</button>
+      </div>
+      <div id="registerForm" style="display:none">
+        <div class="auth-field"><label>Ad Soyad</label><input class="auth-input" id="regName" type="text" placeholder="Ece Yılmaz"></div>
+        <div class="auth-field"><label>E-posta</label><input class="auth-input" id="regEmail" type="email" placeholder="ornek@email.com"></div>
+        <div class="auth-field"><label>Şifre</label><input class="auth-input" id="regPassword" type="password" placeholder="En az 6 karakter"></div>
+        <button class="auth-btn" onclick="register()">Kayıt Ol</button>
+        <div class="auth-info">Kayıt olduktan sonra antrenörün seni sisteme ekleyecek.</div>
+      </div>
+      <div class="auth-err" id="authErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- REST TIMER -->
+<div class="rest-timer" id="restTimer">
+  <div class="rt-lbl">⏱ Dinlenme</div>
+  <div class="rt-time" id="rtDisp">2:00</div>
+  <div class="rt-btns">
+    <button class="rt-btn" onclick="addRest(30)">+30s</button>
+    <button class="rt-btn" onclick="stopRest()">✕</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none">
+  <div class="app-header">
+    <div class="header-left">
+      <h1>GYM TRACKER</h1>
+      <p id="hdDate">...</p>
+    </div>
+    <div class="header-right">
+      <div class="badge" id="clockBadge">--:--</div>
+      <div class="badge streak" id="streakBadge">🔥 0 antrenman</div>
+      <div class="user-badge" id="userBadge">
+        <div class="user-avatar" id="userAvatar" style="background:rgba(212,245,60,0.15);color:#d4f53c">?</div>
+        <span class="user-name" id="userName">...</span>
+        <button class="logout-btn" onclick="logout()">çıkış</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN BANNER -->
+  <div class="admin-banner" id="adminBanner" style="display:none">
+    <p>👑 <strong>Admin Modu</strong> — tüm kullanıcıları görüyorsun</p>
+    <div class="admin-tabs" id="adminTabs"></div>
+  </div>
+
+  <div class="person-bar" id="personBar" style="display:none"></div>
+  <div class="week-grid" id="weekGrid"></div>
+
+  <div class="screen active" id="screen-workout">
+    <div id="profileCard" style="margin:12px 16px 0"></div>
+    <div class="day-tabs" id="dayTabs"></div>
+    <div class="day-content" id="dayContent"></div>
+  </div>
+
+  <div class="screen" id="screen-history">
+    <div class="history-header"><h2>Geçmiş Seanslar</h2></div>
+    <div id="historyList"></div>
+  </div>
+
+  <div class="screen" id="screen-stats">
+    <div class="stats-header"><h2>İstatistikler</h2></div>
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="pr-section"><h3>Kişisel Rekorlar</h3><div id="prList"></div></div>
+  </div>
+
+  <div class="screen" id="screen-nutrition">
+    <div class="nut-header">
+      <h2>Beslenme</h2>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-outline btn-sm" onclick="changeNutDay(-1)">◀</button>
+        <span id="nutDateLbl" style="font-size:11px;color:var(--muted)"></span>
+        <button class="btn btn-outline btn-sm" onclick="changeNutDay(1)">▶</button>
+      </div>
+    </div>
+    <div class="macro-circle-row" id="macroRow"></div>
+    <div class="cal-total" id="calTotal"></div>
+    <div class="nut-targets">
+      <div class="nt-head"><h3>Günlük Hedefler</h3><button class="btn btn-outline btn-sm" onclick="calcMacros()">🧮 Otomatik Hesapla</button></div>
+      <div class="target-row" id="targetRow"></div>
+    </div>
+    <div class="water-track">
+      <label>💧 Su Takibi</label>
+      <div class="water-cups" id="waterCups"></div>
+      <div class="water-lbl" id="waterLbl">0 / 8 bardak</div>
+    </div>
+    <div class="meals-section">
+      <div class="ms-head"><h3>Öğünler</h3><button class="btn btn-acc btn-sm" onclick="addMeal()">+ Öğün Ekle</button></div>
+      <div id="mealsList"></div>
+    </div>
+    <div class="daily-note">
+      <label>Günlük Not</label>
+      <textarea rows="2" placeholder="Nasıl hissettiniz? Açlık, enerji, performans..." id="dailyNoteInp" oninput="saveDailyNote(this.value)"></textarea>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="showScreen('workout',this)"><div class="nav-icon">🏋️</div>Antrenman</button>
+    <button class="nav-btn" onclick="showScreen('nutrition',this)"><div class="nav-icon">🥗</div>Beslenme</button>
+    <button class="nav-btn" onclick="showScreen('history',this)"><div class="nav-icon">📋</div>Geçmiş</button>
+    <button class="nav-btn" onclick="showScreen('stats',this)"><div class="nav-icon">📊</div>İstatistik</button>
+  </div>
+</div>
+
+<script>
+// ── SUPABASE ──
+const SUPA_URL = 'https://iuanbkucwzvldrcksuek.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1YW5ia3Vjd3p2bGRyY2tzdWVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NjM2OTcsImV4cCI6MjA5NjIzOTY5N30.Q9ISn3W_XmwAS0wBLfhs13nLP9GXLrV4sDvH4Io8x7M';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ── ADMIN EMAIL ──
+const ADMIN_EMAIL = 'berkaysimsek1@gmail.com'; // bunu kendi emailinle değiştir!
+
+// ── DEFAULT PROGRAM ──
+const DEFAULT_PROGRAM = [
+  {name:'Gün 1',type:'full',day:'Pazartesi',warmup:null,exercises:[]},
+  {name:'Dinlenme',type:'rest',day:'Salı',warmup:null,exercises:[]},
+  {name:'Gün 2',type:'full',day:'Çarşamba',warmup:null,exercises:[]},
+  {name:'Dinlenme',type:'rest',day:'Perşembe',warmup:null,exercises:[]},
+  {name:'Gün 3',type:'full',day:'Cuma',warmup:null,exercises:[]},
+  {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
+  {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]}
+];
+
+// ── STATE ──
+let currentUser = null;
+let currentProfile = null;
+let allProfiles = [];
+let viewingProfile = null; // admin viewing another user
+let programs = {}; // userId -> program array
+let setCache = {}; // key -> set data
+let nutCache = {}; // userId_date -> nutrition data
+let sessionCache = []; // session logs for current view
+let curDay = 0;
+let editMode = false;
+let restIv = null, restSecs = 0;
+let hiitIv = null, hiitRunning = false, hiitPhase = 'work', hiitRound = 1, hiitSecs = 0;
+let curNutDate = todayStr();
+let saveTimer = {};
+
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function dc(o) { return JSON.parse(JSON.stringify(o)); }
+function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
+function activeProfile() { return viewingProfile || currentProfile; }
+function activeProgram() { return programs[activeProfile()?.id] || DEFAULT_PROGRAM; }
+
+// ── AUTH ──
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.getElementById('loginForm').style.display = tab==='login'?'block':'none';
+  document.getElementById('registerForm').style.display = tab==='register'?'block':'none';
+  document.getElementById('authErr').classList.remove('show');
+}
+
+function showAuthErr(msg) {
+  const el = document.getElementById('authErr');
+  el.textContent = msg; el.classList.add('show');
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if(!email||!password) return showAuthErr('E-posta ve şifre gerekli');
+  const btn = document.querySelector('#loginForm .auth-btn');
+  btn.disabled = true; btn.textContent = 'Giriş yapılıyor...';
+  const {error} = await sb.auth.signInWithPassword({email, password});
+  btn.disabled = false; btn.textContent = 'Giriş Yap';
+  if(error) showAuthErr('Hatalı e-posta veya şifre');
+}
+
+async function register() {
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  if(!name||!email||!password) return showAuthErr('Tüm alanlar zorunlu');
+  if(password.length < 6) return showAuthErr('Şifre en az 6 karakter olmalı');
+  const btn = document.querySelector('#registerForm .auth-btn');
+  btn.disabled = true; btn.textContent = 'Kayıt olunuyor...';
+  const {error} = await sb.auth.signUp({email, password, options:{data:{name}}});
+  btn.disabled = false; btn.textContent = 'Kayıt Ol';
+  if(error) showAuthErr(error.message);
+  else showAuthErr('✅ Kayıt başarılı! Antrenörün seni aktive edecek. Şimdi giriş yapabilirsin.');
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  window.location.reload();
+}
+
+// ── INIT ──
+async function init() {
+  document.getElementById('loadingScreen').style.display = 'flex';
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session) { showAuthUI(); return; }
+  currentUser = session.user;
+  await loadProfile();
+}
+
+function showAuthUI() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'block';
+}
+
+async function loadProfile() {
+  const {data} = await sb.auth.getUser();
+  if(!data?.user) { showAuthUI(); return; }
+  currentUser = data.user;
+
+  // Load own profile
+  let {data: prof} = await sb.supabase?.from('profiles').select('*').eq('id', currentUser.id).single().catch(()=>({})) || {};
+  if(!prof) {
+    // create profile if not exists
+    const name = currentUser.user_metadata?.name || currentUser.email.split('@')[0];
+    await sb.from('profiles').upsert({id: currentUser.id, name, role: isAdmin()?'admin':'user'});
+    const {data: p2} = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+    prof = p2;
+  }
+  currentProfile = prof;
+  viewingProfile = prof;
+
+  // Admin: load all profiles
+  if(isAdmin()) {
+    const {data: all} = await sb.from('profiles').select('*').order('created_at');
+    allProfiles = all || [currentProfile];
+  }
+
+  await loadProgramForUser(currentProfile.id);
+  await loadSessionLogs(currentProfile.id);
+  showMainApp();
+}
+
+async function loadProgramForUser(userId) {
+  const {data} = await sb.from('programs').select('program_data').eq('user_id', userId).single();
+  programs[userId] = data?.program_data || dc(DEFAULT_PROGRAM);
+}
+
+async function loadSessionLogs(userId) {
+  const {data} = await sb.from('session_logs').select('*').eq('user_id', userId).order('logged_at', {ascending:false}).limit(50);
+  sessionCache = data || [];
+}
+
+async function loadSetsForDay(userId, dayIdx) {
+  const {data} = await sb.from('workout_sets').select('*').eq('user_id', userId).eq('day_index', dayIdx);
+  (data||[]).forEach(row => {
+    const k = `${userId}_${dayIdx}_${row.exercise_index}_${row.set_index}`;
+    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: row.done, ts: row.done_at, db_id: row.id};
+  });
+}
+
+async function loadNutrition(userId, date) {
+  const k = `${userId}_${date}`;
+  if(nutCache[k]) return nutCache[k];
+  const {data} = await sb.from('nutrition_logs').select('data').eq('user_id', userId).eq('date', date).single();
+  nutCache[k] = data?.data || {meals:[], water:0, note:'', targets:{kcal:2000,protein:150,carb:200,fat:70}};
+  return nutCache[k];
+}
+
+async function saveNutrition(userId, date) {
+  const k = `${userId}_${date}`;
+  const nd = nutCache[k];
+  if(!nd) return;
+  await sb.from('nutrition_logs').upsert({user_id: userId, date, data: nd}, {onConflict: 'user_id,date'});
+}
+
+async function saveProgram(userId) {
+  await sb.from('programs').upsert({user_id: userId, program_data: programs[userId], updated_at: new Date().toISOString()}, {onConflict: 'user_id'});
+}
+
+async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
+  const k = `${userId}_${dayIdx}_${exIdx}_${setIdx}`;
+  if(!setCache[k]) setCache[k] = {};
+  Object.assign(setCache[k], fields);
+  // debounce save
+  clearTimeout(saveTimer[k]);
+  saveTimer[k] = setTimeout(async () => {
+    const row = {user_id: userId, day_index: dayIdx, exercise_index: exIdx, set_index: setIdx, ...fields};
+    if(setCache[k].db_id) {
+      await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
+    } else {
+      const {data} = await sb.from('workout_sets').upsert(row, {onConflict: 'user_id,day_index,exercise_index,set_index'}).select().single();
+      if(data) setCache[k].db_id = data.id;
+    }
+  }, 800);
+}
+
+function showMainApp() {
+  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+
+  // Header
+  const now = new Date();
+  document.getElementById('hdDate').textContent = now.toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
+  setInterval(()=>{document.getElementById('clockBadge').textContent = new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});},1000);
+  document.getElementById('clockBadge').textContent = now.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'});
+
+  // User badge
+  const p = currentProfile;
+  document.getElementById('userAvatar').textContent = (p?.name||'?')[0].toUpperCase();
+  document.getElementById('userName').textContent = p?.name || currentUser.email;
+
+  // Admin setup
+  if(isAdmin()) {
+    document.getElementById('adminBanner').style.display = 'flex';
+    renderAdminTabs();
+  }
+
+  renderAll();
+}
+
+function renderAdminTabs() {
+  const tabs = document.getElementById('adminTabs');
+  const profiles = allProfiles.length ? allProfiles : [currentProfile];
+  tabs.innerHTML = profiles.map(p =>
+    `<button class="admin-tab${p.id===activeProfile()?.id?' active':''}" onclick="switchViewUser('${p.id}')">${p.name||p.id.substring(0,6)}</button>`
+  ).join('');
+}
+
+async function switchViewUser(userId) {
+  const p = allProfiles.find(x => x.id === userId);
+  if(!p) return;
+  viewingProfile = p;
+  if(!programs[userId]) await loadProgramForUser(userId);
+  await loadSessionLogs(userId);
+  curDay = 0; editMode = false;
+  renderAdminTabs();
+  renderAll();
+}
+
+// ── RENDER ──
+async function renderAll() {
+  const p = activeProfile();
+  if(!p) return;
+  renderWeekGrid();
+  renderProfile(p);
+  renderDayTabs();
+  await renderDayContent(curDay);
+  document.getElementById('streakBadge').textContent = `🔥 ${sessionCache.length} antrenman`;
+}
+
+function renderWeekGrid() {
+  const prog = activeProgram();
+  const days = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+  const today = new Date().getDay();
+  document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
+    const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
+    let dc = 'rest-d', lbl = 'Rest';
+    if(day.type!=='rest'){dc='gym';lbl='Gym'}
+    if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
+    if(i===today){dc='today-d';lbl='Bugün'}
+    return `<div class="wday${i===today?' today':''}" onclick="selDW(${pi})"><div class="wday-name">${d}</div><div class="wday-dot ${dc}"></div><div class="wday-lbl">${lbl}</div></div>`;
+  }).join('');
+}
+function selDW(i){curDay=i;showScreen('workout',document.querySelector('.nav-btn'));renderAll();}
+
+function renderProfile(p) {
+  const color = p.color||'#d4f53c', bg = `rgba(212,245,60,0.12)`;
+  document.getElementById('profileCard').innerHTML = `
+    <div class="p-av-big" style="background:${bg};color:${color}">${(p.name||'?')[0].toUpperCase()}</div>
+    <div style="flex:1;min-width:0">
+      <h3 style="font-size:14px;font-weight:600">${p.name||'İsimsiz'}</h3>
+      <p style="font-size:11px;color:var(--muted);margin-top:1px">${p.weight||'—'} kg</p>
+      <div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${p.goal||'Hedef belirlenmedi'}</div>
+    </div>
+    <div class="p-stats">
+      <div class="pstat"><div class="val" style="color:${color}">${p.weight||'—'}</div><div class="lbl">Şimdi</div></div>
+      ${p.target_weight?`<div class="pstat"><div class="val" style="color:${color}">${p.target_weight}</div><div class="lbl">Hedef</div></div>`:''}
+    </div>`;
+}
+
+function renderDayTabs() {
+  const prog = activeProgram();
+  document.getElementById('dayTabs').innerHTML = prog.map((day,i) => {
+    let cls = '';
+    if(i===curDay) cls='active';
+    else if(day.type==='rest') cls='rest-day';
+    else if(day.type==='hiit'||day.type==='cardio') cls='hiit-day';
+    return `<button class="dtab ${cls}" onclick="selDay(${i})">${day.day.substring(0,3)} — ${day.name.substring(0,10)}${day.name.length>10?'…':''}</button>`;
+  }).join('');
+}
+async function selDay(i){curDay=i;editMode=false;renderDayTabs();await renderDayContent(i);}
+
+async function renderDayContent(di) {
+  const prog = activeProgram(), day = prog[di], el = document.getElementById('dayContent');
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+
+  // Load sets for this day
+  await loadSetsForDay(uid, di);
+
+  if(day.type==='rest') {
+    el.innerHTML = `<div class="rest-card"><div class="emoji">😴</div><h3>Dinlenme Günü</h3><p>Kasların büyür, dinlenirsin.<br>Protein alımına dikkat et 💪</p>
+    ${canEdit()?`<div style="margin-top:14px"><button class="btn btn-outline btn-sm" onclick="changeDayType(${di},'full')">+ Antrenman Günü Yap</button></div>`:''}
+    </div>`;
+    return;
+  }
+  if(day.type==='hiit'||day.type==='cardio') { renderHIITDay(el,day,di); return; }
+
+  const total = day.exercises.reduce((s,e)=>s+e.sets,0);
+  let doneSets = 0;
+  day.exercises.forEach((ex,ei)=>{for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)doneSets++;}});
+  const pct = total>0?Math.round(doneSets/total*100):0;
+
+  let html = `<div class="day-head-row">
+    <div class="day-head-left">
+      <input class="day-head-title" value="${day.name}" ${canEdit()?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id)">
+      <span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">${day.type.toUpperCase()}</span>
+    </div>
+    <div class="day-head-right">
+      <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
+      ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+      <button class="finish-day-btn" onclick="finishDay(${di})">✓ Bitir</button>
+    </div>
+  </div>`;
+
+  if(editMode) {
+    html += `<div class="edit-banner"><p>✏️ <strong>Düzenleme Modu</strong> — egzersiz ekle, sil, düzenle.</p>
+    <button class="btn btn-danger btn-sm" onclick="clearDaySets(${di})">Setleri Sıfırla</button></div>`;
+  }
+
+  if(day.warmup!==null||editMode) {
+    html += `<div class="warmup-row">🔥 <input value="${day.warmup||''}" placeholder="Isınma ekle..." ${canEdit()&&editMode?'':'readonly'} style="${!(canEdit()&&editMode)?'pointer-events:none':''}" onchange="prog[${di}].warmup=this.value;saveProgram(activeProfile().id)"></div>`;
+  }
+
+  html += '<div id="exList"></div>';
+
+  if(editMode&&canEdit()) {
+    html += `<div class="add-ex-form"><h4>+ Yeni Egzersiz Ekle</h4>
+    <div class="aef-grid">
+      <div class="aef-field"><label>Egzersiz Adı *</label><input class="aef-input" id="aef-name" placeholder="ör: Hip Thrust"></div>
+      <div class="aef-field"><label>Kas Grubu</label><input class="aef-input" id="aef-muscle" placeholder="ör: Glute Maximus"></div>
+      <div class="aef-field"><label>Set Sayısı</label><input class="aef-input" id="aef-sets" type="number" min="1" max="10" value="3"></div>
+      <div class="aef-field"><label>Tekrar (ör: 12-10-8)</label><input class="aef-input" id="aef-reps" placeholder="12"></div>
+      <div class="aef-field"><label>Dinlenme (sn)</label><input class="aef-input" id="aef-rest" type="number" value="90"></div>
+      <div class="aef-field"><label>Koç İpucu</label><input class="aef-input" id="aef-tip" placeholder="ör: Son sette failure"></div>
+    </div>
+    <button class="btn btn-acc" onclick="addEx(${di})">+ Egzersiz Ekle</button></div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="changeDayType(${di},'hiit')">→ HIIT Günü</button>
+      <button class="btn btn-outline btn-sm" onclick="changeDayType(${di},'rest')">→ Dinlenme Günü</button>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+  const exList = document.getElementById('exList');
+  day.exercises.forEach((ex,ei) => exList.appendChild(buildExCard(ex,di,ei)));
+}
+
+function canEdit() { return isAdmin() || currentProfile?.id === activeProfile()?.id; }
+
+function buildExCard(ex, di, ei) {
+  const uid = activeProfile()?.id;
+  let done = 0;
+  for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)done++;}
+  const comp = done===ex.sets&&ex.sets>0;
+  const card = document.createElement('div');
+  card.className = `ex-card${comp?' completed':''}`;
+  card.id = `ec_${di}_${ei}`;
+  let setRows = '';
+  for(let s=0;s<ex.sets;s++){
+    const k=`${uid}_${di}_${ei}_${s}`,sd=setCache[k]||{},isDone=!!sd.done;
+    setRows += `<div class="set-row${isDone?' sdone':''}" id="sr_${k}">
+      <div class="snum">${s+1}</div>
+      <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
+      <input class="sinput" type="text" placeholder="${ex.reps.split(/[-,]/)[0]||'rep'}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
+      <input class="note-sinput" type="text" placeholder="not..." value="${sd.note||''}" oninput="qSave('${uid}',${di},${ei},${s},'note',this.value)">
+      <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?'✓':'○'}</button>
+    </div>`;
+  }
+  const editArea = editMode&&canEdit()?`<div class="ex-edit-area"><div class="edit-grid">
+    <div class="edit-field"><label>Egzersiz Adı</label><input class="edit-input" value="${ex.name}" onchange="ex.name=this.value;saveProgram(activeProfile().id)"></div>
+    <div class="edit-field"><label>Kas Grubu</label><input class="edit-input" value="${ex.muscle}" onchange="ex.muscle=this.value;saveProgram(activeProfile().id)"></div>
+    <div class="edit-field"><label>Set</label><input class="edit-input" type="number" min="1" max="10" value="${ex.sets}" onchange="ex.sets=parseInt(this.value)||1;saveProgram(activeProfile().id);renderDayContent(${di})"></div>
+    <div class="edit-field"><label>Tekrar</label><input class="edit-input" value="${ex.reps}" onchange="ex.reps=this.value;saveProgram(activeProfile().id)"></div>
+    <div class="edit-field"><label>Dinlenme (sn)</label><input class="edit-input" type="number" value="${ex.restSec}" onchange="ex.restSec=parseInt(this.value)||60;saveProgram(activeProfile().id)"></div>
+    <div class="edit-field" style="display:flex;align-items:flex-end"><button class="btn btn-danger btn-sm" onclick="delEx(${di},${ei})">🗑 Egzersizi Sil</button></div>
+  </div></div>`:'';
+  card.innerHTML = `<div class="ex-header" onclick="toggleEC('ec_${di}_${ei}')">
+    <div class="ex-num-badge">${ei+1}</div>
+    <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display">${ex.muscle}</div></div>
+    <div class="ex-meta">
+      <div class="meta-pill${comp?' done-pill':''}" id="mp_${di}_${ei}">${done}/${ex.sets}</div>
+      <div class="meta-pill">${ex.reps}×${ex.sets}</div>
+    </div>
+    <div class="expand-arr">⌄</div>
+  </div>
+  <div class="set-area">
+    <div class="set-grid-head"><div>Set</div><div style="text-align:center">KG</div><div style="text-align:center">Tekrar</div><div>Not</div><div></div></div>
+    ${setRows}${editArea}
+    <div class="ex-notes"><label>Egzersiz Notu</label>
+      <textarea rows="1" placeholder="Genel not..." oninput="qSave('${uid}',${di},${ei},-1,'note',this.value)">${setCache[`exn_${uid}_${di}_${ei}`]||''}</textarea>
+    </div>
+    ${ex.tip?`<div class="ex-tip"><span>💡</span><span>${ex.tip}</span></div>`:''}
+  </div>`;
+  return card;
+}
+
+function toggleEC(id){document.getElementById(id)?.classList.toggle('open');}
+
+function qSave(uid,di,ei,si,field,val){
+  if(si===-1){setCache[`exn_${uid}_${di}_${ei}`]=val;return;}
+  saveSet(uid,di,ei,si,{[field]:val});
+}
+
+async function toggleSet(uid,di,ei,si,rs){
+  const k=`${uid}_${di}_${ei}_${si}`;
+  if(!setCache[k])setCache[k]={};
+  const sw=document.getElementById('sw_'+k),sr=document.getElementById('sr2_'+k);
+  const fields={};
+  if(sw&&sw.value)fields.weight=parseFloat(sw.value);
+  if(sr&&sr.value)fields.reps=sr.value;
+  const newDone=!setCache[k].done;
+  fields.done=newDone;
+  if(newDone){fields.done_at=new Date().toISOString();if(rs>0)startRest(rs);}
+  await saveSet(uid,di,ei,si,fields);
+  const row=document.getElementById('sr_'+k),btn=document.getElementById('cb_'+k);
+  if(newDone){row?.classList.add('sdone');if(btn){btn.classList.add('chk');btn.textContent='✓';}}
+  else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='○';}}
+  const ex=activeProgram()[di].exercises[ei];let done=0;
+  for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)done++;}
+  const mp=document.getElementById(`mp_${di}_${ei}`);if(mp){mp.textContent=`${done}/${ex.sets}`;mp.className=`meta-pill${done===ex.sets?' done-pill':''}`;}
+  done===ex.sets?document.getElementById(`ec_${di}_${ei}`)?.classList.add('completed'):document.getElementById(`ec_${di}_${ei}`)?.classList.remove('completed');
+  renderDayTabs();
+}
+
+function toggleEdit(){editMode=!editMode;renderDayContent(curDay);}
+
+function changeDayType(di,type){
+  const prog=activeProgram();
+  prog[di].type=type;
+  if(type==='rest'||type==='hiit'||type==='cardio')prog[di].exercises=[];
+  if(type==='hiit'||type==='cardio')prog[di].hiit={work:40,rest:20,rounds:8};
+  saveProgram(activeProfile().id);
+  renderDayContent(di);renderDayTabs();
+}
+
+function delEx(di,ei){
+  if(!confirm(`"${activeProgram()[di].exercises[ei].name}" silinsin mi?`))return;
+  activeProgram()[di].exercises.splice(ei,1);
+  saveProgram(activeProfile().id);renderDayContent(di);
+}
+
+function addEx(di){
+  const name=document.getElementById('aef-name')?.value.trim();
+  if(!name)return alert('Egzersiz adı zorunlu!');
+  activeProgram()[di].exercises.push({
+    name,muscle:document.getElementById('aef-muscle')?.value.trim()||'',
+    sets:parseInt(document.getElementById('aef-sets')?.value)||3,
+    reps:document.getElementById('aef-reps')?.value.trim()||'12',
+    restSec:parseInt(document.getElementById('aef-rest')?.value)||90,
+    tip:document.getElementById('aef-tip')?.value.trim()||null
+  });
+  saveProgram(activeProfile().id);renderDayContent(di);
+}
+
+async function clearDaySets(di){
+  if(!confirm('Bu günün tüm set kayıtları silinsin mi?'))return;
+  const uid=activeProfile()?.id;
+  await sb.from('workout_sets').delete().eq('user_id',uid).eq('day_index',di);
+  // clear cache
+  Object.keys(setCache).filter(k=>k.startsWith(`${uid}_${di}_`)).forEach(k=>delete setCache[k]);
+  renderDayContent(di);
+}
+
+async function finishDay(di){
+  const prog=activeProgram()[di],uid=activeProfile()?.id;
+  let vol=0,sets=0;
+  prog.exercises.forEach((ex,ei)=>{
+    for(let s=0;s<ex.sets;s++){
+      const d=setCache[`${uid}_${di}_${ei}_${s}`]||{};
+      if(d.done){sets++;vol+=parseFloat(d.weight||0)*parseInt(d.reps?.split(/[-,]/)[0]||ex.reps.split(/[-,]/)[0]||10);}
+    }
+  });
+  await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:Math.round(vol)});
+  await loadSessionLogs(uid);
+  document.getElementById('streakBadge').textContent=`🔥 ${sessionCache.length} antrenman`;
+  alert(`💪 ${prog.name} tamamlandı!\n${sets} set · ${Math.round(vol)} kg toplam hacim`);
+}
+
+function renderHIITDay(el,day,di){
+  const h=day.hiit||{work:40,rest:20,rounds:8};
+  el.innerHTML=`<div class="day-head-row">
+    <input class="day-head-title" value="${day.name}" ${canEdit()&&editMode?'':'readonly'} onchange="activeProgram()[${di}].name=this.value;saveProgram(activeProfile().id)">
+    ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+  </div>
+  <div class="hiit-card"><div class="hiit-head"><h3>⚡ ${day.name}</h3><span style="font-size:10px;color:var(--muted)">${day.day}</span></div>
+  <div class="hiit-body">
+    <div class="hiit-g">
+      <div class="hg"><div class="v">${h.work}</div><div class="l">Çalışma sn</div></div>
+      <div class="hg"><div class="v">${h.rest||'—'}</div><div class="l">Dinlenme sn</div></div>
+      <div class="hg"><div class="v">${h.rounds}</div><div class="l">Round</div></div>
+    </div>
+    <div class="hiit-live" id="hiitLive"><div class="hiit-phase" id="hiitPhL">ÇALIŞMA</div><div class="hiit-cd" id="hiitCd">0:40</div><div class="hiit-round" id="hiitRndL">Round 1/${h.rounds}</div></div>
+    <button class="hiit-start-btn" id="hiitBtn" onclick="toggleHIIT(${di})">▶ BAŞLAT</button>
+    <div style="margin-top:10px"><textarea rows="2" style="width:100%;background:var(--surface2);border:1px solid rgba(255,92,56,.1);border-radius:6px;padding:8px 10px;color:var(--text);font-size:11px;outline:none;resize:none;font-style:italic" placeholder="HIIT notun..."></textarea></div>
+  </div></div>`;
+}
+
+function toggleHIIT(di){
+  const h=activeProgram()[di].hiit||{work:40,rest:20,rounds:8};
+  if(!hiitRunning){hiitRunning=true;hiitPhase='work';hiitRound=1;hiitSecs=h.work;document.getElementById('hiitLive')?.classList.add('show');document.getElementById('hiitBtn').textContent='■ DURDUR';hiitIv=setInterval(()=>tickH(h),1000);tickH(h);}
+  else{hiitRunning=false;clearInterval(hiitIv);document.getElementById('hiitLive')?.classList.remove('show');document.getElementById('hiitBtn').textContent='▶ BAŞLAT';}
+}
+function tickH(h){
+  const pl=document.getElementById('hiitPhL'),cd=document.getElementById('hiitCd'),rl=document.getElementById('hiitRndL');if(!pl)return;
+  const m=Math.floor(hiitSecs/60),s=hiitSecs%60;
+  cd.textContent=`${m}:${s.toString().padStart(2,'0')}`;cd.style.color=hiitPhase==='work'?'var(--acc2)':'var(--acc3)';
+  pl.textContent=hiitPhase==='work'?'ÇALIŞMA':'DİNLENME';pl.style.color=cd.style.color;
+  rl.textContent=`Round ${hiitRound}/${h.rounds}`;hiitSecs--;
+  if(hiitSecs<0){
+    if(hiitPhase==='work'&&h.rest>0){hiitPhase='rest';hiitSecs=h.rest;}
+    else{hiitRound++;if(hiitRound>h.rounds){hiitRunning=false;clearInterval(hiitIv);document.getElementById('hiitBtn').textContent='✓ TAMAMLANDI!';document.getElementById('hiitLive')?.classList.remove('show');return;}hiitPhase='work';hiitSecs=h.work;}
+  }
+}
+
+function startRest(s){stopRest();restSecs=s;document.getElementById('restTimer').classList.add('show');updRT();restIv=setInterval(()=>{restSecs--;if(restSecs<=0){stopRest();return;}updRT();},1000);}
+function updRT(){const m=Math.floor(restSecs/60),s=restSecs%60;document.getElementById('rtDisp').textContent=`${m}:${s.toString().padStart(2,'0')}`;}
+function stopRest(){clearInterval(restIv);document.getElementById('restTimer').classList.remove('show');}
+function addRest(s){restSecs+=s;updRT();}
+
+// ── HISTORY ──
+function renderHistory(){
+  const el=document.getElementById('historyList');
+  el.innerHTML=!sessionCache.length?'<div class="empty-state">Henüz tamamlanan antrenman yok.</div>':
+  sessionCache.map(l=>`<div class="hist-card"><div class="hc-day">${l.day_name}</div><div class="hc-date">${new Date(l.logged_at).toLocaleDateString('tr-TR')}</div>
+  <div class="hc-stats"><span class="hcs"><strong>${l.sets_done}</strong> set</span><span class="hcs"><strong>${l.volume}</strong> kg hacim</span></div></div>`).join('');
+}
+
+// ── STATS ──
+function renderStats(){
+  const p=activeProfile();
+  const tv=sessionCache.reduce((s,l)=>s+(l.volume||0),0);
+  const ts=sessionCache.reduce((s,l)=>s+(l.sets_done||0),0);
+  const color=p?.color||'#d4f53c';
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat-card"><div class="sc-lbl">Toplam Antrenman</div><div class="sc-val" style="color:${color}">${sessionCache.length}</div><div class="sc-sub">seans</div></div>
+    <div class="stat-card"><div class="sc-lbl">Toplam Set</div><div class="sc-val" style="color:${color}">${ts}</div><div class="sc-sub">tamamlandı</div></div>
+    <div class="stat-card"><div class="sc-lbl">Toplam Hacim</div><div class="sc-val" style="color:${color}">${(tv/1000).toFixed(1)}k</div><div class="sc-sub">kg kaldırıldı</div></div>
+    <div class="stat-card"><div class="sc-lbl">Ort. Hacim</div><div class="sc-val" style="color:${color}">${sessionCache.length?Math.round(tv/sessionCache.length):0}</div><div class="sc-sub">kg/seans</div></div>`;
+  // PRs from set cache
+  const prs={};
+  activeProgram().forEach((day,di)=>day.exercises.forEach((ex,ei)=>{
+    for(let s=0;s<ex.sets;s++){const d=setCache[`${p?.id}_${di}_${ei}_${s}`]||{};if(d.weight&&parseFloat(d.weight)>0&&(!prs[ex.name]||parseFloat(d.weight)>parseFloat(prs[ex.name].w)))prs[ex.name]={w:d.weight,d:d.done_at?new Date(d.done_at).toLocaleDateString('tr-TR'):'—'};}
+  }));
+  const keys=Object.keys(prs);
+  document.getElementById('prList').innerHTML=keys.length?keys.map(n=>`<div class="pr-item"><div class="pr-ex">${n}</div><div class="pr-v">${prs[n].w} kg</div><div class="pr-d">${prs[n].d}</div></div>`).join(''):'<div class="empty-state">Henüz ağırlık girilmedi.</div>';
+}
+
+// ── NUTRITION ──
+function changeNutDay(d){const dt=new Date(curNutDate);dt.setDate(dt.getDate()+d);curNutDate=dt.toISOString().split('T')[0];renderNutrition();}
+async function saveDailyNote(v){const nd=await loadNutrition(activeProfile()?.id,curNutDate);nd.note=v;saveNutrition(activeProfile()?.id,curNutDate);}
+
+async function renderNutrition(){
+  const uid=activeProfile()?.id;if(!uid)return;
+  const nd=await loadNutrition(uid,curNutDate);
+  const dt=new Date(curNutDate);
+  document.getElementById('nutDateLbl').textContent=dt.toLocaleDateString('tr-TR',{weekday:'short',day:'numeric',month:'short'});
+  let tk=0,tp=0,tc=0,tf=0;
+  nd.meals?.forEach(m=>m.foods?.forEach(f=>{tk+=parseFloat(f.kcal||0);tp+=parseFloat(f.protein||0);tc+=parseFloat(f.carb||0);tf+=parseFloat(f.fat||0);}));
+  tk=Math.round(tk);tp=Math.round(tp);tc=Math.round(tc);tf=Math.round(tf);
+  const t=nd.targets||{kcal:2000,protein:150,carb:200,fat:70};
+  document.getElementById('macroRow').innerHTML=`
+    <div class="macro-box"><div class="mv" style="color:#ef4444">${tp}g</div><div class="ml">Protein</div><div class="mp">${t.protein}g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:${Math.min(100,Math.round(tp/t.protein*100))}%;background:#ef4444"></div></div></div>
+    <div class="macro-box"><div class="mv" style="color:#f59e0b">${tc}g</div><div class="ml">Karbonhidrat</div><div class="mp">${t.carb}g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:${Math.min(100,Math.round(tc/t.carb*100))}%;background:#f59e0b"></div></div></div>
+    <div class="macro-box"><div class="mv" style="color:#8b5cf6">${tf}g</div><div class="ml">Yağ</div><div class="mp">${t.fat}g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:${Math.min(100,Math.round(tf/t.fat*100))}%;background:#8b5cf6"></div></div></div>`;
+  const pct=Math.min(100,Math.round(tk/t.kcal*100));
+  document.getElementById('calTotal').innerHTML=`<div><div class="cv" style="color:${pct>100?'var(--acc2)':'var(--acc)'}">${tk}</div><div style="font-size:11px;color:var(--muted)">/ ${t.kcal} kcal (${pct}%)</div></div>
+  <div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${t.kcal-tk<0?'var(--acc2)':'var(--muted)'}">${t.kcal-tk}</div></div>`;
+  document.getElementById('targetRow').innerHTML=`
+    <div class="target-box"><label>Kalori</label><input value="${t.kcal}" type="number" onchange="updateTarget('kcal',this.value)"><div class="tu">kcal</div></div>
+    <div class="target-box"><label>Protein</label><input value="${t.protein}" type="number" onchange="updateTarget('protein',this.value)"><div class="tu">gram</div></div>
+    <div class="target-box"><label>Karb</label><input value="${t.carb}" type="number" onchange="updateTarget('carb',this.value)"><div class="tu">gram</div></div>
+    <div class="target-box"><label>Yağ</label><input value="${t.fat}" type="number" onchange="updateTarget('fat',this.value)"><div class="tu">gram</div></div>`;
+  const wc=nd.water||0;
+  document.getElementById('waterCups').innerHTML=Array.from({length:8},(_,i)=>`<div class="wcup${i<wc?' filled':''}" onclick="toggleW(${i})">💧</div>`).join('');
+  document.getElementById('waterLbl').textContent=`${wc} / 8 bardak — ${wc*250}ml`;
+  renderMeals(nd);
+  const noteEl=document.getElementById('dailyNoteInp');if(noteEl)noteEl.value=nd.note||'';
+}
+
+async function updateTarget(field,val){
+  const uid=activeProfile()?.id;const nd=await loadNutrition(uid,curNutDate);nd.targets[field]=parseFloat(val)||0;saveNutrition(uid,curNutDate);renderNutrition();}
+async function toggleW(i){const uid=activeProfile()?.id;const nd=await loadNutrition(uid,curNutDate);nd.water=(nd.water===i+1)?i:i+1;saveNutrition(uid,curNutDate);renderNutrition();}
+
+async function calcMacros(){
+  const p=activeProfile(),w=p?.weight||70,protein=Math.round(w*2),fat=Math.round(w*1);
+  let kcal=p?.goal?.includes('ver')?Math.round(w*28):p?.goal?.includes('kas')||p?.goal?.includes('al')?Math.round(w*35):Math.round(w*30);
+  const carb=Math.round(Math.max(0,(kcal-protein*4-fat*9)/4));
+  const uid=p?.id;const nd=await loadNutrition(uid,curNutDate);nd.targets={kcal,protein,carb,fat};saveNutrition(uid,curNutDate);renderNutrition();
+  alert(`Hedefler güncellendi!\n${kcal} kcal · ${protein}g protein · ${carb}g karb · ${fat}g yağ`);
+}
+
+function renderMeals(nd){
+  const el=document.getElementById('mealsList');
+  if(!nd.meals?.length){el.innerHTML='<div class="empty-state">Henüz öğün eklenmedi.</div>';return;}
+  el.innerHTML=nd.meals.map((meal,mi)=>{
+    let mc=0;meal.foods?.forEach(f=>mc+=parseFloat(f.kcal||0));
+    const foods=(meal.foods||[]).map((f,fi)=>`<div class="food-row">
+      <input class="food-inp" placeholder="ör: Tavuk göğsü" value="${f.name||''}" onchange="updFood(${mi},${fi},'name',this.value)">
+      <input class="food-inp num" placeholder="100g" type="number" value="${f.amount||''}" onchange="updFood(${mi},${fi},'amount',this.value)">
+      <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" onchange="updFood(${mi},${fi},'kcal',this.value)">
+      <input class="food-inp num" placeholder="P" type="number" value="${f.protein||''}" onchange="updFood(${mi},${fi},'protein',this.value)">
+      <input class="food-inp num" placeholder="K" type="number" value="${f.carb||''}" onchange="updFood(${mi},${fi},'carb',this.value)">
+      <button class="del-btn" onclick="delFood(${mi},${fi})">✕</button>
+    </div>`).join('');
+    return `<div class="meal-card${meal.open?' open':''}">
+      <div class="meal-head" onclick="toggleMeal(${mi})">
+        <input class="meal-time-inp" value="${meal.time||''}" placeholder="00:00" onclick="event.stopPropagation()" onchange="updMeal(${mi},'time',this.value)">
+        <input class="meal-name-inp" placeholder="Öğün adı..." value="${meal.name||''}" onclick="event.stopPropagation()" onchange="updMeal(${mi},'name',this.value)">
+        <div class="meal-cals">${Math.round(mc)} kcal</div>
+        <button class="del-btn" onclick="event.stopPropagation();delMeal(${mi})">🗑</button>
+        <div class="meal-arr">⌄</div>
+      </div>
+      <div class="meal-items">
+        <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Kcal</div><div class="fh">Prot</div><div class="fh">Karb</div><div class="fh"></div></div>
+        ${foods}
+        <div class="add-food-btn" onclick="addFood(${mi})">+ Besin Ekle</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function getNd(){return await loadNutrition(activeProfile()?.id,curNutDate);}
+async function updMeal(mi,f,v){const nd=await getNd();nd.meals[mi][f]=v;saveNutrition(activeProfile()?.id,curNutDate);}
+async function delMeal(mi){if(!confirm('Öğün silinsin mi?'))return;const nd=await getNd();nd.meals.splice(mi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
+async function updFood(mi,fi,f,v){const nd=await getNd();nd.meals[mi].foods[fi][f]=v;saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
+async function delFood(mi,fi){const nd=await getNd();nd.meals[mi].foods.splice(fi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
+async function addFood(mi){const nd=await getNd();nd.meals[mi].foods.push({name:'',amount:'',kcal:'',protein:'',carb:''});nd.meals[mi].open=true;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
+async function toggleMeal(mi){const nd=await getNd();nd.meals[mi].open=!nd.meals[mi].open;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
+async function addMeal(){
+  const nd=await getNd();const h=new Date().getHours(),m=new Date().getMinutes();
+  nd.meals.push({name:'Öğün '+(nd.meals.length+1),time:`${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`,foods:[],open:true});
+  saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();
+}
+
+// ── NAV ──
+function showScreen(name,btn){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='history')renderHistory();
+  if(name==='stats')renderStats();
+  if(name==='nutrition')renderNutrition();
+}
+
+// ── AUTH LISTENER ──
+sb.auth.onAuthStateChange((event, session) => {
+  if(event==='SIGNED_IN'&&session&&!currentUser){
+    currentUser=session.user;loadProfile();
+  } else if(event==='SIGNED_OUT'){
+    currentUser=null;currentProfile=null;
+    document.getElementById('mainApp').style.display='none';
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('authScreen').style.display='block';
+  }
+});
+
+init();
+</script>
+</body>
+</html>
