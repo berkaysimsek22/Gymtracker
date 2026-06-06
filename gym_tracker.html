@@ -1136,57 +1136,51 @@ async function updFoodUnitOnly(mi,fi,v){
   const nd=await getNd();
   const food=nd.meals[mi].foods[fi];
   food.unit=v;
-  
-  // Find food in DB
-  const dbKey=Object.keys(FOOD_DB).find(k=>k===(food.name||'').toLowerCase().trim()||k===food.name);
-  const found=dbKey?FOOD_DB[dbKey]:null;
-  
+  const name=(food.name||'').toLowerCase().trim();
+  const found=FOOD_DB[name]||FOOD_DB[Object.keys(FOOD_DB).find(k=>name.includes(k)||k.includes(name))||''];
   if(found){
-    // Determine the base amount for the selected unit
-    let basePer, baseKcal, baseProt, baseCarb, baseFat;
-    if(v==='adet' && found.per_adet){
-      // Use per_adet value - this is how much 1 piece weighs in grams
-      basePer=1;
-      const gramsPerPiece=found.per_adet;
-      const ratio=gramsPerPiece/found.per;
-      baseKcal=Math.round(found.kcal*ratio);
-      baseProt=Math.round(found.protein*ratio*10)/10;
-      baseCarb=Math.round(found.carb*ratio*10)/10;
-      baseFat=Math.round((found.fat||0)*ratio*10)/10;
+    // Per unit değerlerini hesapla
+    let kcalPer1, protPer1, carbPer1, fatPer1, defaultAmt;
+    if(v==='adet'){
+      const g=found.per_adet||found.per; // 1 adet kaç gram
+      const r=g/found.per;
+      kcalPer1=Math.round(found.kcal*r);
+      protPer1=Math.round(found.protein*r*10)/10;
+      carbPer1=Math.round(found.carb*r*10)/10;
+      fatPer1=Math.round((found.fat||0)*r*10)/10;
+      defaultAmt=parseFloat(food.amount)||1;
+    } else if(v==='ml'){
+      kcalPer1=found.kcal/found.per; // per 1ml
+      protPer1=found.protein/found.per;
+      carbPer1=found.carb/found.per;
+      fatPer1=(found.fat||0)/found.per;
+      defaultAmt=parseFloat(food.amount)||100;
     } else {
-      basePer=found.per;
-      baseKcal=found.kcal;
-      baseProt=found.protein;
-      baseCarb=found.carb;
-      baseFat=found.fat||0;
+      // gram - per 1g
+      kcalPer1=found.kcal/found.per;
+      protPer1=found.protein/found.per;
+      carbPer1=found.carb/found.per;
+      fatPer1=(found.fat||0)/found.per;
+      defaultAmt=parseFloat(food.amount)||100;
     }
-    // Store new base
-    food._baseKcal=baseKcal;
-    food._baseProtein=baseProt;
-    food._baseCarb=baseCarb;
-    food._baseFat=baseFat;
-    food._basePer=basePer;
-    // Set default amount for this unit
-    const currentAmt=parseFloat(food.amount)||basePer;
-    food.amount=String(currentAmt);
-    // Recalculate
-    const ratio2=currentAmt/basePer;
-    food.kcal=String(Math.round(baseKcal*ratio2));
-    food.protein=String(Math.round(baseProt*ratio2*10)/10);
-    food.carb=String(Math.round(baseCarb*ratio2*10)/10);
-    food.fat=String(Math.round(baseFat*ratio2*10)/10);
+    food._kcalPer1=kcalPer1;
+    food._protPer1=protPer1;
+    food._carbPer1=carbPer1;
+    food._fatPer1=fatPer1;
+    food.amount=String(defaultAmt);
+    food.kcal=String(Math.round(kcalPer1*defaultAmt));
+    food.protein=String(Math.round(protPer1*defaultAmt*10)/10);
+    food.carb=String(Math.round(carbPer1*defaultAmt*10)/10);
+    food.fat=String(Math.round(fatPer1*defaultAmt*10)/10);
   }
-  
-  // Update inputs
-  const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
-  const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
-  const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
-  const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
-  const amtEl=document.getElementById ? document.querySelector('[id^="finp_'+mi+'_'+fi+'"]') : null;
-  if(kcalEl)kcalEl.value=food.kcal||'';
-  if(protEl)protEl.value=food.protein||'';
-  if(carbEl)carbEl.value=food.carb||'';
-  if(fatEl)fatEl.value=food.fat||'';
+  const ke=document.getElementById('food_kcal_'+mi+'_'+fi);
+  const pe=document.getElementById('food_prot_'+mi+'_'+fi);
+  const ce=document.getElementById('food_carb_'+mi+'_'+fi);
+  const fe=document.getElementById('food_fat_'+mi+'_'+fi);
+  if(ke)ke.value=food.kcal||'';
+  if(pe)pe.value=food.protein||'';
+  if(ce)ce.value=food.carb||'';
+  if(fe)fe.value=food.fat||'';
   saveNutrition(activeProfile()?.id,curNutDate);
   updateNutTotals();
 }
@@ -1219,38 +1213,39 @@ async function updFoodAmount(mi,fi,newAmount){
   const nd=await getNd();
   const food=nd.meals[mi].foods[fi];
   const newAmt=parseFloat(newAmount)||0;
-  if(!newAmt){food.amount=String(newAmount);saveNutrition(activeProfile()?.id,curNutDate);return;}
-  
-  // Use base values if available (set when food selected from DB)
-  if(food._baseKcal!==undefined && food._basePer){
-    const ratio = newAmt / food._basePer;
-    food.amount = String(newAmount);
-    food.kcal = String(Math.round(food._baseKcal * ratio));
-    food.protein = String(Math.round(food._baseProtein * ratio * 10) / 10);
-    food.carb = String(Math.round(food._baseCarb * ratio * 10) / 10);
-    food.fat = String(Math.round((food._baseFat||0) * ratio * 10) / 10);
-  } else if(food.kcal && food.amount && parseFloat(food.amount)>0) {
-    // Proportion from current values
-    const oldAmt = parseFloat(food.amount);
-    const ratio = newAmt / oldAmt;
-    food.amount = String(newAmount);
-    food.kcal = String(Math.round(parseFloat(food.kcal) * ratio));
-    food.protein = String(Math.round(parseFloat(food.protein||0) * ratio * 10) / 10);
-    food.carb = String(Math.round(parseFloat(food.carb||0) * ratio * 10) / 10);
-    food.fat = String(Math.round(parseFloat(food.fat||0) * ratio * 10) / 10);
-  } else {
-    food.amount = String(newAmount);
+  food.amount=String(newAmount);
+  if(!newAmt){saveNutrition(activeProfile()?.id,curNutDate);return;}
+  if(food._kcalPer1!==undefined){
+    // Use per-unit values (set when food selected or unit changed)
+    food.kcal=String(Math.round(food._kcalPer1*newAmt));
+    food.protein=String(Math.round(food._protPer1*newAmt*10)/10);
+    food.carb=String(Math.round(food._carbPer1*newAmt*10)/10);
+    food.fat=String(Math.round(food._fatPer1*newAmt*10)/10);
+  } else if(food._baseKcal!==undefined && food._basePer){
+    // Legacy base values
+    const r=newAmt/food._basePer;
+    food.kcal=String(Math.round(food._baseKcal*r));
+    food.protein=String(Math.round(food._baseProtein*r*10)/10);
+    food.carb=String(Math.round(food._baseCarb*r*10)/10);
+    food.fat=String(Math.round((food._baseFat||0)*r*10)/10);
+  } else if(food.kcal && parseFloat(food.kcal)>0){
+    // Proportion from old amount
+    const oldAmt=parseFloat(food.amount===String(newAmount)?'100':food.amount)||100;
+    const r=newAmt/oldAmt;
+    food.kcal=String(Math.round(parseFloat(food.kcal)*r));
+    food.protein=String(Math.round(parseFloat(food.protein||0)*r*10)/10);
+    food.carb=String(Math.round(parseFloat(food.carb||0)*r*10)/10);
+    food.fat=String(Math.round(parseFloat(food.fat||0)*r*10)/10);
   }
   saveNutrition(activeProfile()?.id,curNutDate);
-  // Update macro inputs directly (no re-render)
-  const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
-  const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
-  const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
-  const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
-  if(kcalEl)kcalEl.value=food.kcal||'';
-  if(protEl)protEl.value=food.protein||'';
-  if(carbEl)carbEl.value=food.carb||'';
-  if(fatEl)fatEl.value=food.fat||'';
+  const ke=document.getElementById('food_kcal_'+mi+'_'+fi);
+  const pe=document.getElementById('food_prot_'+mi+'_'+fi);
+  const ce=document.getElementById('food_carb_'+mi+'_'+fi);
+  const fe=document.getElementById('food_fat_'+mi+'_'+fi);
+  if(ke)ke.value=food.kcal||'';
+  if(pe)pe.value=food.protein||'';
+  if(ce)ce.value=food.carb||'';
+  if(fe)fe.value=food.fat||'';
   updateNutTotals();
 }
 async function delFood(mi,fi){const nd=await getNd();nd.meals[mi].foods.splice(fi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
@@ -1830,17 +1825,16 @@ async function selectFoodSugg(foodKey, mi, fi){
   // Set default amount (1 for adet, 100 for gram/ml)
   const defaultAmount = found.per;
   food.amount = String(defaultAmount);
-  // Store base values (always per found.per units)
-  food._baseKcal = found.kcal;
-  food._baseProtein = found.protein;
-  food._baseCarb = found.carb;
-  food._baseFat = found.fat || 0;
-  food._basePer = found.per;
-  // Set macros directly (1:1 ratio since amount = per)
-  food.kcal = String(Math.round(found.kcal));
-  food.protein = String(Math.round(found.protein * 10) / 10);
-  food.carb = String(Math.round(found.carb * 10) / 10);
-  food.fat = String(Math.round((found.fat||0) * 10) / 10);
+  // Store per-1-unit values for easy recalculation
+  food._kcalPer1 = found.kcal / found.per;
+  food._protPer1 = found.protein / found.per;
+  food._carbPer1 = found.carb / found.per;
+  food._fatPer1 = (found.fat||0) / found.per;
+  // Set macros for default amount
+  food.kcal = String(Math.round(food._kcalPer1 * defaultAmount));
+  food.protein = String(Math.round(food._protPer1 * defaultAmount * 10) / 10);
+  food.carb = String(Math.round(food._carbPer1 * defaultAmount * 10) / 10);
+  food.fat = String(Math.round(food._fatPer1 * defaultAmount * 10) / 10);
   saveNutrition(activeProfile()?.id, curNutDate);
   renderNutrition();
 }
