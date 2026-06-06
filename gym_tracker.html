@@ -238,12 +238,12 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .meal-card.open .meal-arr{transform:rotate(180deg)}
 .meal-items{display:none;border-top:1px solid var(--border)}
 .meal-card.open .meal-items{display:block}
-.food-row{display:grid;grid-template-columns:1fr 58px 52px 52px 52px 26px;gap:4px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
+.food-row{display:grid;grid-template-columns:1fr 52px 44px 52px 44px 44px 44px 26px;gap:4px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
 .food-inp{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 6px;color:var(--text);font-size:11px;outline:none;width:100%}
 .food-inp:focus{border-color:rgba(212,245,60,.3)}
 .food-inp::placeholder{color:#282828}
 .food-inp.num{text-align:center;font-family:'Archivo',monospace}
-.food-grid-head{display:grid;grid-template-columns:1fr 58px 52px 52px 52px 26px;gap:4px;padding:5px 13px}
+.food-grid-head{display:grid;grid-template-columns:1fr 52px 44px 52px 44px 44px 44px 26px;gap:4px;padding:5px 13px}
 .fh{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
 .fh:first-child{text-align:left}
 .add-food-btn{margin:8px 13px;padding:6px 12px;border-radius:8px;background:rgba(212,245,60,.06);border:1px dashed rgba(212,245,60,.15);color:rgba(212,245,60,.5);font-size:10px;cursor:pointer;width:calc(100% - 26px);transition:all .2s;text-align:center}
@@ -1087,10 +1087,19 @@ function renderMeals(nd){
       <input class="food-inp" placeholder="ör: Yumurta, tavuk..." value="${f.name||''}" 
         onchange="updFood(${mi},${fi},'name',this.value)"
         onblur="autoLookupFood(${mi},${fi},this.value)">
-      <input class="food-inp num" placeholder="100g" type="number" value="${f.amount||''}" onchange="updFood(${mi},${fi},'amount',this.value)">
-      <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" onchange="updFood(${mi},${fi},'kcal',this.value)">
-      <input class="food-inp num" placeholder="P" type="number" value="${f.protein||''}" onchange="updFood(${mi},${fi},'protein',this.value)">
-      <input class="food-inp num" placeholder="K" type="number" value="${f.carb||''}" onchange="updFood(${mi},${fi},'carb',this.value)">
+      <input class="food-inp num" placeholder="100" type="number" value="${f.amount||''}" onchange="updFoodAmount(${mi},${fi},this.value)">
+      <select class="food-inp" style="font-size:10px;padding:4px 3px" onchange="updFood(${mi},${fi},'unit',this.value)">
+        <option value="gram" ${(f.unit||'gram')==='gram'?'selected':''}>gram</option>
+        <option value="adet" ${(f.unit||'')==='adet'?'selected':''}>adet</option>
+        <option value="ml" ${(f.unit||'')==='ml'?'selected':''}>ml</option>
+        <option value="porsiyon" ${(f.unit||'')==='porsiyon'?'selected':''}>porsiyon</option>
+        <option value="dilim" ${(f.unit||'')==='dilim'?'selected':''}>dilim</option>
+        <option value="su bardağı" ${(f.unit||'')==='su bardağı'?'selected':''}>bardak</option>
+      </select>
+      <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" id="food_kcal_${mi}_${fi}" onchange="updFood(${mi},${fi},'kcal',this.value)">
+      <input class="food-inp num" placeholder="P" type="number" value="${f.protein||''}" id="food_prot_${mi}_${fi}" onchange="updFood(${mi},${fi},'protein',this.value)">
+      <input class="food-inp num" placeholder="K" type="number" value="${f.carb||''}" id="food_carb_${mi}_${fi}" onchange="updFood(${mi},${fi},'carb',this.value)">
+      <input class="food-inp num" placeholder="Y" type="number" value="${f.fat||''}" id="food_fat_${mi}_${fi}" onchange="updFood(${mi},${fi},'fat',this.value)">
       <button class="del-btn" onclick="delFood(${mi},${fi})">✕</button>
     </div>`).join('');
     return `<div class="meal-card${meal.open?' open':''}">
@@ -1102,7 +1111,7 @@ function renderMeals(nd){
         <div class="meal-arr">⌄</div>
       </div>
       <div class="meal-items">
-        <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Kcal</div><div class="fh">Prot</div><div class="fh">Karb</div><div class="fh"></div></div>
+        <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Birim</div><div class="fh">Kcal</div><div class="fh">Prot</div><div class="fh">Karb</div><div class="fh">Yağ</div><div class="fh"></div></div>
         ${foods}
         <div style="display:flex;gap:6px;margin:8px 13px">
           <div class="add-food-btn" style="flex:1;margin:0" onclick="addFood(${mi})">+ Manuel Ekle</div>
@@ -1117,7 +1126,37 @@ function renderMeals(nd){
 async function getNd(){return await loadNutrition(activeProfile()?.id,curNutDate);}
 async function updMeal(mi,f,v){const nd=await getNd();nd.meals[mi][f]=v;saveNutrition(activeProfile()?.id,curNutDate);}
 async function delMeal(mi){if(!confirm('Öğün silinsin mi?'))return;const nd=await getNd();nd.meals.splice(mi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
-async function updFood(mi,fi,f,v){const nd=await getNd();nd.meals[mi].foods[fi][f]=v;saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
+async function updFood(mi,fi,f,v){
+  const nd=await getNd();
+  nd.meals[mi].foods[fi][f]=v;
+  saveNutrition(activeProfile()?.id,curNutDate);
+  renderNutrition();
+}
+
+async function updFoodAmount(mi,fi,newAmount){
+  const nd=await getNd();
+  const food=nd.meals[mi].foods[fi];
+  const oldAmount=parseFloat(food.amount)||100;
+  const newAmt=parseFloat(newAmount)||0;
+  food.amount=String(newAmount);
+  // Recalculate macros proportionally if base values exist
+  if(food._baseKcal && newAmt && oldAmount){
+    const ratio = newAmt / (food._basePer || oldAmount);
+    food.kcal = String(Math.round(food._baseKcal * ratio));
+    food.protein = String(Math.round(food._baseProtein * ratio * 10) / 10);
+    food.carb = String(Math.round(food._baseCarb * ratio * 10) / 10);
+    food.fat = String(Math.round((food._baseFat||0) * ratio * 10) / 10);
+  } else if(food.kcal && oldAmount && newAmt) {
+    // Simple proportion even without base
+    const ratio = newAmt / oldAmount;
+    food.kcal = String(Math.round(parseFloat(food.kcal) * ratio));
+    food.protein = String(Math.round(parseFloat(food.protein||0) * ratio * 10) / 10);
+    food.carb = String(Math.round(parseFloat(food.carb||0) * ratio * 10) / 10);
+    food.fat = String(Math.round(parseFloat(food.fat||0) * ratio * 10) / 10);
+  }
+  saveNutrition(activeProfile()?.id,curNutDate);
+  renderNutrition();
+}
 async function delFood(mi,fi){const nd=await getNd();nd.meals[mi].foods.splice(fi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
 async function addFood(mi){const nd=await getNd();nd.meals[mi].foods.push({name:'',amount:'',kcal:'',protein:'',carb:''});nd.meals[mi].open=true;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
 async function toggleMeal(mi){const nd=await getNd();nd.meals[mi].open=!nd.meals[mi].open;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
@@ -1516,11 +1555,20 @@ async function autoLookupFood(mi, fi, name) {
     const nd = await loadNutrition(activeProfile()?.id, curNutDate);
     if(!nd.meals[mi] || !nd.meals[mi].foods[fi]) return;
     const food = nd.meals[mi].foods[fi];
-    // Only fill if empty
-    if(!food.kcal) food.kcal = String(found.kcal);
-    if(!food.protein) food.protein = String(found.protein);
-    if(!food.carb) food.carb = String(found.carb);
+    // Store base values for proportional calculation
+    food._baseKcal = found.kcal;
+    food._baseProtein = found.protein;
+    food._baseCarb = found.carb;
+    food._baseFat = found.fat || 0;
+    food._basePer = found.per;
+    const currentAmount = parseFloat(food.amount) || found.per;
+    const ratio = currentAmount / found.per;
+    food.kcal = String(Math.round(found.kcal * ratio));
+    food.protein = String(Math.round(found.protein * ratio * 10) / 10);
+    food.carb = String(Math.round(found.carb * ratio * 10) / 10);
+    food.fat = String(Math.round((found.fat||0) * ratio * 10) / 10);
     if(!food.amount) food.amount = String(found.per);
+    if(!food.unit) food.unit = found.unit && found.unit.includes('adet') ? 'adet' : 'gram';
     saveNutrition(activeProfile()?.id, curNutDate);
     renderNutrition();
     return;
