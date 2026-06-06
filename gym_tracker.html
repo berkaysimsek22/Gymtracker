@@ -298,6 +298,27 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(12,12,12,.97);backdrop-filter:blur(12px);border-top:1px solid var(--border);display:flex;padding:8px 16px 14px;gap:4px;z-index:100}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px;border-radius:8px;cursor:pointer;border:none;background:none;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.4px;transition:all .2s}
 .nav-btn:hover,.nav-btn.active{color:var(--acc)}
+
+/* PROFILE */
+.prof-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:0}
+.prof-section h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px}
+.prof-field{margin-bottom:12px}
+.prof-field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+.prof-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+.prof-input:focus{border-color:rgba(212,245,60,.4)}
+.prof-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.goal-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;cursor:pointer;transition:all .2s;text-align:center;width:100%}
+.goal-btn.active{background:var(--acc);color:#0c0c0c;border-color:var(--acc)}
+.goals-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.muscle-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.muscle-btn{padding:7px 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:10px;cursor:pointer;transition:all .2s;text-align:center}
+.muscle-btn.active{background:rgba(212,245,60,.1);color:var(--acc);border-color:rgba(212,245,60,.3)}
+.prog-suggestion{background:rgba(212,245,60,.04);border:1px solid rgba(212,245,60,.15);border-radius:var(--r);padding:14px;margin-top:10px}
+.prog-suggestion h4{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--acc);margin-bottom:8px}
+.prog-day-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px}
+.prog-day-row:last-child{border-bottom:none}
+.prog-day-name{color:var(--muted);width:80px;flex-shrink:0}
+.prog-day-content{color:var(--text)}
 .nav-icon{font-size:17px}
 
 /* SCREENS */
@@ -435,11 +456,24 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     </div>
   </div>
 
+  <!-- PROFILE SCREEN -->
+  <div class="screen" id="screen-profile">
+    <div style="padding:18px 16px 0;display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px">Profil</h2>
+      <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
+    </div>
+    <div id="profileEditCard" style="margin:12px 16px 0"></div>
+    <div id="goalCard" style="margin:10px 16px 0"></div>
+    <div id="muscleGoalCard" style="margin:10px 16px 0"></div>
+    <div id="autoProgCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
+  </div>
+
   <div class="bottom-nav">
     <button class="nav-btn active" onclick="showScreen('workout',this)"><div class="nav-icon">🏋️</div>Antrenman</button>
     <button class="nav-btn" onclick="showScreen('nutrition',this)"><div class="nav-icon">🥗</div>Beslenme</button>
     <button class="nav-btn" onclick="showScreen('history',this)"><div class="nav-icon">📋</div>Geçmiş</button>
     <button class="nav-btn" onclick="showScreen('stats',this)"><div class="nav-icon">📊</div>İstatistik</button>
+    <button class="nav-btn" onclick="showScreen('profile',this)"><div class="nav-icon">👤</div>Profil</button>
   </div>
 </div>
 
@@ -1354,6 +1388,7 @@ function showScreen(name,btn){
   if(name==='history')renderHistory();
   if(name==='stats')renderStats();
   if(name==='nutrition')renderNutrition();
+  if(name==='profile')renderProfileScreen();
 }
 
 // ── AUTH LISTENER ──
@@ -1923,6 +1958,429 @@ async function selectFoodSugg(foodKey, mi, fi){
   food.fat = String(Math.round(food._fatPer1 * defaultAmount * 10) / 10);
   saveNutrition(activeProfile()?.id, curNutDate);
   renderNutrition();
+}
+
+
+// ── PROFILE SCREEN ──
+const GOALS = [
+  {id:'weight_loss', label:'⚖️ Kilo Ver', desc:'Yağ yakımı odaklı'},
+  {id:'muscle_gain', label:'💪 Kas Kazan', desc:'Hacim & güç artışı'},
+  {id:'recomp', label:'🔄 Recomp', desc:'Yağ yak + kas kazan'},
+  {id:'endurance', label:'🏃 Dayanıklılık', desc:'Kardiyo & kondisyon'},
+  {id:'strength', label:'🏋️ Güç', desc:'Maksimal güç'},
+  {id:'toning', label:'✨ Tonlama', desc:'Şekillendirme'},
+];
+
+const MUSCLE_GOALS = [
+  {id:'glute', label:'🍑 Popo'},
+  {id:'chest', label:'💪 Göğüs'},
+  {id:'back', label:'🔙 Sırt'},
+  {id:'shoulder', label:'🏋️ Omuz'},
+  {id:'arm', label:'💪 Kol'},
+  {id:'leg', label:'🦵 Bacak'},
+  {id:'abs', label:'⚡ Karın'},
+  {id:'full', label:'🌟 Tam Vücut'},
+];
+
+function renderProfileScreen(){
+  const p = activeProfile();
+  if(!p) return;
+  renderProfileEditCard(p);
+  renderGoalCard(p);
+  renderMuscleGoalCard(p);
+  renderAutoProgCard(p);
+}
+
+function renderProfileEditCard(p){
+  const el = document.getElementById('profileEditCard');
+  if(!el) return;
+  el.innerHTML = `<div class="prof-section">
+    <h3>👤 Kişisel Bilgiler</h3>
+    <div class="prof-row">
+      <div class="prof-field"><label>Ad Soyad</label>
+        <input class="prof-input" id="pf_name" value="${p.name||''}" placeholder="Adın"></div>
+      <div class="prof-field"><label>Yaş</label>
+        <input class="prof-input" id="pf_age" type="number" value="${p.age||''}" placeholder="25"></div>
+    </div>
+    <div class="prof-row">
+      <div class="prof-field"><label>Boy (cm)</label>
+        <input class="prof-input" id="pf_height" type="number" value="${p.height||''}" placeholder="170"></div>
+      <div class="prof-field"><label>Cinsiyet</label>
+        <select class="prof-input" id="pf_gender">
+          <option value="female" ${(p.gender||'')==='female'?'selected':''}>Kadın</option>
+          <option value="male" ${(p.gender||'')==='male'?'selected':''}>Erkek</option>
+        </select>
+      </div>
+    </div>
+    <div class="prof-row">
+      <div class="prof-field"><label>Mevcut Kilo (kg)</label>
+        <input class="prof-input" id="pf_weight" type="number" step="0.1" value="${p.weight||''}" placeholder="70"></div>
+      <div class="prof-field"><label>Hedef Kilo (kg)</label>
+        <input class="prof-input" id="pf_target" type="number" step="0.1" value="${p.target_weight||''}" placeholder="65"></div>
+    </div>
+    <div class="prof-field"><label>Aktivite Seviyesi</label>
+      <select class="prof-input" id="pf_activity">
+        <option value="sedentary" ${(p.activity||'')==='sedentary'?'selected':''}>Hareketsiz (masa başı)</option>
+        <option value="light" ${(p.activity||'')==='light'?'selected':''}>Hafif aktif (haftada 1-2 gün)</option>
+        <option value="moderate" ${(p.activity||'')==='moderate'?'selected':''}>Orta aktif (haftada 3-4 gün)</option>
+        <option value="active" ${(p.activity||'')==='active'?'selected':''}>Çok aktif (haftada 5+ gün)</option>
+      </select>
+    </div>
+    <div class="prof-field"><label>Antrenman Deneyimi</label>
+      <select class="prof-input" id="pf_level">
+        <option value="beginner" ${(p.level||'')==='beginner'?'selected':''}>Başlangıç (0-1 yıl)</option>
+        <option value="intermediate" ${(p.level||'')==='intermediate'?'selected':''}>Orta (1-3 yıl)</option>
+        <option value="advanced" ${(p.level||'')==='advanced'?'selected':''}>İleri (3+ yıl)</option>
+      </select>
+    </div>
+    <div class="prof-field"><label>Haftada Kaç Gün Antrenman?</label>
+      <select class="prof-input" id="pf_days">
+        <option value="3" ${(p.trainingDays||'4')==='3'?'selected':''}>3 gün</option>
+        <option value="4" ${(p.trainingDays||'4')==='4'?'selected':''}>4 gün</option>
+        <option value="5" ${(p.trainingDays||'4')==='5'?'selected':''}>5 gün</option>
+        <option value="6" ${(p.trainingDays||'4')==='6'?'selected':''}>6 gün</option>
+      </select>
+    </div>
+  </div>`;
+}
+
+function renderGoalCard(p){
+  const el = document.getElementById('goalCard');
+  if(!el) return;
+  const cur = p.mainGoal||'';
+  el.innerHTML = `<div class="prof-section">
+    <h3>🎯 Ana Hedef</h3>
+    <div class="goals-grid">${GOALS.map(g=>`
+      <button class="goal-btn${cur===g.id?' active':''}" onclick="selectGoal('${g.id}')">
+        <div style="font-size:14px;margin-bottom:3px">${g.label}</div>
+        <div style="font-size:9px;opacity:.7">${g.desc}</div>
+      </button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function selectGoal(id){
+  const p = activeProfile();
+  if(!p) return;
+  p.mainGoal = id;
+  renderGoalCard(p);
+  renderAutoProgCard(p);
+}
+
+function renderMuscleGoalCard(p){
+  const el = document.getElementById('muscleGoalCard');
+  if(!el) return;
+  const selected = p.muscleGoals||[];
+  el.innerHTML = `<div class="prof-section">
+    <h3>🏆 Geliştirmek İstediğin Kaslar</h3>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:8px">Birden fazla seçebilirsin</div>
+    <div class="muscle-grid">${MUSCLE_GOALS.map(m=>`
+      <button class="muscle-btn${selected.includes(m.id)?' active':''}" onclick="toggleMuscleGoal('${m.id}')">
+        ${m.label}
+      </button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function toggleMuscleGoal(id){
+  const p = activeProfile();
+  if(!p) return;
+  if(!p.muscleGoals) p.muscleGoals=[];
+  const idx = p.muscleGoals.indexOf(id);
+  if(idx>-1) p.muscleGoals.splice(idx,1);
+  else p.muscleGoals.push(id);
+  renderMuscleGoalCard(p);
+  renderAutoProgCard(p);
+}
+
+function renderAutoProgCard(p){
+  const el = document.getElementById('autoProgCard');
+  if(!el) return;
+  if(!p.mainGoal){
+    el.innerHTML = `<div class="prof-section" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;padding:20px">
+      Hedef seç → otomatik program önerisi gelecek</div>`;
+    return;
+  }
+  const prog = generateProgramSuggestion(p);
+  el.innerHTML = `<div class="prof-section">
+    <h3>⚡ Önerilen Program</h3>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${prog.desc}</div>
+    <div class="prog-suggestion">
+      <h4>Haftalık Split — ${p.trainingDays||4} gün</h4>
+      ${prog.days.map(d=>`<div class="prog-day-row">
+        <div class="prog-day-name">${d.day}</div>
+        <div class="prog-day-content">${d.content}</div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:11px">
+        <div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:2px">Haftalık Set</div>
+        <div style="color:var(--acc);font-family:'Bebas Neue',sans-serif;font-size:18px">${prog.sets}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:11px">
+        <div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:2px">Rep Aralığı</div>
+        <div style="color:var(--acc);font-family:'Bebas Neue',sans-serif;font-size:18px">${prog.reps}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:11px">
+        <div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:2px">Dinlenme</div>
+        <div style="color:var(--acc);font-family:'Bebas Neue',sans-serif;font-size:18px">${prog.rest}</div>
+      </div>
+    </div>
+    <button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="applyGeneratedProgram()">
+      🚀 Bu Programı Uygula
+    </button>
+  </div>`;
+}
+
+function generateProgramSuggestion(p){
+  const days = parseInt(p.trainingDays)||4;
+  const goal = p.mainGoal||'muscle_gain';
+  const muscles = p.muscleGoals||[];
+  const level = p.level||'beginner';
+  
+  const hasGlute = muscles.includes('glute');
+  const hasFull = muscles.includes('full');
+  
+  let desc, split, sets, reps, rest;
+  
+  if(goal==='weight_loss' || goal==='toning'){
+    sets='12-16'; reps='15-20'; rest='45-60sn';
+    desc='Yüksek tekrar, kısa dinlenme. Kalori yakımı maksimum.';
+  } else if(goal==='strength'){
+    sets='15-20'; reps='3-6'; rest='2-3dk';
+    desc='Ağır yükler, uzun dinlenme. Güç odaklı.';
+  } else if(goal==='endurance'){
+    sets='10-15'; reps='15-25'; rest='30-45sn';
+    desc='Yüksek hacim, minimal dinlenme. Kondisyon odaklı.';
+  } else {
+    sets='12-20'; reps='6-12'; rest='90-120sn';
+    desc='Optimal hipertrofi aralığı. Kas büyümesi için ideal.';
+  }
+  
+  let dayArr = [];
+  const dayNames = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+  
+  if(days===3){
+    if(hasFull||goal==='weight_loss'){
+      dayArr=[
+        {day:'Pzt',content:'Full Vücut A'},
+        {day:'Sal',content:'Dinlenme'},
+        {day:'Çar',content:'Full Vücut B'},
+        {day:'Per',content:'Dinlenme'},
+        {day:'Cum',content:'Full Vücut C'},
+        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+        {day:'Paz',content:'Dinlenme'},
+      ];
+    } else {
+      dayArr=[
+        {day:'Pzt',content:'Göğüs + Triceps'},
+        {day:'Sal',content:'Dinlenme'},
+        {day:'Çar',content:'Sırt + Biceps'},
+        {day:'Per',content:'Dinlenme'},
+        {day:'Cum',content:'Bacak + Omuz'},
+        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+        {day:'Paz',content:'Dinlenme'},
+      ];
+    }
+  } else if(days===4){
+    if(hasGlute){
+      dayArr=[
+        {day:'Pzt',content:'Glute Heavy + Hamstring'},
+        {day:'Sal',content:'Üst Vücut'},
+        {day:'Çar',content:'Dinlenme'},
+        {day:'Per',content:'Quad + Glute Pump'},
+        {day:'Cum',content:'Üst Vücut + Kol'},
+        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+        {day:'Paz',content:'Dinlenme'},
+      ];
+    } else {
+      dayArr=[
+        {day:'Pzt',content:'Göğüs + Triceps'},
+        {day:'Sal',content:'Sırt + Biceps'},
+        {day:'Çar',content:'Dinlenme'},
+        {day:'Per',content:'Bacak'},
+        {day:'Cum',content:'Omuz + Kol'},
+        {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+        {day:'Paz',content:'Dinlenme'},
+      ];
+    }
+  } else if(days===5){
+    dayArr=[
+      {day:'Pzt',content:hasGlute?'Glute Heavy':'Göğüs'},
+      {day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:hasGlute?'Üst Vücut':'Bacak'},
+      {day:'Per',content:hasGlute?'Glute Pump + Quad':'Omuz'},
+      {day:'Cum',content:hasGlute?'Üst Vücut + Kol':'Kol + Karın'},
+      {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ];
+  } else {
+    dayArr=[
+      {day:'Pzt',content:hasGlute?'Glute Heavy':'Göğüs'},
+      {day:'Sal',content:'Sırt + Biceps'},
+      {day:'Çar',content:hasGlute?'Üst Vücut':'Omuz'},
+      {day:'Per',content:'Bacak + ' + (hasGlute?'Glute Pump':'Hamstring')},
+      {day:'Cum',content:'Kol + Karın'},
+      {day:'Cmt',content:goal==='weight_loss'?'HIIT':'Aktif Dinlenme'},
+      {day:'Paz',content:'Dinlenme'},
+    ];
+  }
+  
+  return {desc, days:dayArr, sets, reps, rest};
+}
+
+async function saveProfileAll(){
+  const p = activeProfile();
+  if(!p) return;
+  p.name = document.getElementById('pf_name')?.value.trim() || p.name;
+  p.age = parseInt(document.getElementById('pf_age')?.value)||p.age;
+  p.height = parseFloat(document.getElementById('pf_height')?.value)||p.height;
+  p.gender = document.getElementById('pf_gender')?.value || p.gender;
+  p.weight = parseFloat(document.getElementById('pf_weight')?.value)||p.weight;
+  p.target_weight = parseFloat(document.getElementById('pf_target')?.value)||p.target_weight;
+  p.activity = document.getElementById('pf_activity')?.value || p.activity;
+  p.level = document.getElementById('pf_level')?.value || p.level;
+  p.trainingDays = document.getElementById('pf_days')?.value || p.trainingDays;
+  // Save to Supabase
+  await sb.from('profiles').update({
+    name: p.name, weight: p.weight, target_weight: p.target_weight,
+    goal: p.mainGoal||p.goal,
+  }).eq('id', p.id);
+  renderAll();
+  renderPersonBar();
+  // Show toast
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+  t.textContent='✅ Profil kaydedildi!';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2500);
+}
+
+async function applyGeneratedProgram(){
+  const p = activeProfile();
+  if(!p) return;
+  if(!confirm('Mevcut programın silinecek ve yeni program uygulanacak. Devam?')) return;
+  const prog = generateProgramSuggestion(p);
+  // Generate full program based on suggestion
+  const newProg = generateFullProgram(p, prog);
+  programs[p.id] = newProg;
+  await saveProgram(p.id);
+  curDay = 0;
+  showScreen('workout', document.querySelector('.nav-btn'));
+  renderAll();
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+  t.textContent='🚀 Yeni program uygulandı!';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+function generateFullProgram(p, suggestion){
+  const goal = p.mainGoal||'muscle_gain';
+  const muscles = p.muscleGoals||[];
+  const hasGlute = muscles.includes('glute');
+  const reps = goal==='strength'?'5,4,3':goal==='weight_loss'?'15,15,12':'12,10,8';
+  const sets = goal==='strength'?5:3;
+  const rest = goal==='strength'?180:goal==='weight_loss'?60:90;
+  
+  const SPLITS = {
+    'Glute Heavy':[
+      {name:'Hip Thrust',muscle:'Glute Maximus',sets:4,reps:'12-10-8-6',restSec:120,tip:'Son sette failure'a yaklaş'},
+      {name:'Romanian Deadlift',muscle:'Glute · Hamstring',sets:3,reps:'10,8,8',restSec:90,tip:'3 sn eksentrik'},
+      {name:'Bulgarian Split Squat',muscle:'Glute Max + Medius',sets:3,reps:reps,restSec:rest,tip:'Derinliği koru'},
+      {name:'Hip Abduction',muscle:'Glute Medius',sets:4,reps:'15',restSec:60,tip:'Son sette drop set'},
+      {name:'Machine Kick Back',muscle:'Glute Maximus',sets:3,reps:'15',restSec:60,tip:'1 sn sıkıştır'},
+    ],
+    'Glute Pump + Quad':[
+      {name:'Sumo Squat',muscle:'Glute Medius · Quad',sets:4,reps:'12-10-8-6',restSec:120,tip:'%80 eforla'},
+      {name:'Leg Press',muscle:'Quad · Glute',sets:3,reps:reps,restSec:rest,tip:'Dar duruş → quad'},
+      {name:'Step Up',muscle:'Glute Med + Min',sets:3,reps:'10',restSec:60,tip:'Topuktan it'},
+      {name:'Leg Extension',muscle:'Quad',sets:3,reps:'15',restSec:60,tip:'Tepe noktada tut'},
+      {name:'Hip Abduction',muscle:'Glute Medius',sets:3,reps:'15',restSec:60,tip:'Drop set'},
+    ],
+    'Üst Vücut':[
+      {name:'Shoulder Press',muscle:'Deltoid · Triceps',sets,reps,restSec:rest,tip:null},
+      {name:'Lat Pulldown',muscle:'Latissimus',sets,reps,restSec:rest,tip:'Tam ROM'},
+      {name:'Cable Lateral Raise',muscle:'Lateral Delt',sets:3,reps:'15',restSec:60,tip:'Kablo > DB'},
+      {name:'Seated Row',muscle:'Mid Back',sets,reps,restSec:rest,tip:null},
+      {name:'Face Pull',muscle:'Rear Delt',sets:3,reps:'15',restSec:60,tip:'Her seansta yap'},
+    ],
+    'Üst Vücut + Kol':[
+      {name:'Incline Bench Press',muscle:'Göğüs',sets,reps,restSec:rest,tip:'Barbell öncelikli'},
+      {name:'Lat Pulldown',muscle:'Latissimus',sets,reps,restSec:rest,tip:'Tam ROM'},
+      {name:'Overhead Triceps',muscle:'Triceps',sets:3,reps:'12',restSec:60,tip:'Uzun kafa'},
+      {name:'Barbell Curl',muscle:'Biceps',sets:3,reps:'12',restSec:60,tip:'Strict form'},
+      {name:'Face Pull',muscle:'Rear Delt',sets:3,reps:'15',restSec:60,tip:null},
+    ],
+    'Göğüs + Triceps':[
+      {name:'Incline Bench Press',muscle:'Üst Göğüs',sets:4,reps:'8,8,6,6',restSec:120,tip:'Barbell öncelikli'},
+      {name:'Flat DB Press',muscle:'Orta Göğüs',sets,reps,restSec:rest,tip:'Tam ROM'},
+      {name:'Cable Fly',muscle:'Göğüs',sets:3,reps:'12',restSec:60,tip:'Stretch'},
+      {name:'Overhead Triceps',muscle:'Triceps',sets:3,reps:'12',restSec:60,tip:'Uzun kafa'},
+      {name:'Close Grip Bench',muscle:'Triceps',sets:3,reps:'10',restSec:90,tip:null},
+    ],
+    'Sırt + Biceps':[
+      {name:'Pull-Up',muscle:'Latissimus',sets:4,reps:'AMRAP',restSec:90,tip:'Ağırlık ekle'},
+      {name:'Chest Supported Row',muscle:'Mid Back',sets:4,reps:reps,restSec:rest,tip:'Tam ROM'},
+      {name:'Lat Pulldown',muscle:'Latissimus',sets:3,reps:'12',restSec:90,tip:null},
+      {name:'Face Pull',muscle:'Rear Delt',sets:3,reps:'15',restSec:60,tip:'Mecburi'},
+      {name:'Barbell Curl',muscle:'Biceps',sets:3,reps:'10,10,8',restSec:60,tip:'Strict'},
+    ],
+    'Bacak':[
+      {name:'Back Squat',muscle:'Quad · Glute',sets:4,reps:'8,8,6,6',restSec:150,tip:'Kalça geri'},
+      {name:'Romanian Deadlift',muscle:'Hamstring',sets:3,reps:reps,restSec:rest,tip:'3 sn eksentrik'},
+      {name:'Leg Press',muscle:'Quad',sets:3,reps:'12,10,10',restSec:90,tip:null},
+      {name:'Seated Leg Curl',muscle:'Hamstring',sets:3,reps:'12',restSec:60,tip:'Seated > lying'},
+      {name:'Calf Raise',muscle:'Baldır',sets:4,reps:'15',restSec:45,tip:'Tam aşağı'},
+    ],
+    'Omuz':[
+      {name:'Overhead Press',muscle:'Deltoid',sets:4,reps:'8,8,6,6',restSec:120,tip:null},
+      {name:'Cable Lateral Raise',muscle:'Lateral Delt',sets:4,reps:'15',restSec:60,tip:'Kablo'},
+      {name:'Reverse Pec Deck',muscle:'Rear Delt',sets:3,reps:'15',restSec:60,tip:null},
+      {name:'Face Pull',muscle:'Rear Delt',sets:3,reps:'15',restSec:60,tip:null},
+    ],
+    'Full Vücut A':[
+      {name:'Squat',muscle:'Quad · Glute',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Bench Press',muscle:'Göğüs',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Lat Pulldown',muscle:'Sırt',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Shoulder Press',muscle:'Omuz',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Plank',muscle:'Core',sets:3,reps:'45sn',restSec:60,tip:null},
+    ],
+    'Full Vücut B':[
+      {name:'Romanian Deadlift',muscle:'Hamstring · Glute',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Incline Press',muscle:'Göğüs',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Cable Row',muscle:'Sırt',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Lateral Raise',muscle:'Omuz',sets:3,reps:'15',restSec:60,tip:null},
+      {name:'Cable Crunch',muscle:'Karın',sets:3,reps:'15',restSec:60,tip:null},
+    ],
+    'Full Vücut C':[
+      {name:'Leg Press',muscle:'Quad · Glute',sets:3,reps:reps,restSec:rest,tip:null},
+      {name:'Dip',muscle:'Göğüs · Triceps',sets:3,reps:'AMRAP',restSec:90,tip:null},
+      {name:'Pull-Up',muscle:'Sırt',sets:3,reps:'AMRAP',restSec:90,tip:null},
+      {name:'Face Pull',muscle:'Omuz',sets:3,reps:'15',restSec:60,tip:null},
+      {name:'Hanging Leg Raise',muscle:'Karın',sets:3,reps:'12',restSec:60,tip:null},
+    ],
+    'HIIT':[],
+  };
+  
+  // Build 7-day program from suggestion
+  const prog = [];
+  const weekDays = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+  suggestion.days.forEach((d,i)=>{
+    const dayName = weekDays[i];
+    const content = d.content;
+    if(content==='Dinlenme'||content==='Aktif Dinlenme'){
+      prog.push({name:'Dinlenme',type:'rest',day:dayName,warmup:null,exercises:[]});
+    } else if(content==='HIIT'){
+      prog.push({name:'HIIT',type:'hiit',day:dayName,warmup:null,exercises:[],hiit:{work:40,rest:20,rounds:8}});
+    } else {
+      const exKey = Object.keys(SPLITS).find(k=>content.includes(k))||content;
+      const exercises = SPLITS[exKey]||SPLITS['Full Vücut A'];
+      const warmup = content.includes('Glute')||content.includes('Bacak')?'İncline Treadmill — 10 dk':null;
+      prog.push({name:content,type:'full',day:dayName,warmup,exercises:[...exercises]});
+    }
+  });
+  return prog;
 }
 
 async function handleHashParams() {
