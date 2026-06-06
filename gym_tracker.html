@@ -1141,25 +1141,40 @@ async function updFood(mi,fi,f,v){
 async function updFoodAmount(mi,fi,newAmount){
   const nd=await getNd();
   const food=nd.meals[mi].foods[fi];
-  const oldAmount=parseFloat(food.amount)||100;
   const newAmt=parseFloat(newAmount)||0;
-  food.amount=String(newAmount);
-  // Recalculate macros proportionally if base values exist
-  if(food._baseKcal && newAmt && oldAmount){
-    const ratio = newAmt / (food._basePer || oldAmount);
+  if(!newAmt){food.amount=String(newAmount);saveNutrition(activeProfile()?.id,curNutDate);return;}
+  
+  // Use base values if available (set when food selected from DB)
+  if(food._baseKcal!==undefined && food._basePer){
+    const ratio = newAmt / food._basePer;
+    food.amount = String(newAmount);
     food.kcal = String(Math.round(food._baseKcal * ratio));
     food.protein = String(Math.round(food._baseProtein * ratio * 10) / 10);
     food.carb = String(Math.round(food._baseCarb * ratio * 10) / 10);
     food.fat = String(Math.round((food._baseFat||0) * ratio * 10) / 10);
-  } else if(food.kcal && oldAmount && newAmt) {
-    // Simple proportion even without base
-    const ratio = newAmt / oldAmount;
+  } else if(food.kcal && food.amount && parseFloat(food.amount)>0) {
+    // Proportion from current values
+    const oldAmt = parseFloat(food.amount);
+    const ratio = newAmt / oldAmt;
+    food.amount = String(newAmount);
     food.kcal = String(Math.round(parseFloat(food.kcal) * ratio));
     food.protein = String(Math.round(parseFloat(food.protein||0) * ratio * 10) / 10);
     food.carb = String(Math.round(parseFloat(food.carb||0) * ratio * 10) / 10);
     food.fat = String(Math.round(parseFloat(food.fat||0) * ratio * 10) / 10);
+  } else {
+    food.amount = String(newAmount);
   }
   saveNutrition(activeProfile()?.id,curNutDate);
+  // Update just the macro inputs without full re-render
+  const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
+  const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
+  const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
+  const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
+  if(kcalEl)kcalEl.value=food.kcal||'';
+  if(protEl)protEl.value=food.protein||'';
+  if(carbEl)carbEl.value=food.carb||'';
+  if(fatEl)fatEl.value=food.fat||'';
+  // Update meal total
   renderNutrition();
 }
 async function delFood(mi,fi){const nd=await getNd();nd.meals[mi].foods.splice(fi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
