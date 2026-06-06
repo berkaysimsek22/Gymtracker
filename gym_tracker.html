@@ -1209,15 +1209,6 @@ async function updFoodAmount(mi,fi,newAmount){
     food.amount = String(newAmount);
   }
   saveNutrition(activeProfile()?.id,curNutDate);
-  // Update just the macro inputs without full re-render
-  const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
-  const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
-  const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
-  const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
-  if(kcalEl)kcalEl.value=food.kcal||'';
-  if(protEl)protEl.value=food.protein||'';
-  if(carbEl)carbEl.value=food.carb||'';
-  if(fatEl)fatEl.value=food.fat||'';
   // Update macro inputs directly (no re-render)
   const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
   const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
