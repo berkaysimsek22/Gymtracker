@@ -1089,7 +1089,7 @@ function renderMeals(nd){
           id="finp_${mi}_${fi}"
           oninput="filterFoodSugg(this.value,${mi},${fi})"
           onchange="updFood(${mi},${fi},'name',this.value)"
-          onblur="setTimeout(()=>hideFoodSugg(${mi},${fi}),200)">
+          onblur="setTimeout(()=>{hideFoodSugg(${mi},${fi});autoLookupFood(${mi},${fi},this.value);},250)">
         <div id="fsugg_${mi}_${fi}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.2);border-radius:6px;max-height:160px;overflow-y:auto;z-index:200;margin-top:2px"></div>
       </div>
       <input class="food-inp num" placeholder="100" type="number" value="${f.amount||''}" oninput="updFoodAmount(${mi},${fi},this.value)">
@@ -1714,7 +1714,17 @@ async function autoLookupFood(mi, fi, name) {
     if(!food.amount) food.amount = String(found.per);
     if(!food.unit) food.unit = found.unit && found.unit.includes('adet') ? 'adet' : 'gram';
     saveNutrition(activeProfile()?.id, curNutDate);
-    renderNutrition();
+    // Update inputs directly without re-render
+    const kcE=document.getElementById('food_kcal_'+mi+'_'+fi);
+    const prE=document.getElementById('food_prot_'+mi+'_'+fi);
+    const caE=document.getElementById('food_carb_'+mi+'_'+fi);
+    const faE=document.getElementById('food_fat_'+mi+'_'+fi);
+    const amE=document.getElementById ? document.querySelector('#finp_'+mi+'_'+fi) : null;
+    if(kcE)kcE.value=food.kcal||'';
+    if(prE)prE.value=food.protein||'';
+    if(caE)caE.value=food.carb||'';
+    if(faE)faE.value=food.fat||'';
+    updateNutTotals();
     return;
   }
   
@@ -1750,6 +1760,14 @@ async function autoLookupFood(mi, fi, name) {
 
 
 function filterFoodSugg(query, mi, fi){
+  // Clear previous auto-lookup timeout
+  if(window._foodLookupTimer) clearTimeout(window._foodLookupTimer);
+  // Auto-lookup after 600ms of no typing
+  if(query && query.length >= 2){
+    window._foodLookupTimer = setTimeout(()=>{
+      autoLookupFood(mi, fi, query);
+    }, 700);
+  }
   const sugg = document.getElementById('fsugg_'+mi+'_'+fi);
   if(!sugg) return;
   if(!query || query.length < 1){ sugg.style.display='none'; return; }
