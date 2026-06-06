@@ -1135,25 +1135,23 @@ async function delMeal(mi){if(!confirm('Öğün silinsin mi?'))return;const nd=a
 async function updFoodUnitOnly(mi,fi,v){
   const nd=await getNd();
   const food=nd.meals[mi].foods[fi];
+  const oldUnit=food.unit||'gram';
   food.unit=v;
-  // Recalculate based on current amount and base values
   const amt=parseFloat(food.amount)||0;
-  if(amt>0 && food._baseKcal!==undefined && food._basePer){
-    const ratio=amt/food._basePer;
-    food.kcal=String(Math.round(food._baseKcal*ratio));
-    food.protein=String(Math.round(food._baseProtein*ratio*10)/10);
-    food.carb=String(Math.round(food._baseCarb*ratio*10)/10);
-    food.fat=String(Math.round((food._baseFat||0)*ratio*10)/10);
-    // Update inputs directly
-    const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
-    const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
-    const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
-    const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
-    if(kcalEl)kcalEl.value=food.kcal;
-    if(protEl)protEl.value=food.protein;
-    if(carbEl)carbEl.value=food.carb;
-    if(fatEl)fatEl.value=food.fat;
-  }
+  
+  // Unit change: just save the label, recalculate based on new amount
+  // Miktar değerini de sıfırla ki kullanıcı yeni miktarı girebilsin
+  // Makroları MEVCUT miktara göre koru — birim sadece etiket
+  // Hiçbir makro değişimi yapma, sadece kaydet
+  const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
+  const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
+  const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
+  const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
+  // Keep current macro values as-is
+  if(kcalEl)kcalEl.value=food.kcal||'';
+  if(protEl)protEl.value=food.protein||'';
+  if(carbEl)carbEl.value=food.carb||'';
+  if(fatEl)fatEl.value=food.fat||'';
   saveNutrition(activeProfile()?.id,curNutDate);
   updateNutTotals();
 }
