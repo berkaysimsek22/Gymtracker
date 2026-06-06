@@ -1611,7 +1611,7 @@ const FOOD_DB = {
   'ayran':         {kcal:36,  protein:1.8, carb:2.8, fat:1.5, per:100, unit:'ml'},
   'kahve':         {kcal:2,   protein:0.3, carb:0,   fat:0,   per:100, unit:'ml'},
   'zeytinyağlı sebze':{kcal:80,protein:2,  carb:8,   fat:5,   per:100, unit:'gram'},
-  'avokado':       {kcal:160, protein:2,   carb:9,   fat:15,  per:100, unit:'gram'},
+  'avokado':       {kcal:160, protein:2,   carb:9,   fat:15,  per:100, unit:'gram', per_adet:200},
   'humus':         {kcal:166, protein:8,   carb:14,  fat:10,  per:100, unit:'gram'},
   'fıstık ezmesi': {kcal:588, protein:25,  carb:20,  fat:50,  per:100, unit:'gram'},
   'zeytin':        {kcal:115, protein:0.8, carb:6,   fat:10,  per:100, unit:'gram'},
@@ -1788,20 +1788,24 @@ async function selectFoodSugg(foodKey, mi, fi){
   if(!nd.meals[mi] || !nd.meals[mi].foods[fi]) return;
   const food = nd.meals[mi].foods[fi];
   food.name = foodKey;
+  // Set unit based on DB
+  const isAdet = found.unit && found.unit.includes('adet');
+  const isMl = found.unit && found.unit.includes('ml');
+  food.unit = isAdet ? 'adet' : isMl ? 'ml' : 'gram';
+  // Set default amount (1 for adet, 100 for gram/ml)
+  const defaultAmount = found.per;
+  food.amount = String(defaultAmount);
+  // Store base values (always per found.per units)
   food._baseKcal = found.kcal;
   food._baseProtein = found.protein;
   food._baseCarb = found.carb;
   food._baseFat = found.fat || 0;
   food._basePer = found.per;
-  const currentAmount = parseFloat(food.amount) || found.per;
-  const ratio = currentAmount / found.per;
-  food.kcal = String(Math.round(found.kcal * ratio));
-  food.protein = String(Math.round(found.protein * ratio * 10) / 10);
-  food.carb = String(Math.round(found.carb * ratio * 10) / 10);
-  food.fat = String(Math.round((found.fat||0) * ratio * 10) / 10);
-  if(!food.amount) food.amount = String(found.per);
-  food.unit = found.unit && found.unit.includes('adet') ? 'adet' : 
-               found.unit && found.unit.includes('ml') ? 'ml' : 'gram';
+  // Set macros directly (1:1 ratio since amount = per)
+  food.kcal = String(Math.round(found.kcal));
+  food.protein = String(Math.round(found.protein * 10) / 10);
+  food.carb = String(Math.round(found.carb * 10) / 10);
+  food.fat = String(Math.round((found.fat||0) * 10) / 10);
   saveNutrition(activeProfile()?.id, curNutDate);
   renderNutrition();
 }
