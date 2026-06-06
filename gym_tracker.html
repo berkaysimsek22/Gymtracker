@@ -1093,7 +1093,7 @@ function renderMeals(nd){
         <div id="fsugg_${mi}_${fi}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.2);border-radius:6px;max-height:160px;overflow-y:auto;z-index:200;margin-top:2px"></div>
       </div>
       <input class="food-inp num" placeholder="100" type="number" value="${f.amount||''}" oninput="updFoodAmount(${mi},${fi},this.value)">
-      <select class="food-inp" style="font-size:10px;padding:4px 3px" onchange="updFood(${mi},${fi},'unit',this.value)">
+      <select class="food-inp" style="font-size:10px;padding:4px 3px" onchange="updFoodUnitOnly(${mi},${fi},this.value)">
         <option value="gram" ${(f.unit||'gram')==='gram'?'selected':''}>gram</option>
         <option value="adet" ${(f.unit||'')==='adet'?'selected':''}>adet</option>
         <option value="ml" ${(f.unit||'')==='ml'?'selected':''}>ml</option>
@@ -1111,7 +1111,7 @@ function renderMeals(nd){
       <div class="meal-head" onclick="toggleMeal(${mi})">
         <input class="meal-time-inp" value="${meal.time||''}" placeholder="00:00" onclick="event.stopPropagation()" onchange="updMeal(${mi},'time',this.value)">
         <input class="meal-name-inp" placeholder="Öğün adı..." value="${meal.name||''}" onclick="event.stopPropagation()" onchange="updMeal(${mi},'name',this.value)">
-        <div class="meal-cals">${Math.round(mc)} kcal</div>
+        <div class="meal-cals" id="meal_kcal_${mi}">${Math.round(mc)} kcal</div>
         <button class="del-btn" onclick="event.stopPropagation();delMeal(${mi})">🗑</button>
         <div class="meal-arr">⌄</div>
       </div>
@@ -1131,11 +1131,55 @@ function renderMeals(nd){
 async function getNd(){return await loadNutrition(activeProfile()?.id,curNutDate);}
 async function updMeal(mi,f,v){const nd=await getNd();nd.meals[mi][f]=v;saveNutrition(activeProfile()?.id,curNutDate);}
 async function delMeal(mi){if(!confirm('Öğün silinsin mi?'))return;const nd=await getNd();nd.meals.splice(mi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
+
+async function updFoodUnitOnly(mi,fi,v){
+  const nd=await getNd();
+  const food=nd.meals[mi].foods[fi];
+  food.unit=v;
+  // Recalculate based on current amount and base values
+  const amt=parseFloat(food.amount)||0;
+  if(amt>0 && food._baseKcal!==undefined && food._basePer){
+    const ratio=amt/food._basePer;
+    food.kcal=String(Math.round(food._baseKcal*ratio));
+    food.protein=String(Math.round(food._baseProtein*ratio*10)/10);
+    food.carb=String(Math.round(food._baseCarb*ratio*10)/10);
+    food.fat=String(Math.round((food._baseFat||0)*ratio*10)/10);
+    // Update inputs directly
+    const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
+    const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
+    const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
+    const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
+    if(kcalEl)kcalEl.value=food.kcal;
+    if(protEl)protEl.value=food.protein;
+    if(carbEl)carbEl.value=food.carb;
+    if(fatEl)fatEl.value=food.fat;
+  }
+  saveNutrition(activeProfile()?.id,curNutDate);
+  updateNutTotals();
+}
+
 async function updFood(mi,fi,f,v){
   const nd=await getNd();
   nd.meals[mi].foods[fi][f]=v;
   saveNutrition(activeProfile()?.id,curNutDate);
-  renderNutrition();
+  updateNutTotals();
+}
+
+function updateNutTotals(){
+  const uid=activeProfile()&&activeProfile().id;
+  if(!uid)return;
+  const nd=nutCache[uid+'_'+curNutDate];
+  if(!nd)return;
+  let tk=0,tp=0,tc=0,tf=0;
+  nd.meals&&nd.meals.forEach(function(m){m.foods&&m.foods.forEach(function(f){tk+=parseFloat(f.kcal||0);tp+=parseFloat(f.protein||0);tc+=parseFloat(f.carb||0);tf+=parseFloat(f.fat||0);});});
+  tk=Math.round(tk);tp=Math.round(tp);tc=Math.round(tc);tf=Math.round(tf);
+  const t=nd.targets||{kcal:2000,protein:150,carb:200,fat:70};
+  const mr=document.getElementById('macroRow');
+  if(mr){mr.innerHTML='<div class="macro-box"><div class="mv" style="color:#ef4444">'+tp+'g</div><div class="ml">Protein</div><div class="mp">'+t.protein+'g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.min(100,Math.round(tp/t.protein*100))+'%;background:#ef4444"></div></div></div><div class="macro-box"><div class="mv" style="color:#f59e0b">'+tc+'g</div><div class="ml">Karbonhidrat</div><div class="mp">'+t.carb+'g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.min(100,Math.round(tc/t.carb*100))+'%;background:#f59e0b"></div></div></div><div class="macro-box"><div class="mv" style="color:#8b5cf6">'+tf+'g</div><div class="ml">Yağ</div><div class="mp">'+t.fat+'g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.min(100,Math.round(tf/t.fat*100))+'%;background:#8b5cf6"></div></div></div>';}
+  const ct=document.getElementById('calTotal');
+  const pct=Math.min(100,Math.round(tk/t.kcal*100));
+  if(ct){ct.innerHTML='<div><div class="cv" style="color:'+(pct>100?'var(--acc2)':'var(--acc)')+'">'+tk+'</div><div style="font-size:11px;color:var(--muted)">/ '+t.kcal+' kcal ('+pct+'%)</div></div><div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:'+(t.kcal-tk<0?'var(--acc2)':'var(--muted)')+'">'+( t.kcal-tk)+'</div></div>';}
+  nd.meals&&nd.meals.forEach(function(m,mi){let mc=0;m.foods&&m.foods.forEach(function(f){mc+=parseFloat(f.kcal||0);});const badge=document.getElementById('meal_kcal_'+mi);if(badge)badge.textContent=Math.round(mc)+' kcal';});
 }
 
 async function updFoodAmount(mi,fi,newAmount){
@@ -1174,8 +1218,16 @@ async function updFoodAmount(mi,fi,newAmount){
   if(protEl)protEl.value=food.protein||'';
   if(carbEl)carbEl.value=food.carb||'';
   if(fatEl)fatEl.value=food.fat||'';
-  // Update meal total
-  renderNutrition();
+  // Update macro inputs directly (no re-render)
+  const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
+  const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
+  const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
+  const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
+  if(kcalEl)kcalEl.value=food.kcal||'';
+  if(protEl)protEl.value=food.protein||'';
+  if(carbEl)carbEl.value=food.carb||'';
+  if(fatEl)fatEl.value=food.fat||'';
+  updateNutTotals();
 }
 async function delFood(mi,fi){const nd=await getNd();nd.meals[mi].foods.splice(fi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
 async function addFood(mi){const nd=await getNd();nd.meals[mi].foods.push({name:'',amount:'',kcal:'',protein:'',carb:''});nd.meals[mi].open=true;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
