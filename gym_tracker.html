@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+tip:"",<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
@@ -1209,7 +1209,7 @@ sb.auth.onAuthStateChange((event, session) => {
 // ── EXERCISE DATABASE ──
 const EXERCISE_DB = [
   // GLUTE
-  {name:'Hip Thrust',muscle:'Glute Maximus',muscles:['glute_max'],sets:4,reps:'12-10-8-6',restSec:120,tip:'Son sette failure'a yaklaş'},
+  {name:'Hip Thrust',muscle:'Glute Maximus',muscles:['glute_max'],sets:4,reps:'12-10-8-6',restSec:120,tip:"Son sette failure'a yaklaş"},
   {name:'Romanian Deadlift',muscle:'Glute Maximus · Hamstring',muscles:['glute_max','hamstring'],sets:3,reps:'10,8,8',restSec:90,tip:'3 sn eksentrik, gerin hisset'},
   {name:'Bulgarian Split Squat',muscle:'Glute Max + Medius',muscles:['glute_max','glute_med'],sets:3,reps:'10,8',restSec:90,tip:'Yavaş kontrol, derinliği koru'},
   {name:'Sumo Squat',muscle:'Glute Medius · Quad',muscles:['glute_med','quad'],sets:4,reps:'12-10-8-6',restSec:120,tip:'%80 eforla çalış'},
@@ -1224,7 +1224,7 @@ const EXERCISE_DB = [
   {name:'Back Squat',muscle:'Quadriceps · Glute',muscles:['quad','glute_max'],sets:4,reps:'8,8,6,6',restSec:150,tip:'Kalça geri it'},
   {name:'Front Squat',muscle:'Quadriceps',muscles:['quad'],sets:4,reps:'8,6,6',restSec:120,tip:'Gövde dik'},
   {name:'Leg Press',muscle:'Quadriceps · Glute',muscles:['quad','glute_max'],sets:4,reps:'12,10,10',restSec:90,tip:'Dar duruş → quad dominant'},
-  {name:'Smith Machine Squat',muscle:'Quadriceps · Glute',muscles:['quad','glute_max'],sets:4,reps:'12,10,8',restSec:90,tip:'Failure'a güvenle git'},
+  {name:'Smith Machine Squat',muscle:'Quadriceps · Glute',muscles:['quad','glute_max'],sets:4,reps:'12,10,8',restSec:90,tip:"Failure'a güvenle git"},
   {name:'Leg Extension',muscle:'Quadriceps',muscles:['quad'],sets:3,reps:'15',restSec:60,tip:'Tepe noktada 1-2 sn tut'},
   {name:'Hack Squat',muscle:'Quadriceps',muscles:['quad'],sets:4,reps:'10,8,8',restSec:120,tip:'Tam aşağı in'},
   // HAMSTRING
@@ -1398,26 +1398,19 @@ function showMuscleVisual(activeMuscles){
     mid_back:'Mid Back · Traps',front_delt:'Ön Deltoid',side_delt:'Yan Deltoid',
     rear_delt:'Arka Deltoid',biceps:'Biceps',triceps:'Triceps',abs:'Core · Abs',calves:'Baldır'
   }[m]||m)).filter(Boolean);
-  modal.innerHTML=`<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.5px">Çalışan Kaslar</h3>
-      <button onclick="document.getElementById('muscleVisualModal').remove()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer">✕</button>
-    </div>
-    <div style="display:flex;gap:16px;justify-content:center;margin-bottom:16px">
-      <div style="text-align:center">
-        <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Ön</div>
-        ${front}
-      </div>
-      <div style="text-align:center">
-        <div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Arka</div>
-        ${back}
-      </div>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">
-      ${muscleNames.map(m=>`<span style="font-size:10px;padding:3px 10px;border-radius:10px;background:rgba(212,245,60,.1);color:#d4f53c;border:1px solid rgba(212,245,60,.2)">${m}</span>`).join('')}
-    </div>
-    <button onclick="document.getElementById('muscleVisualModal').remove()" style="width:100%;margin-top:16px;padding:10px;border-radius:8px;background:#d4f53c;border:none;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:12px">Kapat & Ekle</button>
-  </div>`;
+  const muscleChips = muscleNames.map(m=>'<span style="font-size:10px;padding:3px 10px;border-radius:10px;background:rgba(212,245,60,.1);color:#d4f53c;border:1px solid rgba(212,245,60,.2)">'+m+'</span>').join('');
+  modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+    + '<h3 style="font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:.5px">Çalışan Kaslar</h3>'
+    + '<button onclick="document.getElementById('muscleVisualModal').remove()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer">✕</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:16px;justify-content:center;margin-bottom:16px">'
+    + '<div style="text-align:center"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Ön</div>' + front + '</div>'
+    + '<div style="text-align:center"><div style="font-size:9px;color:#555;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Arka</div>' + back + '</div>'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">' + muscleChips + '</div>'
+    + '<button onclick="document.getElementById('muscleVisualModal').remove()" style="width:100%;margin-top:16px;padding:10px;border-radius:8px;background:#d4f53c;border:none;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:12px">Kapat &amp; Ekle</button>'
+    + '</div>';
   document.body.appendChild(modal);
 }
 
