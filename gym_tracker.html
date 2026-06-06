@@ -1135,19 +1135,54 @@ async function delMeal(mi){if(!confirm('Öğün silinsin mi?'))return;const nd=a
 async function updFoodUnitOnly(mi,fi,v){
   const nd=await getNd();
   const food=nd.meals[mi].foods[fi];
-  const oldUnit=food.unit||'gram';
   food.unit=v;
-  const amt=parseFloat(food.amount)||0;
   
-  // Unit change: just save the label, recalculate based on new amount
-  // Miktar değerini de sıfırla ki kullanıcı yeni miktarı girebilsin
-  // Makroları MEVCUT miktara göre koru — birim sadece etiket
-  // Hiçbir makro değişimi yapma, sadece kaydet
+  // Find food in DB
+  const dbKey=Object.keys(FOOD_DB).find(k=>k===(food.name||'').toLowerCase().trim()||k===food.name);
+  const found=dbKey?FOOD_DB[dbKey]:null;
+  
+  if(found){
+    // Determine the base amount for the selected unit
+    let basePer, baseKcal, baseProt, baseCarb, baseFat;
+    if(v==='adet' && found.per_adet){
+      // Use per_adet value - this is how much 1 piece weighs in grams
+      basePer=1;
+      const gramsPerPiece=found.per_adet;
+      const ratio=gramsPerPiece/found.per;
+      baseKcal=Math.round(found.kcal*ratio);
+      baseProt=Math.round(found.protein*ratio*10)/10;
+      baseCarb=Math.round(found.carb*ratio*10)/10;
+      baseFat=Math.round((found.fat||0)*ratio*10)/10;
+    } else {
+      basePer=found.per;
+      baseKcal=found.kcal;
+      baseProt=found.protein;
+      baseCarb=found.carb;
+      baseFat=found.fat||0;
+    }
+    // Store new base
+    food._baseKcal=baseKcal;
+    food._baseProtein=baseProt;
+    food._baseCarb=baseCarb;
+    food._baseFat=baseFat;
+    food._basePer=basePer;
+    // Set default amount for this unit
+    const currentAmt=parseFloat(food.amount)||basePer;
+    food.amount=String(currentAmt);
+    // Recalculate
+    const ratio2=currentAmt/basePer;
+    food.kcal=String(Math.round(baseKcal*ratio2));
+    food.protein=String(Math.round(baseProt*ratio2*10)/10);
+    food.carb=String(Math.round(baseCarb*ratio2*10)/10);
+    food.fat=String(Math.round(baseFat*ratio2*10)/10);
+  }
+  
+  // Update inputs
   const kcalEl=document.getElementById('food_kcal_'+mi+'_'+fi);
   const protEl=document.getElementById('food_prot_'+mi+'_'+fi);
   const carbEl=document.getElementById('food_carb_'+mi+'_'+fi);
   const fatEl=document.getElementById('food_fat_'+mi+'_'+fi);
-  // Keep current macro values as-is
+  const amtEl=document.getElementById ? document.querySelector('[id^="finp_'+mi+'_'+fi+'"]') : null;
   if(kcalEl)kcalEl.value=food.kcal||'';
   if(protEl)protEl.value=food.protein||'';
   if(carbEl)carbEl.value=food.carb||'';
@@ -1563,9 +1598,9 @@ function showDayMuscleMap(di){
 
 // Common Turkish foods database for auto-lookup
 const FOOD_DB = {
-  'yumurta':       {kcal:70,  protein:6,   carb:0.5, fat:5,   per:1,   unit:'adet'},
-  'beyaz yumurta': {kcal:17,  protein:3.6, carb:0.2, fat:0,   per:1,   unit:'adet'},
-  'yumurta sarısı':{kcal:55,  protein:2.7, carb:0.6, fat:4.5, per:1,   unit:'adet'},
+  'yumurta':       {kcal:70,  protein:6,   carb:0.5, fat:5,   per:1,   unit:'adet', per_adet:1},
+  'beyaz yumurta': {kcal:17,  protein:3.6, carb:0.2, fat:0,   per:1,   unit:'adet', per_adet:1},
+  'yumurta sarısı':{kcal:55,  protein:2.7, carb:0.6, fat:4.5, per:1,   unit:'adet', per_adet:1},
   'tavuk göğsü':   {kcal:165, protein:31,  carb:0,   fat:3.6, per:100, unit:'gram'},
   'tavuk':         {kcal:165, protein:31,  carb:0,   fat:3.6, per:100, unit:'gram'},
   'pirinç':        {kcal:130, protein:2.7, carb:28,  fat:0.3, per:100, unit:'gram'},
@@ -1584,9 +1619,9 @@ const FOOD_DB = {
   'whey protein':  {kcal:120, protein:24,  carb:3,   fat:1.5, per:30,  unit:'gram'},
   'badem':         {kcal:579, protein:21,  carb:22,  fat:50,  per:100, unit:'gram'},
   'ceviz':         {kcal:654, protein:15,  carb:14,  fat:65,  per:100, unit:'gram'},
-  'muz':           {kcal:89,  protein:1.1, carb:23,  fat:0.3, per:100, unit:'gram'},
-  'elma':          {kcal:52,  protein:0.3, carb:14,  fat:0.2, per:100, unit:'gram'},
-  'portakal':      {kcal:47,  protein:0.9, carb:12,  fat:0.1, per:100, unit:'gram'},
+  'muz':           {kcal:89,  protein:1.1, carb:23,  fat:0.3, per:100, unit:'gram', per_adet:120},
+  'elma':          {kcal:52,  protein:0.3, carb:14,  fat:0.2, per:100, unit:'gram', per_adet:150},
+  'portakal':      {kcal:47,  protein:0.9, carb:12,  fat:0.1, per:100, unit:'gram', per_adet:180},
   'çilek':         {kcal:32,  protein:0.7, carb:7.7, fat:0.3, per:100, unit:'gram'},
   'yulaf':         {kcal:389, protein:17,  carb:66,  fat:7,   per:100, unit:'gram'},
   'yulaf ezmesi':  {kcal:68,  protein:2.4, carb:12,  fat:1.4, per:100, unit:'gram (pişmiş)'},
