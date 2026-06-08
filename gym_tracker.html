@@ -857,7 +857,7 @@ function buildExCard(ex, di, ei) {
       <div class="snum">${s+1}</div>
       <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
       <input class="sinput" type="text" placeholder="${ex.reps.split(/[-,]/)[0]||'rep'}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
-      <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?'✓':'○'}</button>
+      <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?"✓":"O"}</button>
     </div>`;
   }
   const editArea = editMode&&canEdit()?`<div class="ex-edit-area"><div class="edit-grid">
@@ -908,7 +908,7 @@ async function toggleSet(uid,di,ei,si,rs){
   await saveSet(uid,di,ei,si,fields);
   const row=document.getElementById('sr_'+k),btn=document.getElementById('cb_'+k);
   if(newDone){row?.classList.add('sdone');if(btn){btn.classList.add('chk');btn.textContent='✓';}}
-  else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='○';}}
+  else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='O';}}
   const ex=activeProgram()[di].exercises[ei];let done=0;
   for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)done++;}
   const mp=document.getElementById(`mp_${di}_${ei}`);if(mp){mp.textContent=`${done}/${ex.sets}`;mp.className=`meta-pill${done===ex.sets?' done-pill':''}`;}
@@ -940,7 +940,7 @@ function addExtraSet(uid, di, ei){
   repInp.className='sinput'; repInp.type='text'; repInp.placeholder='rep'; repInp.id='sr2_'+k;
   repInp.oninput = function(){qSave(uid,di,ei,si,'reps',this.value);};
   const chkBtn = document.createElement('button');
-  chkBtn.className='chk-btn'; chkBtn.id='cb_'+k; chkBtn.textContent='○';
+  chkBtn.className='chk-btn'; chkBtn.id='cb_'+k; chkBtn.textContent='O';
   chkBtn.onclick = function(){toggleSet(uid,di,ei,si,ex.restSec);};
   const numDiv = document.createElement('div');
   numDiv.className='snum'; numDiv.textContent=ex.sets;
