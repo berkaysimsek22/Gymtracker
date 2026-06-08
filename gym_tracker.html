@@ -794,7 +794,7 @@ async function renderDayContent(di) {
   let html = `<div class="day-head-row">
     <div class="day-head-left">
       <input class="day-head-title" value="${day.name}" ${canEdit()?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id)">
-      <span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">${day.type.toUpperCase()}</span>
+      ${editMode&&canEdit()?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">${day.type.toUpperCase()}</span>'}
     </div>
     <div class="day-head-right">
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
@@ -952,6 +952,14 @@ function addExtraSet(uid, di, ei){
   setArea.insertBefore(newRow, lastChild);
   const mp = document.getElementById('mp_'+di+'_'+ei);
   if(mp){let done=0;for(let s=0;s<ex.sets;s++){if(setCache[uid+'_'+di+'_'+ei+'_'+s]&&setCache[uid+'_'+di+'_'+ei+'_'+s].done)done++;}mp.textContent=done+'/'+ex.sets;}
+}
+
+
+function changeDay(di, newDay){
+  activeProgram()[di].day = newDay;
+  saveProgram(activeProfile().id);
+  renderDayTabs(people[curP]);
+  renderWeekGrid(people[curP]);
 }
 
 function toggleEdit(){editMode=!editMode;renderDayContent(curDay);}
