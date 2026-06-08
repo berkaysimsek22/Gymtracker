@@ -922,27 +922,36 @@ function addExtraSet(uid, di, ei){
   if(!prog[di]||!prog[di].exercises[ei]) return;
   const ex = prog[di].exercises[ei];
   ex.sets += 1;
-  // Don't save to program - just re-render with extra set
+  const si = ex.sets - 1;
+  const k = uid+'_'+di+'_'+ei+'_'+si;
   const card = document.getElementById('ec_'+di+'_'+ei);
   if(!card) return;
   const setArea = card.querySelector('.set-area');
   if(!setArea) return;
-  const si = ex.sets - 1;
-  const k = uid+'_'+di+'_'+ei+'_'+si;
   const newRow = document.createElement('div');
   newRow.className = 'set-row';
   newRow.id = 'sr_'+k;
-  newRow.innerHTML = '<div class="snum">'+ex.sets+'</div>'
-    +'<input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="kg" id="sw_'+k+'" oninput="qSave(''+uid+'','+di+','+ei+','+si+','weight',this.value)">'
-    +'<input class="sinput" type="text" placeholder="rep" id="sr2_'+k+'" oninput="qSave(''+uid+'','+di+','+ei+','+si+','reps',this.value)">'
-    +'<input class="note-sinput" type="text" placeholder="not..." oninput="qSave(''+uid+'','+di+','+ei+','+si+','note',this.value)">'
-    +'<button class="chk-btn" id="cb_'+k+'" onclick="toggleSet(''+uid+'','+di+','+ei+','+si+','+ex.restSec+')">○</button>';
-  // Insert before the extra-set button row
+  // Use data attributes to avoid quote issues
+  const kgInp = document.createElement('input');
+  kgInp.className='sinput'; kgInp.type='number'; kgInp.step='0.5'; kgInp.min='0';
+  kgInp.inputMode='decimal'; kgInp.placeholder='kg'; kgInp.id='sw_'+k;
+  kgInp.oninput = function(){qSave(uid,di,ei,si,'weight',this.value);};
+  const repInp = document.createElement('input');
+  repInp.className='sinput'; repInp.type='text'; repInp.placeholder='rep'; repInp.id='sr2_'+k;
+  repInp.oninput = function(){qSave(uid,di,ei,si,'reps',this.value);};
+  const chkBtn = document.createElement('button');
+  chkBtn.className='chk-btn'; chkBtn.id='cb_'+k; chkBtn.textContent='○';
+  chkBtn.onclick = function(){toggleSet(uid,di,ei,si,ex.restSec);};
+  const numDiv = document.createElement('div');
+  numDiv.className='snum'; numDiv.textContent=ex.sets;
+  newRow.appendChild(numDiv);
+  newRow.appendChild(kgInp);
+  newRow.appendChild(repInp);
+  newRow.appendChild(chkBtn);
   const lastChild = setArea.lastElementChild;
   setArea.insertBefore(newRow, lastChild);
-  // Update meta
   const mp = document.getElementById('mp_'+di+'_'+ei);
-  if(mp){ let done=0; for(let s=0;s<ex.sets;s++){if(setCache[uid+'_'+di+'_'+ei+'_'+s]?.done)done++;} mp.textContent=done+'/'+ex.sets; }
+  if(mp){let done=0;for(let s=0;s<ex.sets;s++){if(setCache[uid+'_'+di+'_'+ei+'_'+s]&&setCache[uid+'_'+di+'_'+ei+'_'+s].done)done++;}mp.textContent=done+'/'+ex.sets;}
 }
 
 function toggleEdit(){editMode=!editMode;renderDayContent(curDay);}
