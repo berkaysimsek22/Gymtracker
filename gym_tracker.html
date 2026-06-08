@@ -131,8 +131,8 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 /* SET AREA */
 .set-area{display:none;border-top:1px solid var(--border)}
 .ex-card.open .set-area{display:block}
-.set-grid-head{display:grid;grid-template-columns:28px 80px 70px auto 36px;gap:4px;padding:7px 13px;font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
-.set-row{display:grid;grid-template-columns:28px 80px 70px auto 36px;gap:4px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
+.set-grid-head{display:grid;grid-template-columns:28px 1fr 1fr 40px;gap:8px;padding:7px 13px;font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.set-row{display:grid;grid-template-columns:28px 1fr 1fr 40px;gap:8px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
 .set-row.sdone{background:rgba(212,245,60,.025)}
 .snum{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);line-height:1;text-align:center}
 .sdone .snum{color:var(--acc)}
@@ -857,7 +857,6 @@ function buildExCard(ex, di, ei) {
       <div class="snum">${s+1}</div>
       <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
       <input class="sinput" type="text" placeholder="${ex.reps.split(/[-,]/)[0]||'rep'}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
-      <input class="note-sinput" type="text" placeholder="not..." value="${sd.note||''}" oninput="qSave('${uid}',${di},${ei},${s},'note',this.value)">
       <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?'✓':'○'}</button>
     </div>`;
   }
@@ -879,7 +878,7 @@ function buildExCard(ex, di, ei) {
     <div class="expand-arr">⌄</div>
   </div>
   <div class="set-area">
-    <div class="set-grid-head"><div>Set</div><div style="text-align:center">KG</div><div style="text-align:center">Tekrar</div><div>Not</div><div></div></div>
+    <div class="set-grid-head"><div>Set</div><div style="text-align:center">KG</div><div style="text-align:center">Tekrar</div><div></div></div>
     ${setRows}${editArea}
     <div class="ex-notes"><label>Egzersiz Notu</label>
       <textarea rows="1" placeholder="Genel not..." oninput="qSave('${uid}',${di},${ei},-1,'note',this.value)">${(setCache['exn_'+uid+'_'+di+'_'+ei]||'')}</textarea>
