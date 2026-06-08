@@ -131,18 +131,18 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 /* SET AREA */
 .set-area{display:none;border-top:1px solid var(--border)}
 .ex-card.open .set-area{display:block}
-.set-grid-head{display:grid;grid-template-columns:22px 80px 70px 1fr 28px;gap:5px;padding:7px 13px;font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
-.set-row{display:grid;grid-template-columns:22px 80px 70px 1fr 28px;gap:5px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
+.set-grid-head{display:grid;grid-template-columns:28px 80px 70px auto 36px;gap:4px;padding:7px 13px;font-size:8px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.set-row{display:grid;grid-template-columns:28px 80px 70px auto 36px;gap:4px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
 .set-row.sdone{background:rgba(212,245,60,.025)}
 .snum{font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);line-height:1;text-align:center}
 .sdone .snum{color:var(--acc)}
 .sinput{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 7px;color:var(--text);font-family:'Archivo',monospace;font-size:12px;font-weight:500;text-align:center;width:100%;outline:none;transition:border-color .2s}
 .sinput:focus{border-color:rgba(212,245,60,.35)}
 .sinput::placeholder{color:#2e2e2e}
-.note-sinput{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 7px;color:var(--muted);font-family:'Archivo',sans-serif;font-size:10px;width:100%;outline:none;transition:border-color .2s;font-style:italic}
+.note-sinput{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 7px;color:var(--muted);font-family:'Archivo',sans-serif;font-size:10px;width:100%;outline:none;transition:border-color .2s;font-style:italic;min-width:0}
 .note-sinput:focus{border-color:rgba(212,245,60,.2);color:var(--text)}
 .note-sinput::placeholder{color:#262626}
-.chk-btn{width:24px;height:24px;border-radius:6px;border:1.5px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .2s;color:var(--muted);margin:0 auto}
+.chk-btn{width:32px;height:32px;border-radius:8px;border:2px solid rgba(212,245,60,.4);background:rgba(212,245,60,.06);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;color:var(--acc);flex-shrink:0;min-width:32px}
 .chk-btn.chk{background:var(--acc);border-color:var(--acc);color:#0c0c0c}
 
 /* EDIT AREA */
@@ -642,20 +642,35 @@ async function saveProgram(userId) {
 }
 
 async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
-  const k = `${userId}_${dayIdx}_${exIdx}_${setIdx}`;
+  const k = userId+'_'+dayIdx+'_'+exIdx+'_'+setIdx;
   if(!setCache[k]) setCache[k] = {};
   Object.assign(setCache[k], fields);
-  // debounce save
   clearTimeout(saveTimer[k]);
   saveTimer[k] = setTimeout(async () => {
-    const row = {user_id: userId, day_index: dayIdx, exercise_index: exIdx, set_index: setIdx, ...fields};
-    if(setCache[k].db_id) {
-      await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
-    } else {
-      const {data} = await sb.from('workout_sets').upsert(row, {onConflict: 'user_id,day_index,exercise_index,set_index'}).select().single();
-      if(data) setCache[k].db_id = data.id;
+    try {
+      const row = {user_id: userId, day_index: parseInt(dayIdx), exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...fields};
+      if(setCache[k].db_id) {
+        await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
+      } else {
+        // Try to find existing row first
+        const {data: existing} = await sb.from('workout_sets')
+          .select('id').eq('user_id', userId)
+          .eq('day_index', parseInt(dayIdx))
+          .eq('exercise_index', parseInt(exIdx))
+          .eq('set_index', parseInt(setIdx))
+          .single();
+        if(existing) {
+          setCache[k].db_id = existing.id;
+          await sb.from('workout_sets').update(row).eq('id', existing.id);
+        } else {
+          const {data} = await sb.from('workout_sets').insert(row).select().single();
+          if(data) setCache[k].db_id = data.id;
+        }
+      }
+    } catch(e) {
+      console.error('saveSet error:', e);
     }
-  }, 800);
+  }, 600);
 }
 
 function showMainApp() {
@@ -856,7 +871,7 @@ function buildExCard(ex, di, ei) {
   </div></div>`:'';
   card.innerHTML = `<div class="ex-header" onclick="toggleEC('ec_${di}_${ei}')">
     <div class="ex-num-badge">${ei+1}</div>
-    <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display">${ex.muscle}</div></div>
+    <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display"><span style="color:#ef4444;font-weight:500">${ex.muscle.split('·')[0].split('+')[0].trim()}</span>${ex.muscle.includes('·')||ex.muscle.includes('+')?'<span style="color:var(--muted)"> · '+ex.muscle.split(/[·+]/)[1].trim()+'</span>':''}</div></div>
     <div class="ex-meta">
       <div class="meta-pill${comp?' done-pill':''}" id="mp_${di}_${ei}">${done}/${ex.sets}</div>
       <div class="meta-pill">${ex.reps}×${ex.sets}</div>
@@ -867,9 +882,9 @@ function buildExCard(ex, di, ei) {
     <div class="set-grid-head"><div>Set</div><div style="text-align:center">KG</div><div style="text-align:center">Tekrar</div><div>Not</div><div></div></div>
     ${setRows}${editArea}
     <div class="ex-notes"><label>Egzersiz Notu</label>
-      <textarea rows="1" placeholder="Genel not..." oninput="qSave('${uid}',${di},${ei},-1,'note',this.value)">${setCache[`exn_${uid}_${di}_${ei}`]||''}</textarea>
+      <textarea rows="1" placeholder="Genel not..." oninput="qSave('${uid}',${di},${ei},-1,'note',this.value)">${(setCache['exn_'+uid+'_'+di+'_'+ei]||'')}</textarea>
     </div>
-    ${ex.tip?`<div class="ex-tip"><span>💡</span><span>${ex.tip}</span></div>`:''}
+    ${ex.tip?'<div class="ex-tip"><span>💡</span><span>'+ex.tip+'</span></div>':''}
   </div>`;
   return card;
 }
@@ -877,7 +892,7 @@ function buildExCard(ex, di, ei) {
 function toggleEC(id){document.getElementById(id)?.classList.toggle('open');}
 
 function qSave(uid,di,ei,si,field,val){
-  if(si===-1){setCache[`exn_${uid}_${di}_${ei}`]=val;return;}
+  if(si===-1){setCache['exn_'+uid+'_'+di+'_'+ei]=val;return;}
   saveSet(uid,di,ei,si,{[field]:val});
 }
 
@@ -900,6 +915,35 @@ async function toggleSet(uid,di,ei,si,rs){
   const mp=document.getElementById(`mp_${di}_${ei}`);if(mp){mp.textContent=`${done}/${ex.sets}`;mp.className=`meta-pill${done===ex.sets?' done-pill':''}`;}
   done===ex.sets?document.getElementById(`ec_${di}_${ei}`)?.classList.add('completed'):document.getElementById(`ec_${di}_${ei}`)?.classList.remove('completed');
   renderDayTabs();
+}
+
+
+function addExtraSet(uid, di, ei){
+  const prog = activeProgram();
+  if(!prog[di]||!prog[di].exercises[ei]) return;
+  const ex = prog[di].exercises[ei];
+  ex.sets += 1;
+  // Don't save to program - just re-render with extra set
+  const card = document.getElementById('ec_'+di+'_'+ei);
+  if(!card) return;
+  const setArea = card.querySelector('.set-area');
+  if(!setArea) return;
+  const si = ex.sets - 1;
+  const k = uid+'_'+di+'_'+ei+'_'+si;
+  const newRow = document.createElement('div');
+  newRow.className = 'set-row';
+  newRow.id = 'sr_'+k;
+  newRow.innerHTML = '<div class="snum">'+ex.sets+'</div>'
+    +'<input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="kg" id="sw_'+k+'" oninput="qSave(''+uid+'','+di+','+ei+','+si+','weight',this.value)">'
+    +'<input class="sinput" type="text" placeholder="rep" id="sr2_'+k+'" oninput="qSave(''+uid+'','+di+','+ei+','+si+','reps',this.value)">'
+    +'<input class="note-sinput" type="text" placeholder="not..." oninput="qSave(''+uid+'','+di+','+ei+','+si+','note',this.value)">'
+    +'<button class="chk-btn" id="cb_'+k+'" onclick="toggleSet(''+uid+'','+di+','+ei+','+si+','+ex.restSec+')">○</button>';
+  // Insert before the extra-set button row
+  const lastChild = setArea.lastElementChild;
+  setArea.insertBefore(newRow, lastChild);
+  // Update meta
+  const mp = document.getElementById('mp_'+di+'_'+ei);
+  if(mp){ let done=0; for(let s=0;s<ex.sets;s++){if(setCache[uid+'_'+di+'_'+ei+'_'+s]?.done)done++;} mp.textContent=done+'/'+ex.sets; }
 }
 
 function toggleEdit(){editMode=!editMode;renderDayContent(curDay);}
