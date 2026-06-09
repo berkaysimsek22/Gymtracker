@@ -758,6 +758,8 @@ async function renderAll() {
   document.getElementById('streakBadge').textContent = `🔥 ${sessionCache.length} antrenman`;
 }
 
+let weekOffset = 0; // 0 = this week, -1 = last week, +1 = next week
+
 function renderWeekGrid() {
   const prog = activeProgram();
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -765,6 +767,18 @@ function renderWeekGrid() {
   // Check which program days have been completed (by day_name match)
   const uid = activeProfile()?.id;
   const completedNames = new Set((sessionCache||[]).map(s => s.day_name));
+  
+  // Week label
+  const baseDate = new Date();
+  baseDate.setDate(baseDate.getDate() + weekOffset * 7);
+  const weekStart = new Date(baseDate);
+  weekStart.setDate(baseDate.getDate() - (baseDate.getDay()===0?6:baseDate.getDay()-1));
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const fmtDate = d => d.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()];
+  const lbl = document.getElementById('weekLabel');
+  if(lbl) lbl.textContent = weekOffset===0 ? 'Bu Hafta' : weekOffset===-1 ? 'Geçen Hafta' : fmtDate(weekStart)+' – '+fmtDate(weekEnd);
+
   document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
     let dc = 'rest-d', lbl = 'Rest';
@@ -777,16 +791,16 @@ function renderWeekGrid() {
     const dayLabel = editMode && canEdit()
       ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
       : `<div class="wday-lbl">${lbl}</div>`;
-    // Calculate date for this day
+    // Calculate date for this day (with week offset)
     const now = new Date();
-    const dayDiff = i - now.getDay();
+    const dayDiff = i - now.getDay() + weekOffset * 7;
     const dayDate = new Date(now);
     dayDate.setDate(now.getDate() + dayDiff);
     const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
     const isSelected = pi === curDay;
     const isDone = completedNames.has(day.name);
     const boxStyle = isDone
-      ? 'background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.5)'
+      ? 'background:rgba(52,211,153,.25);border-color:#34d399;box-shadow:0 0 8px rgba(52,211,153,.2)'
       : isSelected
         ? 'border-color:rgba(212,245,60,.5);background:rgba(212,245,60,.06)'
         : '';
@@ -1066,6 +1080,12 @@ async function clearDayConfirm(di){
   t.textContent='🗑 Gün temizlendi';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2500);
+}
+
+
+function changeWeek(dir){
+  weekOffset += dir;
+  renderWeekGrid();
 }
 
 function toggleEdit(){
