@@ -960,8 +960,8 @@ function addExtraSet(uid, di, ei){
 function changeDay(di, newDay){
   activeProgram()[di].day = newDay;
   saveProgram(activeProfile().id);
-  renderDayTabs(people[curP]);
-  renderWeekGrid(people[curP]);
+  renderWeekGrid();
+  renderDayTabs();
 }
 
 function toggleEdit(){editMode=!editMode;renderDayContent(curDay);}
@@ -1180,13 +1180,13 @@ function renderMeals(nd){
   el.innerHTML=nd.meals.map((meal,mi)=>{
     let mc=0;meal.foods?.forEach(f=>mc+=parseFloat(f.kcal||0));
     const foods=(meal.foods||[]).map((f,fi)=>`<div class="food-row">
-      <div style="position:relative">
+      <div style="position:relative;z-index:100">
         <input class="food-inp" placeholder="Yemek ara..." value="${f.name||''}" 
           id="finp_${mi}_${fi}"
           oninput="filterFoodSugg(this.value,${mi},${fi})"
           onchange="updFood(${mi},${fi},'name',this.value)"
           onblur="setTimeout(()=>{hideFoodSugg(${mi},${fi});autoLookupFood(${mi},${fi},this.value);},250)">
-        <div id="fsugg_${mi}_${fi}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.2);border-radius:6px;max-height:160px;overflow-y:auto;z-index:200;margin-top:2px"></div>
+        <div id="fsugg_${mi}_${fi}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.3);border-radius:8px;max-height:200px;overflow-y:auto;z-index:9999;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.8)"></div>
       </div>
       <input class="food-inp num" placeholder="100" type="number" value="${f.amount||''}" oninput="updFoodAmount(${mi},${fi},this.value)">
       <select class="food-inp" style="font-size:10px;padding:4px 3px" onchange="updFoodUnitOnly(${mi},${fi},this.value)">
