@@ -620,9 +620,18 @@ async function loadSessionLogs(userId) {
 
 async function loadSetsForDay(userId, dayIdx) {
   const {data} = await sb.from('workout_sets').select('*').eq('user_id', userId).eq('day_index', dayIdx);
+  // Get this week's Monday at 00:00
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (now.getDay()===0?6:now.getDay()-1));
+  monday.setHours(0,0,0,0);
+  
   (data||[]).forEach(row => {
     const k = `${userId}_${dayIdx}_${row.exercise_index}_${row.set_index}`;
-    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: row.done, ts: row.done_at, db_id: row.id};
+    // If done_at is before this week's Monday, reset done (but keep weight/reps)
+    const doneAt = row.done_at ? new Date(row.done_at) : null;
+    const isDoneThisWeek = doneAt && doneAt >= monday;
+    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDoneThisWeek ? row.done : false, ts: row.done_at, db_id: row.id};
   });
 }
 
@@ -776,11 +785,16 @@ function renderWeekGrid() {
     const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
     const isSelected = pi === curDay;
     const isDone = completedNames.has(day.name);
-    return `<div class="wday${isToday?' today':''}${isSelected?' selected':''}" onclick="selDW(${pi})" style="${isSelected?'border-color:rgba(212,245,60,.5);background:rgba(212,245,60,.06)':''}">
-      <div class="wday-name" style="${isToday?'color:var(--acc)':''}">${d}</div>
-      <div class="wday-dot ${isDone?'done-d':dc}" style="${isDone?'background:#34d399':''}">${isDone?'✓':''}</div>
+    const boxStyle = isDone
+      ? 'background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.5)'
+      : isSelected
+        ? 'border-color:rgba(212,245,60,.5);background:rgba(212,245,60,.06)'
+        : '';
+    return `<div class="wday${isToday?' today':''}${isSelected?' selected':''}" onclick="selDW(${pi})" style="${boxStyle}">
+      <div class="wday-name" style="${isDone?'color:#34d399':isToday?'color:var(--acc)':''}">${d}</div>
+      <div class="wday-dot ${isDone?'done-d':dc}">${isDone?'✓':''}</div>
       ${dayLabel}
-      <div style="font-size:8px;color:var(--muted);margin-top:1px;opacity:0.6">${dateStr}</div>
+      <div style="font-size:8px;color:${isDone?'#34d399':'var(--muted)'};margin-top:1px;opacity:0.8">${dateStr}</div>
     </div>`;
   }).join('');
 }
@@ -893,8 +907,8 @@ function buildExCard(ex, di, ei) {
     const k=`${uid}_${di}_${ei}_${s}`,sd=setCache[k]||{},isDone=!!sd.done;
     setRows += `<div class="set-row${isDone?' sdone':''}" id="sr_${k}">
       <div class="snum">${s+1}</div>
-      <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="${sd.weight?sd.weight:'kg'}" value="${sd.done?sd.weight:''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)" style="${!sd.done&&sd.weight?'color:rgba(255,255,255,.3)':''}">
-      <input class="sinput" type="text" placeholder="${sd.reps||(ex.reps.split(/[-,]/)[0]||'rep')}" value="${sd.done?sd.reps:''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
+      <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="${sd.weight||'kg'}" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
+      <input class="sinput" type="text" placeholder="${sd.reps||(ex.reps.split(/[-,]/)[0]||'rep')}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
       <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?"✓":"O"}</button>
     </div>`;
   }
