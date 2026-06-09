@@ -401,6 +401,11 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
   </div>
 
   <div class="person-bar" id="personBar" style="display:none"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0">
+    <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
+    <div id="weekLabel" style="font-size:10px;color:var(--muted)">Bu Hafta</div>
+    <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
+  </div>
   <div class="week-grid" id="weekGrid"></div>
 
   <div class="screen active" id="screen-workout">
@@ -2506,13 +2511,23 @@ async function saveProfileAll(){
   p.activity = document.getElementById('pf_activity')?.value || p.activity;
   p.level = document.getElementById('pf_level')?.value || p.level;
   p.trainingDays = document.getElementById('pf_days')?.value || p.trainingDays;
-  // Save to Supabase
+  // Save all to Supabase
   await sb.from('profiles').update({
-    name: p.name, weight: p.weight, target_weight: p.target_weight,
+    name: p.name,
+    weight: p.weight,
+    target_weight: p.target_weight,
     goal: p.mainGoal||p.goal,
+    age: p.age,
+    height: p.height,
+    gender: p.gender,
+    activity: p.activity,
+    level: p.level,
   }).eq('id', p.id);
+  // Also update allProfiles cache
+  const idx = allProfiles.findIndex(x => x.id === p.id);
+  if(idx >= 0) allProfiles[idx] = {...allProfiles[idx], ...p};
   renderAll();
-  renderPersonBar();
+  renderAdminTabs();
   // Show toast
   const t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
