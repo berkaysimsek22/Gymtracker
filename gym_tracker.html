@@ -743,20 +743,17 @@ async function renderAll() {
 
 function renderWeekGrid() {
   const prog = activeProgram();
-  const days = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const today = new Date().getDay();
-  // Check which days have been completed this week
+  // Check which program days have been completed (by day_name match)
   const uid = activeProfile()?.id;
-  const completedDays = new Set((sessionCache||[])
-    .filter(s => { const d = new Date(s.logged_at); const now = new Date();
-      return d >= new Date(now.setDate(now.getDate()-now.getDay())); })
-    .map(s => s.day_name));
+  const completedNames = new Set((sessionCache||[]).map(s => s.day_name));
   document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
     let dc = 'rest-d', lbl = 'Rest';
     if(day.type!=='rest'){dc='gym';lbl='Gym'}
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
-    if(completedDays.has(day.name)){dc='done-d';lbl='✓'}
+    if(completedNames.has(day.name)){dc='done-d';lbl='✓'}
     if(i===today){dc='today-d';lbl='Bugün'}
     return `<div class="wday${i===today?' today':''}" onclick="selDW(${pi})"><div class="wday-name">${d}</div><div class="wday-dot ${dc}"></div><div class="wday-lbl">${lbl}</div></div>`;
   }).join('');
@@ -1144,10 +1141,12 @@ function renderHistory(){
 
 async function deleteSession(id){
   if(!confirm('Bu antrenman kaydı silinsin mi?')) return;
-  await sb.from('session_logs').delete().eq('id', id);
+  const {error} = await sb.from('session_logs').delete().eq('id', id);
+  if(error){alert('Silinemedi: '+error.message);return;}
   await loadSessionLogs(activeProfile()?.id);
   document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
   renderHistory();
+  renderWeekGrid();
 }
 
 
