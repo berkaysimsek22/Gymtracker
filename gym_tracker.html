@@ -774,11 +774,13 @@ function renderWeekGrid() {
     const dayDate = new Date(now);
     dayDate.setDate(now.getDate() + dayDiff);
     const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
-    return `<div class="wday${isToday?' today':''}" onclick="selDW(${pi})">
-      <div class="wday-name">${d}</div>
-      <div class="wday-dot ${dc}"></div>
+    const isSelected = pi === curDay;
+    const isDone = completedNames.has(day.name);
+    return `<div class="wday${isToday?' today':''}${isSelected?' selected':''}" onclick="selDW(${pi})" style="${isSelected?'border-color:rgba(212,245,60,.5);background:rgba(212,245,60,.06)':''}">
+      <div class="wday-name" style="${isToday?'color:var(--acc)':''}">${d}</div>
+      <div class="wday-dot ${isDone?'done-d':dc}" style="${isDone?'background:#34d399':''}">${isDone?'✓':''}</div>
       ${dayLabel}
-      <div style="font-size:8px;color:var(--muted);margin-top:2px;opacity:0.6">${dateStr}</div>
+      <div style="font-size:8px;color:var(--muted);margin-top:1px;opacity:0.6">${dateStr}</div>
     </div>`;
   }).join('');
 }
