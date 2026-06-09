@@ -761,7 +761,12 @@ function renderWeekGrid() {
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
     if(completedNames.has(day.name)){dc='done-d';lbl='✓'}
     if(i===today){dc+=' today-d';lbl=(day.type==='rest'?'Rest':shortName)}
-    return `<div class="wday${i===today?' today':''}" onclick="selDW(${pi})"><div class="wday-name">${d}</div><div class="wday-dot ${dc}"></div><div class="wday-lbl">${lbl}</div></div>`;
+    const isToday = i===today;
+    return `<div class="wday${isToday?' today':''}" onclick="selDW(${pi})">
+      <div class="wday-name">${d}</div>
+      <div class="wday-dot ${dc}"></div>
+      <div class="wday-lbl" ondblclick="event.stopPropagation();editDayLabel(${pi},this)">${lbl}</div>
+    </div>`;
   }).join('');
 }
 function selDW(i){curDay=i;showScreen('workout',document.querySelector('.nav-btn'));renderAll();}
@@ -814,7 +819,10 @@ async function renderDayContent(di) {
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
       <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">💪</button>
       ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
-      <button class="finish-day-btn" onclick="confirmFinishDay(${di})">🏁 Günü Tamamla</button>
+      ${sessionCache.some(s=>s.day_name===day.name)?
+        '<button class="finish-day-btn" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399;cursor:default">✓ Tamamlandı</button>':
+        '<button class="finish-day-btn" onclick="confirmFinishDay('+di+')">🏁 Günü Tamamla</button>'
+      }
     </div>
   </div>`;
 
@@ -974,6 +982,27 @@ function changeDay(di, newDay){
   programs[uid][di].day = newDay;
   saveProgram(uid);
   renderAll();
+}
+
+
+function editDayLabel(pi, el){
+  const prog = activeProgram();
+  if(!prog[pi]) return;
+  const inp = document.createElement('input');
+  inp.value = prog[pi].name || '';
+  inp.style.cssText = 'background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:2px 4px;font-size:9px;color:var(--acc);width:60px;outline:none;text-align:center';
+  el.replaceWith(inp);
+  inp.focus();
+  inp.select();
+  function save(){
+    prog[pi].name = inp.value;
+    const uid = activeProfile()?.id;
+    if(uid) saveProgram(uid);
+    renderWeekGrid();
+    renderDayContent(curDay);
+  }
+  inp.onblur = save;
+  inp.onkeydown = e => { if(e.key==='Enter') inp.blur(); if(e.key==='Escape') inp.blur(); };
 }
 
 function toggleEdit(){
