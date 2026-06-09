@@ -958,8 +958,9 @@ function addExtraSet(uid, di, ei){
 
 
 function changeDay(di, newDay){
-  activeProgram()[di].day = newDay;
-  saveProgram(activeProfile().id);
+  const uid = activeProfile().id;
+  programs[uid][di].day = newDay;
+  saveProgram(uid);
   renderWeekGrid();
   renderDayTabs();
 }
