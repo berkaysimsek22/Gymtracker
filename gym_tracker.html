@@ -714,9 +714,19 @@ async function switchViewUser(userId) {
   viewingProfile = p;
   if(!programs[userId]) await loadProgramForUser(userId);
   await loadSessionLogs(userId);
+  await loadNutrition(userId, curNutDate);
   curDay = 0; editMode = false;
   renderAdminTabs();
   renderAll();
+  // Re-render current active screen
+  const activeScreen = document.querySelector('.screen.active');
+  if(activeScreen){
+    const screenId = activeScreen.id;
+    if(screenId==='screen-nutrition') renderNutrition();
+    if(screenId==='screen-stats') renderStats();
+    if(screenId==='screen-history') renderHistory();
+    if(screenId==='screen-profile') renderProfileScreen();
+  }
 }
 
 // ── RENDER ──
@@ -796,7 +806,7 @@ async function renderDayContent(di) {
   let html = `<div class="day-head-row">
     <div class="day-head-left">
       <input class="day-head-title" value="${day.name}" ${canEdit()?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id)">
-      ${editMode&&canEdit()?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">${day.type.toUpperCase()}</span>'}
+      ${editMode&&canEdit()?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">'+day.type.toUpperCase()+'</span>'}
     </div>
     <div class="day-head-right">
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
@@ -964,7 +974,17 @@ function changeDay(di, newDay){
   renderAll();
 }
 
-function toggleEdit(){editMode=!editMode;renderDayContent(curDay);}
+function toggleEdit(){
+  editMode=!editMode;
+  if(!editMode){
+    // Exiting edit mode - save program
+    const uid=activeProfile()&&activeProfile().id;
+    if(uid) saveProgram(uid);
+    renderAll();
+  } else {
+    renderDayContent(curDay);
+  }
+}
 
 function changeDayType(di,type){
   const prog=activeProgram();
@@ -1197,13 +1217,14 @@ function renderMeals(nd){
         <option value="dilim" ${(f.unit||'')==='dilim'?'selected':''}>dilim</option>
         <option value="su bardağı" ${(f.unit||'')==='su bardağı'?'selected':''}>bardak</option>
       </select>
-      </div></div>
+      </div>
       <div class="food-row-macros">
-      <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" id="food_kcal_${mi}_${fi}" oninput="updFood(${mi},${fi},'kcal',this.value)" style="border-color:rgba(239,68,68,.2)">
-      <input class="food-inp num" placeholder="prot" type="number" value="${f.protein||''}" id="food_prot_${mi}_${fi}" oninput="updFood(${mi},${fi},'protein',this.value)" style="border-color:rgba(239,68,68,.15)">
-      <input class="food-inp num" placeholder="karb" type="number" value="${f.carb||''}" id="food_carb_${mi}_${fi}" oninput="updFood(${mi},${fi},'carb',this.value)" style="border-color:rgba(245,158,11,.15)">
-      <input class="food-inp num" placeholder="yağ" type="number" value="${f.fat||''}" id="food_fat_${mi}_${fi}" oninput="updFood(${mi},${fi},'fat',this.value)" style="border-color:rgba(139,92,246,.15)">
-      <button class="del-btn" onclick="delFood(${mi},${fi})">✕</button>
+        <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" id="food_kcal_${mi}_${fi}" oninput="updFood(${mi},${fi},'kcal',this.value)" style="border-color:rgba(239,68,68,.2)">
+        <input class="food-inp num" placeholder="prot" type="number" value="${f.protein||''}" id="food_prot_${mi}_${fi}" oninput="updFood(${mi},${fi},'protein',this.value)" style="border-color:rgba(239,68,68,.15)">
+        <input class="food-inp num" placeholder="karb" type="number" value="${f.carb||''}" id="food_carb_${mi}_${fi}" oninput="updFood(${mi},${fi},'carb',this.value)" style="border-color:rgba(245,158,11,.15)">
+        <input class="food-inp num" placeholder="yağ" type="number" value="${f.fat||''}" id="food_fat_${mi}_${fi}" oninput="updFood(${mi},${fi},'fat',this.value)" style="border-color:rgba(139,92,246,.15)">
+        <button class="del-btn" onclick="delFood(${mi},${fi})">✕</button>
+      </div>
     </div>`).join('');
     return `<div class="meal-card${meal.open?' open':''}">
       <div class="meal-head" onclick="toggleMeal(${mi})">
