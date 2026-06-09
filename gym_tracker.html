@@ -762,10 +762,13 @@ function renderWeekGrid() {
     if(completedNames.has(day.name)){dc='done-d';lbl='✓'}
     if(i===today){dc+=' today-d';lbl=(day.type==='rest'?'Rest':shortName)}
     const isToday = i===today;
+    const dayLabel = editMode && canEdit()
+      ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
+      : `<div class="wday-lbl">${lbl}</div>`;
     return `<div class="wday${isToday?' today':''}" onclick="selDW(${pi})">
       <div class="wday-name">${d}</div>
       <div class="wday-dot ${dc}"></div>
-      <div class="wday-lbl" ondblclick="event.stopPropagation();editDayLabel(${pi},this)">${lbl}</div>
+      ${dayLabel}
     </div>`;
   }).join('');
 }
@@ -985,6 +988,14 @@ function changeDay(di, newDay){
 }
 
 
+
+function changeDayNameOnly(pi, newName){
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  programs[uid][pi].name = newName;
+  saveProgram(uid);
+}
+
 function editDayLabel(pi, el){
   const prog = activeProgram();
   if(!prog[pi]) return;
@@ -1089,7 +1100,9 @@ async function finishDay(di,sets,vol){
   const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol}).select().single();
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
-  document.getElementById('streakBadge').textContent=`🔥 ${sessionCache.length} antrenman`;
+  document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
+  renderWeekGrid();
+  await renderDayContent(di);
   // Show success with undo
   const toast=document.createElement('div');
   toast.id='finishToast';
