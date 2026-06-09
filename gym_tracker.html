@@ -82,7 +82,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .day-tabs{display:flex;gap:5px;padding:12px 16px 0;overflow-x:auto;scrollbar-width:none}
 .day-tabs::-webkit-scrollbar{display:none}
 .dtab{flex-shrink:0;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:10px;font-weight:500;cursor:pointer;transition:all .2s;white-space:nowrap}
-.dtab.active{background:var(--acc);color:#0c0c0c;border-color:var(--acc)}
+
 .dtab.rest-day{color:#333;border-color:#1e1e1e}
 .dtab.hiit-day{border-color:rgba(255,92,56,.4);color:var(--acc2)}
 .dtab.done-day::after{content:' ✓';opacity:.5}
@@ -402,7 +402,6 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 
   <div class="screen active" id="screen-workout">
     <div id="profileCard" style="margin:12px 16px 0"></div>
-    <div class="day-tabs" id="dayTabs"></div>
     <div class="day-content" id="dayContent"></div>
   </div>
 
@@ -757,7 +756,7 @@ function renderWeekGrid() {
   document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
     let dc = 'rest-d', lbl = 'Rest';
-    const shortName = day.name ? day.name.replace(/Dinlenme/gi,'Rest').substring(0,8) : 'Rest';
+    const shortName = day.name ? (day.type==='rest'?'Rest':day.name.replace(/Dinlenme/gi,'Rest').replace(/Gün /gi,'G').substring(0,6)) : 'Rest';
     if(day.type!=='rest'){dc='gym';lbl=shortName}
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
     if(completedNames.has(day.name)){dc='done-d';lbl='✓'}
