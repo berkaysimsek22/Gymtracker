@@ -768,10 +768,17 @@ function renderWeekGrid() {
     const dayLabel = editMode && canEdit()
       ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
       : `<div class="wday-lbl">${lbl}</div>`;
+    // Calculate date for this day
+    const now = new Date();
+    const dayDiff = i - now.getDay();
+    const dayDate = new Date(now);
+    dayDate.setDate(now.getDate() + dayDiff);
+    const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
     return `<div class="wday${isToday?' today':''}" onclick="selDW(${pi})">
       <div class="wday-name">${d}</div>
       <div class="wday-dot ${dc}"></div>
       ${dayLabel}
+      <div style="font-size:8px;color:var(--muted);margin-top:2px;opacity:0.6">${dateStr}</div>
     </div>`;
   }).join('');
 }
@@ -824,6 +831,7 @@ async function renderDayContent(di) {
     <div class="day-head-right">
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
       <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">💪</button>
+      ${canEdit()&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
       ${sessionCache.some(s=>s.day_name===day.name)?
         '<button class="finish-day-btn" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399;cursor:default">✓ Tamamlandı</button>':
@@ -883,8 +891,8 @@ function buildExCard(ex, di, ei) {
     const k=`${uid}_${di}_${ei}_${s}`,sd=setCache[k]||{},isDone=!!sd.done;
     setRows += `<div class="set-row${isDone?' sdone':''}" id="sr_${k}">
       <div class="snum">${s+1}</div>
-      <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="kg" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
-      <input class="sinput" type="text" placeholder="${ex.reps.split(/[-,]/)[0]||'rep'}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
+      <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="${sd.weight?sd.weight:'kg'}" value="${sd.done?sd.weight:''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)" style="${!sd.done&&sd.weight?'color:rgba(255,255,255,.3)':''}">
+      <input class="sinput" type="text" placeholder="${sd.reps||(ex.reps.split(/[-,]/)[0]||'rep')}" value="${sd.done?sd.reps:''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
       <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?"✓":"O"}</button>
     </div>`;
   }
@@ -1017,6 +1025,31 @@ function editDayLabel(pi, el){
   }
   inp.onblur = save;
   inp.onkeydown = e => { if(e.key==='Enter') inp.blur(); if(e.key==='Escape') inp.blur(); };
+}
+
+
+async function clearDayConfirm(di){
+  if(!confirm('Bu günün tüm set kayıtları silinsin mi?')) return;
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  // Delete from Supabase
+  await sb.from('workout_sets').delete().eq('user_id', uid).eq('day_index', di);
+  // Clear local cache
+  const prog = activeProgram()[di];
+  if(prog && prog.exercises){
+    prog.exercises.forEach((ex, ei) => {
+      for(let s=0; s<ex.sets+3; s++){
+        const k = uid+'_'+di+'_'+ei+'_'+s;
+        delete setCache[k];
+      }
+    });
+  }
+  await renderDayContent(di);
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(255,92,56,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#ff5c38';
+  t.textContent='🗑 Gün temizlendi';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2500);
 }
 
 function toggleEdit(){
