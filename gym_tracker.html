@@ -1,6 +1,9 @@
 tip:"",<!DOCTYPE html>
 <html lang="tr">
 <head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GYM TRACKER</title>
@@ -2459,6 +2462,65 @@ function generateFullProgram(p, suggestion){
   const sets = goal==='strength'?5:3;
   const rest = goal==='strength'?180:goal==='weight_loss'?60:90;
   
+  // Special: Jeff Nippard Upper/Lower for chest+shoulder+arm + muscle_gain
+  const _mg = p.muscleGoals||[];
+  const hasChest = _mg.includes('chest');
+  const hasShoulder = _mg.includes('shoulder');
+  const hasArm = _mg.includes('arm');
+  const _goal = p.mainGoal||'muscle_gain';
+  
+  if((hasChest||hasShoulder||hasArm) && _goal==='muscle_gain' && parseInt(p.trainingDays||4)>=4){
+    const weekDays = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+    const warmupDay1 = 'Band Pull Apart 2x20 · Face Pull 2x15 · Scapular Pull Up 2x10 · Push Up 2x15';
+    return [
+      {name:'Upper Strength',type:'full',day:'Pazartesi',warmup:warmupDay1,exercises:[
+        {name:'Incline Barbell Press',muscle:'Pectoral (Üst)',sets:4,reps:'6-8',restSec:150,tip:'Barbell öncelikli, overload hedefi'},
+        {name:'Weighted Dip',muscle:'Alt Pectoral · Triceps',sets:3,reps:'6-10',restSec:120,tip:'Ağırlık ekle, öne eğil'},
+        {name:'Weighted Pull Up',muscle:'Latissimus · Biceps',sets:4,reps:'5-8',restSec:120,tip:'Tam ROM, kontrollü iniş'},
+        {name:'Chest Supported Row',muscle:'Rhomboids · Mid Back',sets:3,reps:'8-10',restSec:90,tip:'Momentum yok, saf sırt'},
+        {name:'Cable Lateral Raise',muscle:'Lateral Deltoid',sets:5,reps:'12-20',restSec:60,tip:'Kablo > DB, sabit gerilim'},
+        {name:'Incline Dumbbell Curl',muscle:'Biceps (Uzun Kafa)',sets:3,reps:'8-12',restSec:60,tip:'Stretch bias, yavaş eksentrik'},
+        {name:'Overhead Cable Triceps Extension',muscle:'Triceps (Uzun Kafa)',sets:3,reps:'10-15',restSec:60,tip:'Uzun kafa gerilir'},
+        {name:'Rope Pushdown',muscle:'Triceps (Lateral)',sets:2,reps:'12-15',restSec:45,tip:'Tepe noktada aç'},
+      ]},
+      {name:'Lower Strength',type:'full',day:'Salı',warmup:null,exercises:[
+        {name:'Back Squat',muscle:'Quadriceps · Glute',sets:4,reps:'6-8',restSec:180,tip:'Kalça geri, diz öne'},
+        {name:'Romanian Deadlift',muscle:'Hamstring · Glute',sets:4,reps:'8-10',restSec:120,tip:'3 sn eksentrik, gerin hisset'},
+        {name:'Bulgarian Split Squat',muscle:'Glute Max + Quad',sets:3,reps:'8-12',restSec:90,tip:'Arka ayak yüksekte'},
+        {name:'Seated Leg Curl',muscle:'Hamstring',sets:3,reps:'10-15',restSec:60,tip:'Öne eğil bonus gerilim'},
+        {name:'Standing Calf Raise',muscle:'Gastrocnemius',sets:4,reps:'10-15',restSec:60,tip:'Tam aşağı kadar in'},
+        {name:'Dumbbell Shrug',muscle:'Trapezius',sets:3,reps:'10-15',restSec:60,tip:'Tepe noktada 1sn tut'},
+        {name:'Hanging Leg Raise',muscle:'Core · Alt Karın',sets:3,reps:'12-20',restSec:60,tip:'Kontrollü, sallama'},
+      ]},
+      {name:'Dinlenme',type:'rest',day:'Çarşamba',warmup:null,exercises:[]},
+      {name:'Upper Hypertrophy',type:'full',day:'Perşembe',warmup:warmupDay1,exercises:[
+        {name:'Incline Dumbbell Press',muscle:'Pectoral (Üst)',sets:4,reps:'8-12',restSec:90,tip:'DB > barbell hypertrophy için'},
+        {name:'Machine Chest Press',muscle:'Pectoral',sets:3,reps:'8-12',restSec:75,tip:'Sabit gerilim, tam ROM'},
+        {name:'Chin Up',muscle:'Latissimus · Biceps',sets:4,reps:'6-12',restSec:90,tip:'Underhand grip, tam uzat'},
+        {name:'Seated Cable Row',muscle:'Mid Back · Rhomboids',sets:3,reps:'8-12',restSec:75,tip:'Göğse çek, omuz geri'},
+        {name:'Reverse Pec Deck',muscle:'Posterior Deltoid',sets:3,reps:'12-20',restSec:60,tip:'Arka delt izolasyonu'},
+        {name:'Preacher Curl',muscle:'Biceps (Kısa Kafa)',sets:3,reps:'10-15',restSec:60,tip:'Tam ROM, yavaş iniş'},
+        {name:'Hammer Curl',muscle:'Brachialis · Biceps',sets:3,reps:'10-15',restSec:60,tip:'Cross-body varyant'},
+        {name:'Rope Pushdown',muscle:'Triceps',sets:3,reps:'10-15',restSec:60,tip:'Tepe noktada aç'},
+      ]},
+      {name:'Lower + Arms + Neck',type:'full',day:'Cuma',warmup:null,exercises:[
+        {name:'Walking Lunge',muscle:'Glute Max · Quad',sets:3,reps:'10-12',restSec:75,tip:'Adım uzun, topuktan it'},
+        {name:'Seated Leg Curl',muscle:'Hamstring',sets:3,reps:'10-15',restSec:60,tip:'Seated > lying'},
+        {name:'Seated Calf Raise',muscle:'Soleus',sets:4,reps:'12-20',restSec:45,tip:'Diz bükülü → soleus'},
+        {name:'Cable Lateral Raise',muscle:'Lateral Deltoid',sets:5,reps:'15-20',restSec:45,tip:'Yüksek hacim, pump'},
+        {name:'Face Pull',muscle:'Rear Deltoid · Traps',sets:3,reps:'15-20',restSec:45,tip:'Her seansta mecburi'},
+        {name:'Bayesian Cable Curl',muscle:'Biceps (Uzun Kafa)',sets:3,reps:'10-15',restSec:60,tip:'Stretch bias, en iyi curl'},
+        {name:'Reverse Curl',muscle:'Brachialis · Brachioradialis',sets:3,reps:'12-15',restSec:60,tip:'Ön kol geliştirme'},
+        {name:'Overhead Cable Extension',muscle:'Triceps (Uzun Kafa)',sets:3,reps:'10-15',restSec:60,tip:'Uzun kafa gerilir'},
+        {name:'Single Arm Cross Body Pushdown',muscle:'Triceps',sets:2,reps:'12-15',restSec:45,tip:'Tam eksentrik'},
+        {name:'Cable Crunch',muscle:'Rectus Abdominis',sets:3,reps:'12-20',restSec:60,tip:'Ağırlıklı, kontrollü'},
+      ]},
+      {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
+      {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
+      {name:'Dinlenme',type:'rest',day:'Pazartesi',warmup:null,exercises:[]},
+    ];
+  }
+
   const SPLITS = {
     'Glute Heavy':[
       {name:'Hip Thrust',muscle:'Glute Maximus',sets:4,reps:'12-10-8-6',restSec:120,tip:"Son sette failure'a yaklaş"},
