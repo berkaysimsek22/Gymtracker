@@ -1197,7 +1197,7 @@ function renderMeals(nd){
         <option value="dilim" ${(f.unit||'')==='dilim'?'selected':''}>dilim</option>
         <option value="su bardağı" ${(f.unit||'')==='su bardağı'?'selected':''}>bardak</option>
       </select>
-      </div>
+      </div></div>
       <div class="food-row-macros">
       <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" id="food_kcal_${mi}_${fi}" oninput="updFood(${mi},${fi},'kcal',this.value)" style="border-color:rgba(239,68,68,.2)">
       <input class="food-inp num" placeholder="prot" type="number" value="${f.protein||''}" id="food_prot_${mi}_${fi}" oninput="updFood(${mi},${fi},'protein',this.value)" style="border-color:rgba(239,68,68,.15)">
