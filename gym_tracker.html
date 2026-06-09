@@ -726,6 +726,7 @@ async function switchViewUser(userId) {
     if(screenId==='screen-stats') renderStats();
     if(screenId==='screen-history') renderHistory();
     if(screenId==='screen-profile') renderProfileScreen();
+    if(screenId==='screen-workout') {renderDayTabs();renderDayContent(curDay);}
   }
 }
 
@@ -744,11 +745,18 @@ function renderWeekGrid() {
   const prog = activeProgram();
   const days = ['Paz','Pzt','Sal','Çar','Per','Cum','Cmt'];
   const today = new Date().getDay();
+  // Check which days have been completed this week
+  const uid = activeProfile()?.id;
+  const completedDays = new Set((sessionCache||[])
+    .filter(s => { const d = new Date(s.logged_at); const now = new Date();
+      return d >= new Date(now.setDate(now.getDate()-now.getDay())); })
+    .map(s => s.day_name));
   document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
     let dc = 'rest-d', lbl = 'Rest';
     if(day.type!=='rest'){dc='gym';lbl='Gym'}
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
+    if(completedDays.has(day.name)){dc='done-d';lbl='✓'}
     if(i===today){dc='today-d';lbl='Bugün'}
     return `<div class="wday${i===today?' today':''}" onclick="selDW(${pi})"><div class="wday-name">${d}</div><div class="wday-dot ${dc}"></div><div class="wday-lbl">${lbl}</div></div>`;
   }).join('');
@@ -1125,12 +1133,24 @@ function addRest(s){restSecs+=s;updRT();}
 // ── HISTORY ──
 function renderHistory(){
   const el=document.getElementById('historyList');
-  el.innerHTML=!sessionCache.length?'<div class="empty-state">Henüz tamamlanan antrenman yok.</div>':
-  sessionCache.map(l=>`<div class="hist-card"><div class="hc-day">${l.day_name}</div><div class="hc-date">${new Date(l.logged_at).toLocaleDateString('tr-TR')}</div>
-  <div class="hc-stats"><span class="hcs"><strong>${l.sets_done}</strong> set</span><span class="hcs"><strong>${l.volume}</strong> kg hacim</span></div></div>`).join('');
+  if(!sessionCache.length){el.innerHTML='<div class="empty-state">Henüz tamamlanan antrenman yok.</div>';return;}
+  el.innerHTML=sessionCache.map((l,i)=>`<div class="hist-card" style="position:relative">
+    <div class="hc-day">${l.day_name}</div>
+    <div class="hc-date">${new Date(l.logged_at).toLocaleDateString('tr-TR')} ${new Date(l.logged_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>
+    <div class="hc-stats"><span class="hcs"><strong>${l.sets_done}</strong> set</span><span class="hcs"><strong>${l.volume}</strong> kg hacim</span></div>
+    <button onclick="deleteSession('${l.id}')" style="position:absolute;top:8px;right:8px;background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.2);color:#ff5c38;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer">Sil</button>
+  </div>`).join('');
 }
 
-// ── STATS ──
+async function deleteSession(id){
+  if(!confirm('Bu antrenman kaydı silinsin mi?')) return;
+  await sb.from('session_logs').delete().eq('id', id);
+  await loadSessionLogs(activeProfile()?.id);
+  document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
+  renderHistory();
+}
+
+
 function renderStats(){
   const p=activeProfile();
   const tv=sessionCache.reduce((s,l)=>s+(l.volume||0),0);
@@ -1954,6 +1974,17 @@ async function autoLookupFood(mi, fi, name) {
     return;
   }
   
+  // Show save to DB button
+  const existingBtn = document.getElementById('saveToDb_'+mi+'_'+fi);
+  if(existingBtn) existingBtn.remove();
+  const saveBtn = document.createElement('button');
+  saveBtn.id = 'saveToDb_'+mi+'_'+fi;
+  saveBtn.style.cssText = 'position:absolute;right:0;top:100%;background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;font-size:10px;color:var(--acc);cursor:pointer;z-index:100;white-space:nowrap;margin-top:2px';
+  saveBtn.textContent = "DB'ye kaydet +";
+  saveBtn.onclick = function(){saveFoodToDB(mi,fi);this.remove();};
+  const inp = document.getElementById('finp_'+mi+'_'+fi);
+  if(inp && inp.parentElement) inp.parentElement.appendChild(saveBtn);
+  
   // If not in local DB, ask AI
   if(name.length < 3) return;
   try {
@@ -2467,6 +2498,26 @@ function generateFullProgram(p, suggestion){
     }
   });
   return prog;
+}
+
+
+async function saveFoodToDB(mi, fi){
+  const nd = await getNd();
+  const food = nd.meals[mi] && nd.meals[mi].foods[fi];
+  if(!food || !food.name) return;
+  const name = food.name.toLowerCase().trim();
+  const kcal = parseFloat(food.kcal)||0;
+  const protein = parseFloat(food.protein)||0;
+  const carb = parseFloat(food.carb)||0;
+  const fat = parseFloat(food.fat)||0;
+  const amount = parseFloat(food.amount)||100;
+  if(!kcal){alert('Önce kalori değerini gir!');return;}
+  FOOD_DB[name] = {kcal, protein, carb, fat, per:amount, unit:food.unit||'gram'};
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:10px 18px;z-index:500;font-size:12px;color:#d4f53c';
+  t.textContent='✅ '+food.name+' veritabanına eklendi!';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
 }
 
 async function handleHashParams() {
