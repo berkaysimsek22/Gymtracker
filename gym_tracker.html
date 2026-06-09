@@ -757,10 +757,11 @@ function renderWeekGrid() {
   document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
     let dc = 'rest-d', lbl = 'Rest';
-    if(day.type!=='rest'){dc='gym';lbl='Gym'}
+    const shortName = day.name ? day.name.replace(/Dinlenme/gi,'Rest').substring(0,8) : 'Rest';
+    if(day.type!=='rest'){dc='gym';lbl=shortName}
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
     if(completedNames.has(day.name)){dc='done-d';lbl='✓'}
-    if(i===today){dc='today-d';lbl='Bugün'}
+    if(i===today){dc+=' today-d';lbl=(day.type==='rest'?'Rest':shortName)}
     return `<div class="wday${i===today?' today':''}" onclick="selDW(${pi})"><div class="wday-name">${d}</div><div class="wday-dot ${dc}"></div><div class="wday-lbl">${lbl}</div></div>`;
   }).join('');
 }
@@ -781,16 +782,7 @@ function renderProfile(p) {
     </div>`;
 }
 
-function renderDayTabs() {
-  const prog = activeProgram();
-  document.getElementById('dayTabs').innerHTML = prog.map((day,i) => {
-    let cls = '';
-    if(i===curDay) cls='active';
-    else if(day.type==='rest') cls='rest-day';
-    else if(day.type==='hiit'||day.type==='cardio') cls='hiit-day';
-    return `<button class="dtab ${cls}" onclick="selDay(${i})">${day.day.substring(0,3)} — ${day.name.substring(0,10)}${day.name.length>10?'…':''}</button>`;
-  }).join('');
-}
+function renderDayTabs(){} // removed
 async function selDay(i){curDay=i;editMode=false;renderDayTabs();await renderDayContent(i);}
 
 async function renderDayContent(di) {
