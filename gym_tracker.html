@@ -697,6 +697,10 @@ function showMainApp() {
     renderAdminTabs();
   }
 
+  // Set curDay to today's program index
+  const todayJS = new Date().getDay(); // 0=Sun,1=Mon...6=Sat
+  curDay = todayJS === 0 ? 6 : todayJS - 1; // Convert to Mon=0...Sun=6
+
   renderAll();
 }
 
@@ -715,7 +719,9 @@ async function switchViewUser(userId) {
   if(!programs[userId]) await loadProgramForUser(userId);
   await loadSessionLogs(userId);
   await loadNutrition(userId, curNutDate);
-  curDay = 0; editMode = false;
+  const _todayJS = new Date().getDay();
+  curDay = _todayJS === 0 ? 6 : _todayJS - 1;
+  editMode = false;
   renderAdminTabs();
   renderAll();
   // Re-render current active screen
