@@ -771,7 +771,15 @@ function renderWeekGrid() {
   const today = new Date().getDay();
   // Check which program days have been completed (by day_name match)
   const uid = activeProfile()?.id;
-  const completedNames = new Set((sessionCache||[]).map(s => s.day_name));
+  // Only show completed for the displayed week
+  const weekStartDisplay = new Date();
+  weekStartDisplay.setDate(weekStartDisplay.getDate() - (weekStartDisplay.getDay()===0?6:weekStartDisplay.getDay()-1) + weekOffset*7);
+  weekStartDisplay.setHours(0,0,0,0);
+  const weekEndDisplay = new Date(weekStartDisplay);
+  weekEndDisplay.setDate(weekStartDisplay.getDate() + 7);
+  const completedNames = new Set((sessionCache||[])
+    .filter(s => { const d = new Date(s.logged_at); return d >= weekStartDisplay && d < weekEndDisplay; })
+    .map(s => s.day_name));
   
   // Week label
   const baseDate = new Date();
