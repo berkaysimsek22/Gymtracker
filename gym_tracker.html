@@ -2248,43 +2248,81 @@ function toggleMuscleGoal(id){
   renderAutoProgCard(p);
 }
 
+// Store editable program suggestion
+let editableProg = null;
+
 function renderAutoProgCard(p){
   const el = document.getElementById('autoProgCard');
   if(!el) return;
   if(!p.mainGoal){
-    el.innerHTML = `<div class="prof-section" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;padding:20px">
-      Hedef seç → otomatik program önerisi gelecek</div>`;
+    el.innerHTML = '<div class="prof-section" style="text-align:center;color:var(--muted);font-size:12px;font-style:italic;padding:20px">Hedef seç → otomatik program önerisi gelecek</div>';
     return;
   }
   const prog = generateProgramSuggestion(p);
-  el.innerHTML = `<div class="prof-section">
-    <h3>⚡ Önerilen Program</h3>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${prog.desc}</div>
-    <div class="prog-suggestion">
-      <h4>Haftalık Split — ${p.trainingDays||4} gün</h4>
-      ${prog.days.map(d=>`<div class="prog-day-row">
-        <div class="prog-day-name">${d.day}</div>
-        <div class="prog-day-content">${d.content}</div>
-      </div>`).join('')}
-    </div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-      <div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:11px">
-        <div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:2px">Haftalık Set</div>
-        <div style="color:var(--acc);font-family:'Bebas Neue',sans-serif;font-size:18px">${prog.sets}</div>
+  // Generate full program and store as editable
+  editableProg = generateFullProgram(p, prog);
+  renderEditableProg(prog.desc);
+}
+
+function renderEditableProg(desc){
+  const el = document.getElementById('autoProgCard');
+  if(!el||!editableProg) return;
+  const rows = editableProg.map((day,di)=>{
+    const isRest = day.type==='rest'||day.type==='hiit';
+    const exList = isRest ? '' : day.exercises.map((ex,ei)=>`
+      <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:6px">
+        <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center">
+          <input value="${ex.name}" onchange="editableProg[${di}].exercises[${ei}].name=this.value"
+            style="background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:500;outline:none;padding:2px 0">
+          <div style="text-align:center">
+            <div style="font-size:8px;color:var(--muted);margin-bottom:2px">SET</div>
+            <input type="number" min="1" max="8" value="${ex.sets}" onchange="editableProg[${di}].exercises[${ei}].sets=parseInt(this.value)"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--acc);font-size:11px;width:36px;text-align:center;outline:none;padding:2px">
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:8px;color:var(--muted);margin-bottom:2px">TEKRAR</div>
+            <input value="${ex.reps}" onchange="editableProg[${di}].exercises[${ei}].reps=this.value"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:11px;width:56px;text-align:center;outline:none;padding:2px">
+          </div>
+          <button onclick="editableProg[${di}].exercises.splice(${ei},1);renderEditableProg()"
+            style="background:none;border:none;color:#555;font-size:14px;cursor:pointer;padding:0 4px">✕</button>
+        </div>
+        <div style="font-size:9px;color:#ef4444;margin-top:4px">${ex.muscle||''}</div>
+      </div>`).join('');
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${isRest?'0':'8px'}">
+        <span style="font-size:9px;color:var(--muted);width:24px">${day.day.substring(0,3)}</span>
+        <input value="${day.name}" onchange="editableProg[${di}].name=this.value"
+          style="flex:1;background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:600;outline:none;padding:2px 0">
+        ${!isRest?`<button onclick="editableProg[${di}].exercises.push({name:'Yeni Egzersiz',muscle:'',sets:3,reps:'12',restSec:90,tip:null});renderEditableProg()" 
+          style="background:rgba(212,245,60,.08);border:1px solid rgba(212,245,60,.2);border-radius:6px;color:var(--acc);font-size:10px;padding:3px 8px;cursor:pointer">+ Ekle</button>`:''}
       </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:11px">
-        <div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:2px">Rep Aralığı</div>
-        <div style="color:var(--acc);font-family:'Bebas Neue',sans-serif;font-size:18px">${prog.reps}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:11px">
-        <div style="color:var(--muted);font-size:9px;text-transform:uppercase;margin-bottom:2px">Dinlenme</div>
-        <div style="color:var(--acc);font-family:'Bebas Neue',sans-serif;font-size:18px">${prog.rest}</div>
-      </div>
-    </div>
-    <button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="applyGeneratedProgram()">
-      🚀 Bu Programı Uygula
-    </button>
-  </div>`;
+      ${exList}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = '<div class="prof-section">'
+    + '<h3>⚡ Önerilen Program <span style="font-size:9px;color:var(--muted);font-weight:400;text-transform:none">— düzenleyebilirsin</span></h3>'
+    + (desc?'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+desc+'</div>':'')
+    + rows
+    + '<button class="btn btn-acc" style="width:100%;margin-top:4px" onclick="applyEditableProgram()">🚀 Bu Programı Uygula</button>'
+    + '</div>';
+}
+
+async function applyEditableProgram(){
+  const p = activeProfile();
+  if(!p||!editableProg) return;
+  if(!confirm('Mevcut programın silinecek. Devam?')) return;
+  programs[p.id] = editableProg;
+  await saveProgram(p.id);
+  curDay = new Date().getDay()===0?6:new Date().getDay()-1;
+  showScreen('workout', document.querySelector('.nav-btn'));
+  renderAll();
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c';
+  t.textContent='🚀 Program uygulandı!';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
 }
 
 function generateProgramSuggestion(p){
@@ -2411,24 +2449,7 @@ async function saveProfileAll(){
   setTimeout(()=>t.remove(),2500);
 }
 
-async function applyGeneratedProgram(){
-  const p = activeProfile();
-  if(!p) return;
-  if(!confirm('Mevcut programın silinecek ve yeni program uygulanacak. Devam?')) return;
-  const prog = generateProgramSuggestion(p);
-  // Generate full program based on suggestion
-  const newProg = generateFullProgram(p, prog);
-  programs[p.id] = newProg;
-  await saveProgram(p.id);
-  curDay = 0;
-  showScreen('workout', document.querySelector('.nav-btn'));
-  renderAll();
-  const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
-  t.textContent='🚀 Yeni program uygulandı!';
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(),3000);
-}
+// applyGeneratedProgram replaced by applyEditableProgram
 
 function generateFullProgram(p, suggestion){
   const goal = p.mainGoal||'muscle_gain';
