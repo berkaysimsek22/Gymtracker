@@ -815,7 +815,7 @@ async function renderDayContent(di) {
 
   let html = `<div class="day-head-row">
     <div class="day-head-left">
-      <input class="day-head-title" value="${day.name}" ${canEdit()?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id)">
+      <input class="day-head-title" value="${day.name}" ${canEdit()?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
       ${editMode&&canEdit()?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">'+day.type.toUpperCase()+'</span>'}
     </div>
     <div class="day-head-right">
