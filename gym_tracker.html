@@ -961,8 +961,7 @@ function changeDay(di, newDay){
   const uid = activeProfile().id;
   programs[uid][di].day = newDay;
   saveProgram(uid);
-  renderWeekGrid();
-  renderDayTabs();
+  renderAll();
 }
 
 function toggleEdit(){editMode=!editMode;renderDayContent(curDay);}
