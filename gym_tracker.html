@@ -238,12 +238,14 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .meal-card.open .meal-arr{transform:rotate(180deg)}
 .meal-items{display:none;border-top:1px solid var(--border)}
 .meal-card.open .meal-items{display:block}
-.food-row{display:grid;grid-template-columns:1fr 52px 44px 52px 44px 44px 44px 26px;gap:4px;padding:7px 13px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
-.food-inp{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:5px 6px;color:var(--text);font-size:11px;outline:none;width:100%}
+.food-row{display:grid;grid-template-columns:1fr 58px 52px 26px;gap:4px;padding:7px 13px 4px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
+.food-row-macros{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;padding:2px 13px 7px;border-bottom:1px solid rgba(255,255,255,.03)}
+.food-inp{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:6px 8px;color:var(--text);font-size:13px;outline:none;width:100%}
 .food-inp:focus{border-color:rgba(212,245,60,.3)}
 .food-inp::placeholder{color:#282828}
 .food-inp.num{text-align:center;font-family:'Archivo',monospace}
-.food-grid-head{display:grid;grid-template-columns:1fr 52px 44px 52px 44px 44px 44px 26px;gap:4px;padding:5px 13px}
+.food-grid-head{display:grid;grid-template-columns:1fr 58px 52px 26px;gap:4px;padding:5px 13px 2px}
+.food-grid-head-macros{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;padding:0 13px 4px}
 .fh{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
 .fh:first-child{text-align:left}
 .add-food-btn{margin:8px 13px;padding:6px 12px;border-radius:8px;background:rgba(212,245,60,.06);border:1px dashed rgba(212,245,60,.15);color:rgba(212,245,60,.5);font-size:10px;cursor:pointer;width:calc(100% - 26px);transition:all .2s;text-align:center}
@@ -1195,10 +1197,12 @@ function renderMeals(nd){
         <option value="dilim" ${(f.unit||'')==='dilim'?'selected':''}>dilim</option>
         <option value="su bardağı" ${(f.unit||'')==='su bardağı'?'selected':''}>bardak</option>
       </select>
-      <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" id="food_kcal_${mi}_${fi}" oninput="updFood(${mi},${fi},'kcal',this.value)">
-      <input class="food-inp num" placeholder="P" type="number" value="${f.protein||''}" id="food_prot_${mi}_${fi}" oninput="updFood(${mi},${fi},'protein',this.value)">
-      <input class="food-inp num" placeholder="K" type="number" value="${f.carb||''}" id="food_carb_${mi}_${fi}" oninput="updFood(${mi},${fi},'carb',this.value)">
-      <input class="food-inp num" placeholder="Y" type="number" value="${f.fat||''}" id="food_fat_${mi}_${fi}" oninput="updFood(${mi},${fi},'fat',this.value)">
+      </div>
+      <div class="food-row-macros">
+      <input class="food-inp num" placeholder="kcal" type="number" value="${f.kcal||''}" id="food_kcal_${mi}_${fi}" oninput="updFood(${mi},${fi},'kcal',this.value)" style="border-color:rgba(239,68,68,.2)">
+      <input class="food-inp num" placeholder="prot" type="number" value="${f.protein||''}" id="food_prot_${mi}_${fi}" oninput="updFood(${mi},${fi},'protein',this.value)" style="border-color:rgba(239,68,68,.15)">
+      <input class="food-inp num" placeholder="karb" type="number" value="${f.carb||''}" id="food_carb_${mi}_${fi}" oninput="updFood(${mi},${fi},'carb',this.value)" style="border-color:rgba(245,158,11,.15)">
+      <input class="food-inp num" placeholder="yağ" type="number" value="${f.fat||''}" id="food_fat_${mi}_${fi}" oninput="updFood(${mi},${fi},'fat',this.value)" style="border-color:rgba(139,92,246,.15)">
       <button class="del-btn" onclick="delFood(${mi},${fi})">✕</button>
     </div>`).join('');
     return `<div class="meal-card${meal.open?' open':''}">
@@ -1210,7 +1214,8 @@ function renderMeals(nd){
         <div class="meal-arr">⌄</div>
       </div>
       <div class="meal-items">
-        <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Birim</div><div class="fh">Kcal</div><div class="fh">Prot</div><div class="fh">Karb</div><div class="fh">Yağ</div><div class="fh"></div></div>
+        <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Birim</div><div class="fh"></div></div>
+      <div class="food-grid-head-macros"><div class="fh" style="color:#ef4444">Kcal</div><div class="fh" style="color:#ef4444">Prot</div><div class="fh" style="color:#f59e0b">Karb</div><div class="fh" style="color:#8b5cf6">Yağ</div></div>
         ${foods}
         <div style="display:flex;gap:6px;margin:8px 13px">
           <div class="add-food-btn" style="flex:1;margin:0" onclick="addFood(${mi})">+ Manuel Ekle</div>
