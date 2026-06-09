@@ -637,8 +637,9 @@ async function loadSetsForDay(userId, dayIdx) {
     const k = userId+'_'+dayIdx+'_'+row.exercise_index+'_'+row.set_index;
     // done is only true if done_at is within THIS week (Mon 00:00 to next Mon 00:00)
     const doneAt = row.done_at ? new Date(row.done_at) : null;
-    const isDoneThisWeek = doneAt && doneAt >= monday && doneAt < nextMonday && row.done === true;
-    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDoneThisWeek, ts: row.done_at, db_id: row.id};
+    // Only show done if viewing current week
+    const isDone = row.done === true && doneAt && doneAt >= monday && doneAt < nextMonday;
+    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDone, ts: row.done_at, db_id: row.id};
   });
 }
 
@@ -933,7 +934,7 @@ function buildExCard(ex, di, ei) {
   card.id = `ec_${di}_${ei}`;
   let setRows = '';
   for(let s=0;s<ex.sets;s++){
-    const k=`${uid}_${di}_${ei}_${s}`,sd=setCache[k]||{},isDone=!!sd.done;
+    const k=`${uid}_${di}_${ei}_${s}`,sd=setCache[k]||{},isDone=weekOffset===0&&!!sd.done;
     setRows += `<div class="set-row${isDone?' sdone':''}" id="sr_${k}">
       <div class="snum">${s+1}</div>
       <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="${sd.weight||'kg'}" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
@@ -2797,4 +2798,3 @@ handleHashParams();
 </script>
 </body>
 </html>
-
