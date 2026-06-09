@@ -630,13 +630,15 @@ async function loadSetsForDay(userId, dayIdx) {
   const monday = new Date(now);
   monday.setDate(now.getDate() - (now.getDay()===0?6:now.getDay()-1));
   monday.setHours(0,0,0,0);
+  const nextMonday = new Date(monday);
+  nextMonday.setDate(monday.getDate() + 7);
   
   (data||[]).forEach(row => {
-    const k = `${userId}_${dayIdx}_${row.exercise_index}_${row.set_index}`;
-    // If done_at is before this week's Monday, reset done (but keep weight/reps)
+    const k = userId+'_'+dayIdx+'_'+row.exercise_index+'_'+row.set_index;
+    // done is only true if done_at is within THIS week (Mon 00:00 to next Mon 00:00)
     const doneAt = row.done_at ? new Date(row.done_at) : null;
-    const isDoneThisWeek = doneAt && doneAt >= monday;
-    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDoneThisWeek ? row.done : false, ts: row.done_at, db_id: row.id};
+    const isDoneThisWeek = doneAt && doneAt >= monday && doneAt < nextMonday && row.done === true;
+    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDoneThisWeek, ts: row.done_at, db_id: row.id};
   });
 }
 
@@ -2795,3 +2797,4 @@ handleHashParams();
 </script>
 </body>
 </html>
+
