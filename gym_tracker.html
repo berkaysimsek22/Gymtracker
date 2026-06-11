@@ -421,6 +421,8 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
   <div class="screen" id="screen-stats">
     <div class="stats-header"><h2>İstatistikler</h2></div>
     <div class="stats-grid" id="statsGrid"></div>
+    <div id="weightChartSection" style="margin:12px 16px 0"></div>
+    <div id="nutChartSection" style="margin:10px 16px 0"></div>
     <div class="pr-section"><h3>Kişisel Rekorlar</h3><div id="prList"></div></div>
   </div>
 
@@ -472,6 +474,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
       <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
     </div>
     <div id="profileEditCard" style="margin:12px 16px 0"></div>
+    <div id="weightLogCard" style="margin:10px 16px 0"></div>
     <div id="goalCard" style="margin:10px 16px 0"></div>
     <div id="muscleGoalCard" style="margin:10px 16px 0"></div>
     <div id="autoProgCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
@@ -1277,8 +1280,154 @@ async function deleteSession(id){
 }
 
 
-function renderStats(){
+async 
+async function renderWeightChart(p){
+  const el = document.getElementById('weightChartSection');
+  if(!el) return;
+  const {data} = await sb.from('weight_logs').select('*')
+    .eq('user_id', p.id)
+    .order('date', {ascending: true})
+    .limit(30);
+  const logs = data||[];
+  if(logs.length < 2){
+    el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;text-align:center;color:var(--muted);font-size:12px">Kilo grafiği için en az 2 ölçüm gerekli.<br>Profil sekmesinden ölçüm ekle.</div>';
+    return;
+  }
+  const weights = logs.map(l => parseFloat(l.weight));
+  const dates = logs.map(l => { const d = new Date(l.date); return d.getDate()+'/'+(d.getMonth()+1); });
+  const minW = Math.min(...weights) - 1;
+  const maxW = Math.max(...weights) + 1;
+  const W = 320, H = 160, pad = 36;
+  const xStep = (W - pad*2) / (logs.length - 1);
+  const yScale = (H - pad) / (maxW - minW);
+  
+  // Build SVG path
+  const points = weights.map((w,i) => {
+    const x = pad + i * xStep;
+    const y = H - pad/2 - (w - minW) * yScale;
+    return {x, y, w, d: dates[i]};
+  });
+  const pathD = points.map((p,i) => (i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+  const areaD = pathD + ' L'+points[points.length-1].x.toFixed(1)+' '+(H-pad/2)+' L'+pad+' '+(H-pad/2)+' Z';
+  
+  // Y axis labels
+  const yLabels = [minW+1, Math.round((minW+maxW)/2), maxW-1].map(v => {
+    const y = H - pad/2 - (v - minW) * yScale;
+    return '<text x="'+(pad-4)+'" y="'+(y+4)+'" fill="rgba(255,255,255,.3)" font-size="8" text-anchor="end">'+v.toFixed(1)+'</text>';
+  }).join('');
+  
+  // X axis labels (show every other)
+  const xLabels = points.filter((_,i)=>i%Math.ceil(points.length/6)===0||i===points.length-1).map(p =>
+    '<text x="'+p.x+'" y="'+(H-2)+'" fill="rgba(255,255,255,.3)" font-size="8" text-anchor="middle">'+p.d+'</text>'
+  ).join('');
+  
+  // Dots
+  const dots = points.map((p,i) => '<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="'+((p.w===Math.min(...weights))?'#38b6ff':(p.w===Math.max(...weights))?'#ef4444':'#d4f53c')+'" stroke="#0c0c0c" stroke-width="1.5"/>').join('');
+  
+  // Last value label
+  const last = points[points.length-1];
+  const first = points[0];
+  const diff = (last.w - first.w).toFixed(1);
+  const diffColor = diff > 0 ? '#ef4444' : '#34d399';
+  const diffSign = diff > 0 ? '+' : '';
+  
+  el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+    +'<h3 style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">⚖️ Kilo Grafiği</h3>'
+    +'<div style="font-size:11px"><span style="color:var(--text);font-weight:600">'+last.w+' kg</span>'
+    +' <span style="color:'+diffColor+'">'+diffSign+diff+' kg</span></div>'
+    +'</div>'
+    +'<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="overflow:visible">'
+    +'<defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d4f53c" stop-opacity="0.2"/><stop offset="100%" stop-color="#d4f53c" stop-opacity="0"/></linearGradient></defs>'
+    +'<path d="'+areaD+'" fill="url(#wg)"/>'
+    +'<path d="'+pathD+'" fill="none" stroke="#d4f53c" stroke-width="2" stroke-linejoin="round"/>'
+    +yLabels+xLabels+dots
+    +'</svg>'
+    +'</div>';
+}
+
+
+async function renderNutChart(p){
+  const el = document.getElementById('nutChartSection');
+  if(!el) return;
+
+  // Load last 14 days nutrition
+  const logs = [];
+  for(let i=13; i>=0; i--){
+    const d = new Date();
+    d.setDate(d.getDate()-i);
+    const date = d.toISOString().split('T')[0];
+    const k = p.id+'_'+date;
+    const nd = nutCache[k];
+    if(nd && nd.meals && nd.meals.length){
+      let kcal=0, protein=0;
+      nd.meals.forEach(m=>m.foods&&m.foods.forEach(f=>{kcal+=parseFloat(f.kcal||0);protein+=parseFloat(f.protein||0);}));
+      if(kcal>0) logs.push({date, kcal:Math.round(kcal), protein:Math.round(protein), label:(d.getDate()+'/'+(d.getMonth()+1))});
+    }
+  }
+
+  if(logs.length < 2){
+    el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;text-align:center;color:var(--muted);font-size:12px">Beslenme grafiği için en az 2 günlük veri gerekli.</div>';
+    return;
+  }
+
+  const W=320, H=160, pad=36;
+  const kcals = logs.map(l=>l.kcal);
+  const prots = logs.map(l=>l.protein);
+  const maxK = Math.max(...kcals)*1.1||2000;
+  const maxP = Math.max(...prots)*1.1||200;
+  const xStep = (W-pad*2)/(logs.length-1);
+
+  function buildPath(vals, maxV, closed){
+    const pts = vals.map((v,i)=>({x:pad+i*xStep, y:H-pad/2-(v/maxV)*(H-pad)}));
+    const d = pts.map((p,i)=>(i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+    if(closed) return d+' L'+(pad+(vals.length-1)*xStep).toFixed(1)+' '+(H-pad/2)+' L'+pad+' '+(H-pad/2)+' Z';
+    return d;
+  }
+
+  const kcalPath = buildPath(kcals, maxK, false);
+  const kcalArea = buildPath(kcals, maxK, true);
+  const protPath = buildPath(prots, maxP, false);
+
+  const xLabels = logs.filter((_,i)=>i%Math.ceil(logs.length/5)===0||i===logs.length-1)
+    .map(l=>'<text x="'+(pad+logs.indexOf(l)*xStep)+'" y="'+(H-2)+'" fill="rgba(255,255,255,.3)" font-size="8" text-anchor="middle">'+l.label+'</text>').join('');
+
+  const avgK = Math.round(kcals.reduce((a,b)=>a+b,0)/kcals.length);
+  const avgP = Math.round(prots.reduce((a,b)=>a+b,0)/prots.length);
+  const target = p.targets||{kcal:2000,protein:150};
+
+  el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+    +'<h3 style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">🥗 Beslenme Grafiği</h3>'
+    +'<div style="display:flex;gap:10px;font-size:10px">'
+    +'<span><span style="color:#f59e0b">■</span> Ort. '+avgK+' kcal</span>'
+    +'<span><span style="color:#ef4444">■</span> Ort. '+avgP+'g protein</span>'
+    +'</div></div>'
+    +'<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="overflow:visible">'
+    +'<defs>'
+    +'<linearGradient id="kg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/></linearGradient>'
+    +'</defs>'
+    +'<path d="'+kcalArea+'" fill="url(#kg2)"/>'
+    +'<path d="'+kcalPath+'" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linejoin="round"/>'
+    +'<path d="'+protPath+'" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="4,2"/>'
+    +xLabels
+    +'</svg>'
+    +'<div style="display:flex;gap:8px;margin-top:6px">'
+    +'<div style="flex:1;background:rgba(245,158,11,.08);border-radius:6px;padding:6px 10px;font-size:10px">'
+    +'<div style="color:var(--muted)">Ort. Kalori</div>'
+    +'<div style="color:#f59e0b;font-weight:600;font-size:14px">'+avgK+'<span style="font-size:9px;font-weight:400"> kcal</span></div>'
+    +'</div>'
+    +'<div style="flex:1;background:rgba(239,68,68,.08);border-radius:6px;padding:6px 10px;font-size:10px">'
+    +'<div style="color:var(--muted)">Ort. Protein</div>'
+    +'<div style="color:#ef4444;font-weight:600;font-size:14px">'+avgP+'<span style="font-size:9px;font-weight:400"> g</span></div>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
+}
+
+async function renderStats(){
   const p=activeProfile();
+  if(!p) return;
   const tv=sessionCache.reduce((s,l)=>s+(l.volume||0),0);
   const ts=sessionCache.reduce((s,l)=>s+(l.sets_done||0),0);
   const color=p?.color||'#d4f53c';
@@ -1287,6 +1436,9 @@ function renderStats(){
     <div class="stat-card"><div class="sc-lbl">Toplam Set</div><div class="sc-val" style="color:${color}">${ts}</div><div class="sc-sub">tamamlandı</div></div>
     <div class="stat-card"><div class="sc-lbl">Toplam Hacim</div><div class="sc-val" style="color:${color}">${(tv/1000).toFixed(1)}k</div><div class="sc-sub">kg kaldırıldı</div></div>
     <div class="stat-card"><div class="sc-lbl">Ort. Hacim</div><div class="sc-val" style="color:${color}">${sessionCache.length?Math.round(tv/sessionCache.length):0}</div><div class="sc-sub">kg/seans</div></div>`;
+  // Load weight logs and draw chart
+  await renderWeightChart(p);
+  await renderNutChart(p);
   // PRs from set cache
   const prs={};
   activeProgram().forEach((day,di)=>day.exercises.forEach((ex,ei)=>{
@@ -2225,10 +2377,54 @@ const MUSCLE_GOALS = [
   {id:'full', label:'🌟 Tam Vücut'},
 ];
 
+
+async function renderWeightLogCard(p){
+  const el = document.getElementById('weightLogCard');
+  if(!el) return;
+  // Load last 8 weight logs
+  const {data} = await sb.from('weight_logs').select('*')
+    .eq('user_id', p.id)
+    .order('date', {ascending: false})
+    .limit(8);
+  const logs = data||[];
+  const rows = logs.map(l => {
+    const d = new Date(l.date);
+    const dateStr = d.getDate()+' '+['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()];
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px">'
+      +'<span style="color:var(--muted)">'+dateStr+'</span>'
+      +'<span style="color:var(--text);font-weight:500">'+l.weight+' kg</span>'
+      +'</div>';
+  }).join('');
+  
+  el.innerHTML = '<div class="prof-section">'
+    +'<h3>⚖️ Kilo Takibi</h3>'
+    +(logs.length ? rows : '<div style="font-size:11px;color:var(--muted);text-align:center;padding:10px">Henüz ölçüm yok</div>')
+    +'<div style="display:flex;gap:8px;margin-top:10px">'
+    +'<input type="number" step="0.1" id="newWeightInp" placeholder="76.5 kg" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none">'
+    +'<button onclick="addWeightLog(this.dataset.uid)" data-uid="'+p.id+'" style="background:var(--acc);border:none;border-radius:6px;padding:8px 16px;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:12px">+ Ekle</button>'
+    +'</div>'
+    +'</div>';
+}
+
+async function addWeightLog(uid){
+  const inp = document.getElementById('newWeightInp');
+  const w = parseFloat(inp?.value);
+  if(!w) return;
+  const today = new Date().toISOString().split('T')[0];
+  await sb.from('weight_logs').upsert({user_id: uid, weight: w, date: today}, {onConflict: 'user_id,date'});
+  // Update profile weight
+  const p = activeProfile();
+  if(p){ p.weight = w; await sb.from('profiles').update({weight: w}).eq('id', uid); }
+  inp.value = '';
+  renderWeightLogCard(activeProfile());
+  renderAll();
+}
+
 function renderProfileScreen(){
   const p = activeProfile();
   if(!p) return;
   renderProfileEditCard(p);
+  renderWeightLogCard(p);
   renderGoalCard(p);
   renderMuscleGoalCard(p);
   renderAutoProgCard(p);
@@ -2352,6 +2548,27 @@ function renderAutoProgCard(p){
   renderEditableProg(prog.desc);
 }
 
+
+function lookupMuscleForEditable(name, di, ei){
+  if(!name || name.length < 2) return;
+  const q = name.toLowerCase().trim();
+  // Check EXERCISE_DB first
+  const found = EXERCISE_DB.find(e => e.name.toLowerCase().includes(q) || q.includes(e.name.toLowerCase()));
+  if(found && editableProg[di] && editableProg[di].exercises[ei]){
+    editableProg[di].exercises[ei].muscle = found.muscle;
+    const el = document.getElementById('em_'+di+'_'+ei);
+    if(el) el.textContent = found.muscle;
+    return;
+  }
+  // Check FOOD... no, check EXERCISE_DB by partial
+  const partialMatch = EXERCISE_DB.find(e => e.name.toLowerCase().startsWith(q.substring(0,4)));
+  if(partialMatch && editableProg[di] && editableProg[di].exercises[ei]){
+    editableProg[di].exercises[ei].muscle = partialMatch.muscle;
+    const el = document.getElementById('em_'+di+'_'+ei);
+    if(el) el.textContent = partialMatch.muscle;
+  }
+}
+
 function renderEditableProg(desc){
   const el = document.getElementById('autoProgCard');
   if(!el||!editableProg) return;
@@ -2360,7 +2577,9 @@ function renderEditableProg(desc){
     const exList = isRest ? '' : day.exercises.map((ex,ei)=>`
       <div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-top:6px">
         <div style="display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center">
-          <input value="${ex.name}" onchange="editableProg[${di}].exercises[${ei}].name=this.value"
+          <input value="${ex.name}" 
+            onchange="editableProg[${di}].exercises[${ei}].name=this.value"
+            oninput="lookupMuscleForEditable(this.value,${di},${ei})"
             style="background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:500;outline:none;padding:2px 0">
           <div style="text-align:center">
             <div style="font-size:8px;color:var(--muted);margin-bottom:2px">SET</div>
@@ -2375,7 +2594,7 @@ function renderEditableProg(desc){
           <button onclick="editableProg[${di}].exercises.splice(${ei},1);renderEditableProg()"
             style="background:none;border:none;color:#555;font-size:14px;cursor:pointer;padding:0 4px">✕</button>
         </div>
-        <div style="font-size:9px;color:#ef4444;margin-top:4px">${ex.muscle||''}</div>
+        <div style="font-size:9px;color:#ef4444;margin-top:4px" id="em_${di}_${ei}">${ex.muscle||''}</div>
       </div>`).join('');
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:${isRest?'0':'8px'}">
@@ -2523,7 +2742,7 @@ async function saveProfileAll(){
   p.level = document.getElementById('pf_level')?.value || p.level;
   p.trainingDays = document.getElementById('pf_days')?.value || p.trainingDays;
   // Save all to Supabase
-  await sb.from('profiles').update({
+  const {error: profErr} = await sb.from('profiles').update({
     name: p.name,
     weight: p.weight,
     target_weight: p.target_weight,
@@ -2533,7 +2752,20 @@ async function saveProfileAll(){
     gender: p.gender,
     activity: p.activity,
     level: p.level,
+    trainingDays: p.trainingDays,
+    mainGoal: p.mainGoal,
+    muscleGoals: p.muscleGoals,
   }).eq('id', p.id);
+  if(profErr) console.error('Profile save error:', profErr);
+  
+  // Save weight measurement with date
+  if(p.weight){
+    await sb.from('weight_logs').upsert({
+      user_id: p.id,
+      weight: p.weight,
+      date: new Date().toISOString().split('T')[0]
+    }, {onConflict: 'user_id,date'});
+  }
   // Also update allProfiles cache
   const idx = allProfiles.findIndex(x => x.id === p.id);
   if(idx >= 0) allProfiles[idx] = {...allProfiles[idx], ...p};
