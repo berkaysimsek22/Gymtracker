@@ -1383,10 +1383,10 @@ function changeDayType(di,type){
     prog[di].amrap={timeCapSec:1200,exercises:[
       {name:'Pull Up',reps:5},{name:'Push Up',reps:10},{name:'Air Squat',reps:15}
     ]};
-    if(!prog[di].name||/^Gün \d+$/.test(prog[di].name))prog[di].name='Cindy';
+    prog[di].name='Cindy';
   }
   saveProgram(activeProfile().id);
-  renderDayContent(di);renderDayTabs();
+  renderDayContent(di);renderDayTabs();renderWeekGrid();
 }
 
 function delEx(di,ei){
