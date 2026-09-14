@@ -59,12 +59,10 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .logout-btn{font-size:10px;color:var(--acc2);background:none;border:none;cursor:pointer;padding:2px 0}
 
 /* ADMIN BANNER */
-.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:100%;overflow:hidden}
-.admin-banner p{font-size:11px;color:var(--acc4);flex-shrink:0}
-.admin-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0}
-.admin-tabs::-webkit-scrollbar{display:none}
-.admin-tab{flex-shrink:0;white-space:nowrap;padding:4px 10px;border-radius:12px;border:1px solid rgba(247,201,72,.2);background:none;color:var(--acc4);font-size:10px;cursor:pointer;transition:all .2s}
-.admin-tab.active{background:var(--acc4);color:#0c0c0c}
+.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:8px;max-width:100%}
+.admin-user-search{width:100%;background:var(--surface2);border:1px solid rgba(247,201,72,.25);border-radius:20px;padding:7px 14px;color:var(--acc4);font-size:12px;outline:none}
+.admin-user-search::placeholder{color:rgba(247,201,72,.55)}
+.admin-user-search:focus{border-color:rgba(247,201,72,.5)}
 
 /* PERSON BAR */
 .person-bar{display:flex;gap:6px;padding:14px 16px 0;overflow-x:auto;scrollbar-width:none}
@@ -436,9 +434,6 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
   /* Prevent zoom on input focus */
   input, select, textarea { font-size: 16px !important; }
   
-  /* Admin banner scroll */
-  .admin-tabs { -webkit-overflow-scrolling: touch; }
-  
   /* Day head buttons */
   .day-head-right { gap: 4px !important; flex-wrap: wrap; justify-content: flex-end; }
   
@@ -554,8 +549,11 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 
   <!-- ADMIN BANNER -->
   <div class="admin-banner" id="adminBanner" style="display:none">
-    <p>👑 <strong>Admin Modu</strong> — tüm kullanıcıları görüyorsun</p>
-    <div class="admin-tabs" id="adminTabs"></div>
+    <div style="position:relative;flex:1;min-width:0">
+      <input type="text" id="adminUserSearch" class="admin-user-search" placeholder="👑 Kullanıcı ara..." autocomplete="off"
+        oninput="filterAdminUsers(this.value)" onfocus="filterAdminUsers(this.value)" onblur="setTimeout(hideAdminUserSugg,200)">
+      <div id="adminUserSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(247,201,72,.3);border-radius:8px;max-height:240px;overflow-y:auto;z-index:200;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.6)"></div>
+    </div>
   </div>
 
   <div class="person-bar" id="personBar" style="display:none"></div>
@@ -909,11 +907,38 @@ function showMainApp() {
 }
 
 function renderAdminTabs() {
-  const tabs = document.getElementById('adminTabs');
-  const profiles = allProfiles.length ? allProfiles : [currentProfile];
-  tabs.innerHTML = profiles.map(p =>
-    `<button class="admin-tab${p.id===activeProfile()?.id?' active':''}" onclick="switchViewUser('${p.id}')">${p.name||p.id.substring(0,6)}</button>`
-  ).join('');
+  const inp = document.getElementById('adminUserSearch');
+  if(inp) inp.value = activeProfile()?.name || '';
+}
+
+function filterAdminUsers(query){
+  const sugg = document.getElementById('adminUserSugg');
+  if(!sugg) return;
+  const q = (query||'').toLowerCase().trim();
+  const list = allProfiles.length ? allProfiles : [currentProfile];
+  const matches = q ? list.filter(p=>(p.name||'').toLowerCase().includes(q)) : list;
+  sugg.style.display = 'block';
+  if(!matches.length){
+    sugg.innerHTML = '<div style="padding:10px 14px;font-size:11px;color:var(--muted)">Bulunamadı</div>';
+    return;
+  }
+  sugg.innerHTML = matches.map(p => `
+    <div onclick="selectAdminUser('${p.id}')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;${p.id===activeProfile()?.id?'color:var(--acc4);font-weight:700':'color:var(--text)'}"
+      onmouseover="this.style.background='rgba(247,201,72,.08)'" onmouseout="this.style.background='none'">
+      ${p.name||p.id.substring(0,6)}
+    </div>`).join('');
+}
+
+function hideAdminUserSugg(){
+  const sugg = document.getElementById('adminUserSugg');
+  if(sugg) sugg.style.display = 'none';
+}
+
+async function selectAdminUser(userId){
+  hideAdminUserSugg();
+  await switchViewUser(userId);
+  const inp = document.getElementById('adminUserSearch');
+  if(inp) inp.value = activeProfile()?.name || '';
 }
 
 async function switchViewUser(userId) {
