@@ -59,10 +59,11 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .logout-btn{font-size:10px;color:var(--acc2);background:none;border:none;cursor:pointer;padding:2px 0}
 
 /* ADMIN BANNER */
-.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-.admin-banner p{font-size:11px;color:var(--acc4)}
-.admin-tabs{display:flex;gap:4px}
-.admin-tab{padding:4px 10px;border-radius:12px;border:1px solid rgba(247,201,72,.2);background:none;color:var(--acc4);font-size:10px;cursor:pointer;transition:all .2s}
+.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:100%;overflow:hidden}
+.admin-banner p{font-size:11px;color:var(--acc4);flex-shrink:0}
+.admin-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0}
+.admin-tabs::-webkit-scrollbar{display:none}
+.admin-tab{flex-shrink:0;white-space:nowrap;padding:4px 10px;border-radius:12px;border:1px solid rgba(247,201,72,.2);background:none;color:var(--acc4);font-size:10px;cursor:pointer;transition:all .2s}
 .admin-tab.active{background:var(--acc4);color:#0c0c0c}
 
 /* PERSON BAR */
@@ -634,7 +635,8 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div id="weightLogCard" style="margin:10px 16px 0"></div>
     <div id="goalCard" style="margin:10px 16px 0"></div>
     <div id="muscleGoalCard" style="margin:10px 16px 0"></div>
-    <div id="autoProgCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
+    <div id="autoProgCard" style="margin:10px 16px 0"></div>
+    <div id="deleteProfileCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
   </div>
 
   <div class="bottom-nav">
@@ -2712,6 +2714,46 @@ function renderProfileScreen(){
   renderGoalCard(p);
   renderMuscleGoalCard(p);
   renderAutoProgCard(p);
+  renderDeleteProfileCard(p);
+}
+
+function renderDeleteProfileCard(p){
+  const el = document.getElementById('deleteProfileCard');
+  if(!el) return;
+  // Sadece admin, kendisi disindaki bir profili silebilir
+  if(!isAdmin() || p.id === currentProfile?.id){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="prof-section" style="border-color:rgba(255,92,56,.25)">
+    <h3 style="color:var(--acc2)">⚠️ Tehlikeli Bölge</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">"${p.name||'Bu kullanıcı'}" profilini ve tüm antrenman/beslenme/ağırlık geçmişini kalıcı olarak siler. Bu işlem geri alınamaz.</p>
+    <button class="btn btn-danger" style="width:100%" onclick="deleteProfile()">🗑 Profili Sil</button>
+  </div>`;
+}
+
+async function deleteProfile(){
+  const p = activeProfile();
+  if(!p || !isAdmin() || p.id === currentProfile?.id) return;
+  if(!confirm(`"${p.name||p.id}" adlı kullanıcının TÜM verileri (program, antrenman geçmişi, beslenme kayıtları, kilo takibi) kalıcı olarak silinecek.\n\nDevam edilsin mi?`)) return;
+  if(!confirm('Son onay: bu işlem geri alınamaz. Emin misin?')) return;
+  const uid = p.id;
+  const {error} = await sb.from('profiles').delete().eq('id', uid);
+  if(error){ alert('Silme başarısız: '+error.message); return; }
+  await sb.from('workout_sets').delete().eq('user_id', uid);
+  await sb.from('session_logs').delete().eq('user_id', uid);
+  await sb.from('nutrition_logs').delete().eq('user_id', uid);
+  await sb.from('weight_logs').delete().eq('user_id', uid);
+  await sb.from('programs').delete().eq('user_id', uid);
+  allProfiles = allProfiles.filter(x=>x.id!==uid);
+  delete programs[uid];
+  Object.keys(setCache).forEach(k=>{ if(k.startsWith(uid+'_')) delete setCache[k]; });
+  Object.keys(nutCache).forEach(k=>{ if(k.startsWith(uid+'_')) delete nutCache[k]; });
+  viewingProfile = currentProfile;
+  renderAdminTabs();
+  renderAll();
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(255,92,56,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#ff5c38';
+  t.textContent='🗑 Profil silindi';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
 }
 
 function renderProfileEditCard(p){
