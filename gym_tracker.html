@@ -59,10 +59,11 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .logout-btn{font-size:10px;color:var(--acc2);background:none;border:none;cursor:pointer;padding:2px 0}
 
 /* ADMIN BANNER */
-.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
-.admin-banner p{font-size:11px;color:var(--acc4)}
-.admin-tabs{display:flex;gap:4px}
-.admin-tab{padding:4px 10px;border-radius:12px;border:1px solid rgba(247,201,72,.2);background:none;color:var(--acc4);font-size:10px;cursor:pointer;transition:all .2s}
+.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:100%;overflow:hidden}
+.admin-banner p{font-size:11px;color:var(--acc4);flex-shrink:0}
+.admin-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0}
+.admin-tabs::-webkit-scrollbar{display:none}
+.admin-tab{flex-shrink:0;white-space:nowrap;padding:4px 10px;border-radius:12px;border:1px solid rgba(247,201,72,.2);background:none;color:var(--acc4);font-size:10px;cursor:pointer;transition:all .2s}
 .admin-tab.active{background:var(--acc4);color:#0c0c0c}
 
 /* PERSON BAR */
