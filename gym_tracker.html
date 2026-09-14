@@ -777,8 +777,13 @@ async function loadProfile() {
 
   // Admin: load all profiles
   if(isAdmin()) {
-    const {data: all} = await sb.from('profiles').select('*').order('created_at');
-    allProfiles = all || [currentProfile];
+    const {data: all, error: allErr} = await sb.from('profiles').select('*').order('created_at');
+    if(allErr){
+      console.error('Kullanıcı listesi yüklenemedi:', allErr);
+      allProfiles = allProfiles.length ? allProfiles : [currentProfile];
+    } else {
+      allProfiles = all && all.length ? all : [currentProfile];
+    }
   }
 
   await loadProgramForUser(currentProfile.id);
