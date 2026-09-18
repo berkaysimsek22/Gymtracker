@@ -97,6 +97,38 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .dtab.hiit-day{border-color:rgba(255,92,56,.4);color:var(--acc2)}
 .dtab.done-day::after{content:' ✓';opacity:.5}
 
+/* WORKOUTS TAB */
+.wo-subtabs{display:flex;gap:6px;padding:14px 16px 0;overflow-x:auto;scrollbar-width:none}
+.wo-subtabs::-webkit-scrollbar{display:none}
+.wo-subtab{flex-shrink:0;padding:8px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s}
+.wo-subtab.active{background:var(--acc);color:#0c0c0c;border-color:var(--acc)}
+.wo-section{margin-top:16px}
+.wo-day-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.wo-day-card h4{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.3px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.wo-day-card h4 span{font-size:10px;color:var(--muted);font-family:'Archivo',sans-serif;font-weight:400}
+.wo-ex-item{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid rgba(255,255,255,.05)}
+.wo-ex-item:first-child{border-top:none}
+.wo-ex-item .n{font-size:12px;font-weight:500}
+.wo-ex-item .m{font-size:10px;color:#ef4444;margin-top:1px}
+.wo-ex-item .sr{font-size:11px;color:var(--muted);font-family:'Archivo',monospace;flex-shrink:0}
+.wo-challenge-card{background:rgba(56,182,255,.04);border:1px solid rgba(56,182,255,.15);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.wo-challenge-card h3{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc3);letter-spacing:.5px}
+.wo-challenge-meta{display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
+.wo-challenge-pill{font-size:10px;padding:3px 10px;border-radius:10px;background:rgba(56,182,255,.1);color:var(--acc3);border:1px solid rgba(56,182,255,.2)}
+.wo-challenge-note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px;font-style:italic}
+.wo-muscle-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wo-muscle-btn{padding:14px 10px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s}
+.wo-muscle-btn:hover,.wo-muscle-btn.active{border-color:var(--acc);color:var(--acc);background:rgba(212,245,60,.06)}
+.wo-rank-item{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px}
+.wo-rank-num{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--muted);width:22px;flex-shrink:0;text-align:center}
+.wo-rank-item:nth-child(1) .wo-rank-num{color:#f7c948}
+.wo-rank-item:nth-child(2) .wo-rank-num{color:#c9c9c9}
+.wo-rank-item:nth-child(3) .wo-rank-num{color:#cd7f32}
+.wo-rank-info{flex:1;min-width:0}
+.wo-rank-info .n{font-size:13px;font-weight:600}
+.wo-rank-info .m{font-size:10px;color:var(--muted);margin-top:1px}
+.wo-rank-info .t{font-size:10px;color:#38b6ff;margin-top:3px;font-style:italic}
+
 /* DAY CONTENT */
 .day-content{padding:12px 16px 0}
 
@@ -660,9 +692,22 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div id="deleteProfileCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
   </div>
 
+  <div class="screen" id="screen-workouts">
+    <div style="padding:18px 16px 0">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px">Workouts</h2>
+    </div>
+    <div class="wo-subtabs" id="woSubtabs">
+      <button class="wo-subtab active" onclick="switchWoTab('split',this)">📋 Split</button>
+      <button class="wo-subtab" onclick="switchWoTab('challenge',this)">🏆 Challenge</button>
+      <button class="wo-subtab" onclick="switchWoTab('muscle',this)">💪 Kas Grubu</button>
+    </div>
+    <div id="woContent" style="padding:0 16px 20px"></div>
+  </div>
+
   <div class="bottom-nav">
     <button class="nav-btn active" onclick="showScreen('workout',this)"><div class="nav-icon">🏋️</div>Antrenman</button>
     <button class="nav-btn" onclick="showScreen('nutrition',this)"><div class="nav-icon">🥗</div>Beslenme</button>
+    <button class="nav-btn" onclick="showScreen('workouts',this)"><div class="nav-icon">📚</div>Workouts</button>
     <button class="nav-btn" onclick="showScreen('history',this)"><div class="nav-icon">📋</div>Geçmiş</button>
     <button class="nav-btn" onclick="showScreen('stats',this)"><div class="nav-icon">📊</div>İstatistik</button>
     <button class="nav-btn" onclick="showScreen('profile',this)"><div class="nav-icon">👤</div>Profil</button>
@@ -2196,6 +2241,107 @@ function showScreen(name,btn){
   if(name==='stats')renderStats();
   if(name==='nutrition')renderNutrition();
   if(name==='profile')renderProfileScreen();
+  if(name==='workouts'){
+    document.querySelectorAll('#woSubtabs .wo-subtab').forEach((b,i)=>b.classList.toggle('active',i===0));
+    renderWoTab('split');
+  }
+}
+
+// ── WORKOUTS (Split / Challenge / Kas Grubu) ──
+const CHALLENGE_LIBRARY = [
+  {id:'cindy', name:'Cindy', format:'AMRAP', timeCapSec:1200,
+    exercises:[{name:'Pull Up',reps:5},{name:'Push Up',reps:10},{name:'Air Squat',reps:15}],
+    scoring:'20 dakika içinde tamamlayabildiğin kadar round yap. Skor = toplam round + son bitmeyen roundda yaptığın ekstra tekrar.'}
+];
+
+const MUSCLE_REGIONS = [
+  {id:'chest', label:'Göğüs', tags:['chest']},
+  {id:'back', label:'Sırt', tags:['lat','mid_back']},
+  {id:'shoulder', label:'Omuz', tags:['front_delt','side_delt','rear_delt']},
+  {id:'biceps', label:'Biceps', tags:['biceps']},
+  {id:'triceps', label:'Triceps', tags:['triceps']},
+  {id:'abs', label:'Karın', tags:['abs']},
+  {id:'glute', label:'Kalça (Glute)', tags:['glute_max','glute_med']},
+  {id:'quad', label:'Quadriceps', tags:['quad']},
+  {id:'hamstring', label:'Hamstring', tags:['hamstring']},
+  {id:'calves', label:'Baldır', tags:['calves']},
+];
+
+function switchWoTab(tab, btn){
+  document.querySelectorAll('#woSubtabs .wo-subtab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderWoTab(tab);
+}
+
+function renderWoTab(tab){
+  const el = document.getElementById('woContent');
+  if(!el) return;
+  if(tab==='split') renderWoSplit(el);
+  else if(tab==='challenge') renderWoChallenge(el);
+  else if(tab==='muscle') renderWoMuscle(el);
+}
+
+function renderWoSplit(el){
+  const prog = activeProgram();
+  if(!prog || !prog.length){ el.innerHTML = '<div class="empty-state">Henüz bir program yok.</div>'; return; }
+  const cards = prog.map(day=>{
+    if(day.type==='rest') return '';
+    if(day.type==='hiit'||day.type==='cardio'){
+      const h=day.hiit||{work:40,rest:20,rounds:8};
+      return `<div class="wo-day-card"><h4>${day.name} <span>${day.day} · HIIT</span></h4>
+        <div class="wo-ex-item"><div class="n">Çalışma ${h.work}sn / Dinlenme ${h.rest}sn</div><div class="sr">${h.rounds} round</div></div>
+      </div>`;
+    }
+    if(day.type==='amrap'){
+      const a=day.amrap||{timeCapSec:1200,exercises:[]};
+      const exs=(a.exercises||[]).map(ex=>`<div class="wo-ex-item"><div class="n">${ex.name}</div><div class="sr">${ex.reps} tekrar</div></div>`).join('');
+      return `<div class="wo-day-card"><h4>${day.name} <span>${day.day} · AMRAP ${Math.round((a.timeCapSec||1200)/60)}dk</span></h4>${exs}</div>`;
+    }
+    const exs=(day.exercises||[]).map(ex=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div></div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
+    return `<div class="wo-day-card"><h4>${day.name} <span>${day.day}</span></h4>${exs}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="wo-section">${cards || '<div class="empty-state">Programında antrenman günü yok.</div>'}</div>`;
+}
+
+function renderWoChallenge(el){
+  const cards = CHALLENGE_LIBRARY.map(c=>{
+    const exs = c.exercises.map(ex=>`<div class="wo-ex-item"><div class="n">${ex.name}</div><div class="sr">${ex.reps} tekrar</div></div>`).join('');
+    return `<div class="wo-challenge-card">
+      <h3>🏆 ${c.name}</h3>
+      <div class="wo-challenge-meta">
+        <span class="wo-challenge-pill">${c.format}</span>
+        <span class="wo-challenge-pill">${Math.round(c.timeCapSec/60)} dk</span>
+      </div>
+      ${exs}
+      <div class="wo-challenge-note">${c.scoring}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="wo-section">${cards}
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.6">Bir güne uygulamak için o günü ✏️ Düzenle modunda "→ Challenge (WOD) Günü" yap.</div>
+  </div>`;
+}
+
+function getExercisesForRegion(tags){
+  const seen = new Set();
+  return EXERCISE_DB.filter(e=>{
+    if(!e.muscles || !e.muscles.some(m=>tags.includes(m))) return false;
+    if(seen.has(e.name)) return false;
+    seen.add(e.name);
+    return true;
+  });
+}
+
+function renderWoMuscle(el, activeRegion){
+  const buttons = MUSCLE_REGIONS.map(r=>`<button class="wo-muscle-btn${activeRegion===r.id?' active':''}" onclick="renderWoMuscle(document.getElementById('woContent'),'${r.id}')">${r.label}</button>`).join('');
+  let rankingHtml = '';
+  if(activeRegion){
+    const region = MUSCLE_REGIONS.find(r=>r.id===activeRegion);
+    const list = getExercisesForRegion(region.tags);
+    rankingHtml = `<div class="wo-section"><h4 style="font-family:'Bebas Neue',sans-serif;font-size:18px;margin-bottom:8px">${region.label} — En İyiden Kötüye</h4>`
+      + (list.length ? list.map((e,i)=>`<div class="wo-rank-item"><div class="wo-rank-num">${i+1}</div><div class="wo-rank-info"><div class="n">${e.name}</div><div class="m">${e.muscle}</div>${e.tip?`<div class="t">💡 ${e.tip}</div>`:''}</div></div>`).join('') : '<div class="empty-state">Bu bölge için egzersiz bulunamadı.</div>')
+      + '</div>';
+  }
+  el.innerHTML = `<div class="wo-muscle-grid">${buttons}</div>${rankingHtml}`;
 }
 
 // ── AUTH LISTENER ──
