@@ -1157,7 +1157,7 @@ async function renderDayContent(di) {
   if(editMode&&canEdit()) {
     html += `<div class="add-ex-form"><h4>+ Yeni Egzersiz Ekle</h4>
     <div style="position:relative;margin-bottom:8px">
-      <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" autocomplete="off" style="width:100%">
+      <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="filterExercises(this.value)" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
       <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
     </div>
     <div class="aef-grid">
@@ -2291,9 +2291,8 @@ const EXERCISE_DB = [
 
 function filterExercises(query){
   const sugg=document.getElementById('exSuggestions');
-  if(!query||query.length<2){sugg.style.display='none';return;}
-  const q=query.toLowerCase();
-  const matches=EXERCISE_DB.filter(e=>e.name.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q)).slice(0,8);
+  const q=(query||'').toLowerCase().trim();
+  const matches=(q?EXERCISE_DB.filter(e=>e.name.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q)):EXERCISE_DB).slice(0,q?8:EXERCISE_DB.length);
   if(!matches.length){sugg.style.display='none';return;}
   sugg.style.display='block';
   // Store matches in global for onclick access
@@ -3137,9 +3136,8 @@ function setSplitType(id){
 function filterEditableExSugg(query, di, ei){
   const sugg = document.getElementById('epsugg_'+di+'_'+ei);
   if(!sugg) return;
-  if(!query || query.length < 2){ sugg.style.display='none'; return; }
-  const q = query.toLowerCase().trim();
-  const matches = EXERCISE_DB.filter(e => e.name.toLowerCase().includes(q) || e.muscle.toLowerCase().includes(q)).slice(0,8);
+  const q = (query||'').toLowerCase().trim();
+  const matches = (q?EXERCISE_DB.filter(e => e.name.toLowerCase().includes(q) || e.muscle.toLowerCase().includes(q)):EXERCISE_DB).slice(0,q?8:EXERCISE_DB.length);
   if(!matches.length){ sugg.style.display='none'; return; }
   window._epMatches = window._epMatches || {};
   window._epMatches[di+'_'+ei] = matches;
@@ -3185,6 +3183,7 @@ function renderEditableProg(desc){
             <input value="${ex.name}" id="epn_${di}_${ei}"
               onchange="editableProg[${di}].exercises[${ei}].name=this.value"
               oninput="filterEditableExSugg(this.value,${di},${ei})"
+              onfocus="filterEditableExSugg(this.value,${di},${ei})"
               onblur="setTimeout(()=>hideEditableExSugg(${di},${ei}),200)"
               autocomplete="off"
               style="background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:500;outline:none;padding:2px 0;width:100%">
