@@ -606,7 +606,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
   <div class="admin-banner" id="adminBanner" style="display:none">
     <div style="position:relative;flex:1;min-width:0">
       <input type="text" id="adminUserSearch" class="admin-user-search" placeholder="👑 Kullanıcı ara..." autocomplete="off"
-        oninput="filterAdminUsers(this.value)" onfocus="filterAdminUsers(this.value)" onblur="setTimeout(hideAdminUserSugg,200)">
+        oninput="filterAdminUsers(this.value)" onfocus="this.select();filterAdminUsers('')" onblur="setTimeout(hideAdminUserSugg,200)">
       <div id="adminUserSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(247,201,72,.3);border-radius:8px;max-height:240px;overflow-y:auto;z-index:200;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.6)"></div>
     </div>
   </div>
@@ -1202,7 +1202,7 @@ async function renderDayContent(di) {
   if(editMode&&canEdit()) {
     html += `<div class="add-ex-form"><h4>+ Yeni Egzersiz Ekle</h4>
     <div style="position:relative;margin-bottom:8px">
-      <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="filterExercises(this.value)" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
+      <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="this.select();filterExercises('')" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
       <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
     </div>
     <div class="aef-grid">
@@ -3329,7 +3329,7 @@ function renderEditableProg(desc){
             <input value="${ex.name}" id="epn_${di}_${ei}"
               onchange="editableProg[${di}].exercises[${ei}].name=this.value"
               oninput="filterEditableExSugg(this.value,${di},${ei})"
-              onfocus="filterEditableExSugg(this.value,${di},${ei})"
+              onfocus="this.select();filterEditableExSugg('',${di},${ei})"
               onblur="setTimeout(()=>hideEditableExSugg(${di},${ei}),200)"
               autocomplete="off"
               style="background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:500;outline:none;padding:2px 0;width:100%">
