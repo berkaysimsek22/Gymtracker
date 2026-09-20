@@ -132,6 +132,16 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .wo-split-pick:hover{border-color:var(--acc)}
 .wo-split-pick .n{font-size:14px;font-weight:700;color:var(--text)}
 .wo-split-pick .d{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.5}
+.wo-week-table{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.wo-week-row{display:grid;grid-template-columns:30px 1fr auto auto 14px;gap:8px;align-items:center;padding:11px 12px;border-top:1px solid rgba(255,255,255,.05);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.wo-week-row:first-child{border-top:none}
+.wo-week-row:active{background:rgba(255,255,255,.03)}
+.wo-week-row.rest{opacity:.4;cursor:default}
+.wo-week-row .d{font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:700}
+.wo-week-row .n{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.wo-week-row .t{font-size:9px;color:var(--acc);background:rgba(212,245,60,.1);padding:2px 7px;border-radius:8px;white-space:nowrap}
+.wo-week-row .c{font-size:10px;color:var(--muted);white-space:nowrap}
+.wo-week-row .arr{color:var(--muted);font-size:14px}
 
 /* DAY CONTENT */
 .day-content{padding:12px 16px 0}
@@ -871,6 +881,12 @@ async function loadProfile() {
 async function loadProgramForUser(userId) {
   const {data} = await sb.from('programs').select('program_data').eq('user_id', userId).single();
   programs[userId] = data?.program_data || dc(DEFAULT_PROGRAM);
+  // Eski bir hatadan kalma: gün AMRAP/Challenge'a cevrilmis ama adi hala "Dinlenme" kalmis olabilir
+  let fixed = false;
+  programs[userId].forEach(day=>{
+    if(day.type==='amrap' && (!day.name || day.name==='Dinlenme')){ day.name='Cindy'; fixed=true; }
+  });
+  if(fixed) saveProgram(userId);
 }
 
 async function loadSessionLogs(userId) {
@@ -2396,7 +2412,7 @@ function renderWoSplit(el){
     <div class="d">${s.tagline}</div>
   </button>`).join('');
   el.innerHTML = `<div class="wo-section">
-    <button class="wo-split-pick" style="border-color:rgba(212,245,60,.3)" onclick="renderMyCurrentProgram(document.getElementById('woContent'))">
+    <button class="wo-split-pick" style="border-color:rgba(212,245,60,.3)" onclick="renderMyCurrentProgram()">
       <div class="n">📌 Şu Anki Programım</div>
       <div class="d">Uyguladığın programı buradan görüntüle</div>
     </button>
@@ -2405,45 +2421,73 @@ function renderWoSplit(el){
   </div>`;
 }
 
-function renderMyCurrentProgram(el){
-  const prog = activeProgram();
-  const back = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>`;
-  if(!prog || !prog.length){ el.innerHTML = back+'<div class="empty-state">Henüz bir program yok.</div>'; return; }
-  const cards = prog.map(day=>{
-    if(day.type==='rest') return '';
-    if(day.type==='hiit'||day.type==='cardio'){
-      const h=day.hiit||{work:40,rest:20,rounds:8};
-      return `<div class="wo-day-card"><h4>${day.name} <span>${day.day} · HIIT</span></h4>
-        <div class="wo-ex-item"><div class="n">Çalışma ${h.work}sn / Dinlenme ${h.rest}sn</div><div class="sr">${h.rounds} round</div></div>
-      </div>`;
-    }
-    if(day.type==='amrap'){
-      const a=day.amrap||{timeCapSec:1200,exercises:[]};
-      const exs=(a.exercises||[]).map(ex=>`<div class="wo-ex-item"><div class="n">${ex.name}</div><div class="sr">${ex.reps} tekrar</div></div>`).join('');
-      return `<div class="wo-day-card"><h4>${day.name} <span>${day.day} · AMRAP ${Math.round((a.timeCapSec||1200)/60)}dk</span></h4>${exs}</div>`;
-    }
-    const exs=(day.exercises||[]).map(ex=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div></div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
-    return `<div class="wo-day-card"><h4>${day.name} <span>${day.day}</span></h4>${exs}</div>`;
-  }).join('');
-  el.innerHTML = back+`<div class="wo-section">${cards || '<div class="empty-state">Programında antrenman günü yok.</div>'}</div>`;
+// Hafta tablosu + gün detayı: hem "Şu Anki Programım" hem her split detayı bunu kullanır
+let _woSchedule = null;
+let _woSplitMeta = null;
+
+function renderMyCurrentProgram(){
+  _woSchedule = activeProgram();
+  _woSplitMeta = null;
+  renderWoWeekTable();
 }
 
 function showPopularSplitDetail(id){
   const split = POPULAR_SPLITS.find(s=>s.id===id);
+  if(!split) return;
+  _woSchedule = split.schedule;
+  _woSplitMeta = split;
+  renderWoWeekTable();
+}
+
+function _woDayMeta(day){
+  const isRest = day.type==='rest';
+  const typeLabel = isRest?'—':day.type==='hiit'||day.type==='cardio'?'HIIT':day.type==='amrap'?'AMRAP':'Full';
+  const count = isRest?'':day.type==='amrap'?`${((day.amrap&&day.amrap.exercises)||[]).length} hareket`:day.type==='hiit'||day.type==='cardio'?`${(day.hiit&&day.hiit.rounds)||0} round`:`${(day.exercises||[]).length} hareket`;
+  return {isRest, typeLabel, count};
+}
+
+// Haftayı tek ekranda, kompakt bir tablo olarak gösterir — gün seçince detay açılır, aşağı kaydırmaya gerek kalmaz
+function renderWoWeekTable(){
   const el = document.getElementById('woContent');
-  if(!split || !el) return;
-  const dayCards = split.schedule.map(day=>{
-    if(day.type==='rest') return `<div class="wo-day-card" style="opacity:.5"><h4>${day.name} <span>${day.day}</span></h4></div>`;
-    const exs = day.exercises.map(ex=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div></div>`).join('');
-    return `<div class="wo-day-card"><h4>${day.name} <span>${day.day}</span></h4>${exs}</div>`;
-  }).join('');
-  el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>
-    <div class="wo-section" style="margin-top:0">
-      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">${split.name}</h3>
-      <p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${split.tagline}</p>
-      ${dayCards}
-      ${canEdit()?`<button class="btn btn-acc" style="width:100%;margin-top:10px" onclick="applyPopularSplit('${id}')">🚀 Bu Split'i Uygula</button>`:''}
+  if(!el) return;
+  const schedule = _woSchedule;
+  if(!schedule || !schedule.length){ el.innerHTML = `<button class="btn btn-outline btn-sm" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button><div class="empty-state">Program yok.</div>`; return; }
+  const rows = schedule.map((day,i)=>{
+    const {isRest, typeLabel, count} = _woDayMeta(day);
+    return `<div class="wo-week-row${isRest?' rest':''}" ${isRest?'':`onclick="showWoDayDetail(${i})"`}>
+      <div class="d">${(day.day||'').substring(0,3)}</div>
+      <div class="n">${day.name}</div>
+      <div class="t">${typeLabel}</div>
+      <div class="c">${count}</div>
+      ${isRest?'':'<div class="arr">›</div>'}
     </div>`;
+  }).join('');
+  const header = _woSplitMeta ? `<h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>` : '';
+  const applyBtn = _woSplitMeta && canEdit() ? `<button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="applyPopularSplit('${_woSplitMeta.id}')">🚀 Bu Split'i Uygula</button>` : '';
+  el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>
+    ${header}
+    <div class="wo-week-table">${rows}</div>
+    ${applyBtn}`;
+}
+
+function showWoDayDetail(i){
+  const day = _woSchedule && _woSchedule[i];
+  const el = document.getElementById('woContent');
+  if(!day || !el) return;
+  let exsHtml;
+  if(day.type==='amrap'){
+    const a=day.amrap||{timeCapSec:1200,exercises:[]};
+    exsHtml = (a.exercises||[]).map(ex=>`<div class="wo-ex-item"><div class="n">${ex.name}</div><div class="sr">${ex.reps} tekrar</div></div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
+  } else if(day.type==='hiit'||day.type==='cardio'){
+    const h=day.hiit||{work:40,rest:20,rounds:8};
+    exsHtml = `<div class="wo-ex-item"><div class="n">Çalışma ${h.work}sn / Dinlenme ${h.rest}sn</div><div class="sr">${h.rounds} round</div></div>`;
+  } else {
+    exsHtml = (day.exercises||[]).map(ex=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div></div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
+  }
+  const {typeLabel} = _woDayMeta(day);
+  const sub = day.type==='amrap' ? `AMRAP ${Math.round(((day.amrap&&day.amrap.timeCapSec)||1200)/60)}dk` : typeLabel==='Full' ? '' : typeLabel;
+  el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoWeekTable()">← Hafta</button>
+    <div class="wo-day-card"><h4>${day.name} <span>${day.day}${sub?' · '+sub:''}</span></h4>${exsHtml}</div>`;
 }
 
 async function applyPopularSplit(id){
