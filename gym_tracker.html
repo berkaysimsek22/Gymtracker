@@ -917,16 +917,41 @@ async function loadSetsForDay(userId, dayIdx) {
 async function loadNutrition(userId, date) {
   const k = `${userId}_${date}`;
   if(nutCache[k]) return nutCache[k];
-  const {data} = await sb.from('nutrition_logs').select('data').eq('user_id', userId).eq('date', date).single();
-  nutCache[k] = data?.data || {meals:[], water:0, note:'', targets:{kcal:2000,protein:150,carb:200,fat:70}};
-  return nutCache[k];
+  // .single() yerine liste okuyoruz: ayni kullanici+tarih icin birden fazla satir varsa
+  // (onConflict'in guvendigi unique constraint DB'de yoksa boyle olabilir) .single() hata
+  // veriyordu ve bu hata hic kontrol edilmeden sessizce bos varsayilanlara dusuluyordu -
+  // "girisler kayboluyor, makrolar sifirlaniyor" sikayetinin sebebi buydu.
+  const {data, error} = await sb.from('nutrition_logs').select('id,data').eq('user_id', userId).eq('date', date);
+  if(error) console.error('loadNutrition error:', error);
+  const rows = data || [];
+  const row = rows[rows.length-1];
+  const nd = row?.data || {meals:[], water:0, note:'', targets:{kcal:2000,protein:150,carb:200,fat:70}};
+  nd._dbId = row?.id || null;
+  nutCache[k] = nd;
+  return nd;
 }
 
 async function saveNutrition(userId, date) {
   const k = `${userId}_${date}`;
   const nd = nutCache[k];
   if(!nd) return;
-  await sb.from('nutrition_logs').upsert({user_id: userId, date, data: nd}, {onConflict: 'user_id,date'});
+  // upsert(onConflict) yerine workout_sets'teki gibi elle bul/guncelle/ekle: DB'de
+  // gercek bir unique constraint olmasa bile mukerrer satir olusturmaz.
+  if(nd._dbId){
+    const {error} = await sb.from('nutrition_logs').update({data: nd}).eq('id', nd._dbId);
+    if(error) console.error('saveNutrition update error:', error);
+    return;
+  }
+  const {data: existing} = await sb.from('nutrition_logs').select('id').eq('user_id', userId).eq('date', date);
+  if(existing && existing.length){
+    nd._dbId = existing[existing.length-1].id;
+    const {error} = await sb.from('nutrition_logs').update({data: nd}).eq('id', nd._dbId);
+    if(error) console.error('saveNutrition update error:', error);
+  } else {
+    const {data: inserted, error} = await sb.from('nutrition_logs').insert({user_id: userId, date, data: nd}).select().single();
+    if(error) console.error('saveNutrition insert error:', error);
+    if(inserted) nd._dbId = inserted.id;
+  }
 }
 
 async function saveProgram(userId) {
