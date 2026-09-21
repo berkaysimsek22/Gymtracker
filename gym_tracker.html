@@ -674,6 +674,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div class="meals-section">
       <div class="ms-head"><h3>Öğünler</h3>
         <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399" onclick="saveNutritionNow()">💾 Kaydet</button>
           <button class="btn btn-sm" style="background:rgba(56,182,255,.1);border:1px solid rgba(56,182,255,.2);color:#38b6ff" onclick="document.getElementById('foodPhotoInput').click()">📸 Fotoğrafla Analiz</button>
           <button class="btn btn-acc btn-sm" onclick="addMeal()">+ Öğün Ekle</button>
         </div>
@@ -931,12 +932,15 @@ async function loadNutrition(userId, date) {
   return nd;
 }
 
-async function saveNutrition(userId, date) {
-  const k = `${userId}_${date}`;
+let nutSaveTimer = {};
+
+// Gercek DB yazma islemi. Es zamanli (debounce'suz) cagrilirsa, _dbId henuz
+// belli olmadan iki cagri ayni anda "var mi?" diye sorup ikisi de INSERT
+// yapabilir (mukerrer satir + veri kaybi riski) - bu yuzden saveNutrition
+// bunu dogrudan degil, debounce ile sirali cagiriyor.
+async function _persistNutrition(userId, date, k) {
   const nd = nutCache[k];
   if(!nd) return;
-  // upsert(onConflict) yerine workout_sets'teki gibi elle bul/guncelle/ekle: DB'de
-  // gercek bir unique constraint olmasa bile mukerrer satir olusturmaz.
   if(nd._dbId){
     const {error} = await sb.from('nutrition_logs').update({data: nd}).eq('id', nd._dbId);
     if(error) console.error('saveNutrition update error:', error);
@@ -952,6 +956,38 @@ async function saveNutrition(userId, date) {
     if(error) console.error('saveNutrition insert error:', error);
     if(inserted) nd._dbId = inserted.id;
   }
+}
+
+function saveNutrition(userId, date) {
+  const k = `${userId}_${date}`;
+  if(!nutCache[k]) return Promise.resolve();
+  clearTimeout(nutSaveTimer[k]);
+  return new Promise(resolve => {
+    nutSaveTimer[k] = setTimeout(() => { delete nutSaveTimer[k]; _persistNutrition(userId, date, k).finally(resolve); }, 500);
+  });
+}
+
+// Baska bir kullaniciya/güne gecmeden once BEKLEYEN (debounce'ta olan) bir kayit
+// varsa onu hemen tamamlar - aksi halde cache temizlenirken henuz kaydedilmemis son
+// degisiklikler kaybolabiliyordu. Bekleyen kayit yoksa hicbir sey yapmaz (yoksa
+// hicbir degisiklik olmasa bile her kullanici gecisinde bos bir satir yazardi).
+async function flushNutritionSave(userId, date) {
+  const k = `${userId}_${date}`;
+  if(!nutSaveTimer[k]) return;
+  clearTimeout(nutSaveTimer[k]);
+  delete nutSaveTimer[k];
+  await _persistNutrition(userId, date, k);
+}
+
+async function saveNutritionNow(){
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  await flushNutritionSave(uid, curNutDate);
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(52,211,153,.35);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#34d399;white-space:nowrap';
+  t.textContent='💾 Kaydedildi';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2000);
 }
 
 async function saveProgram(userId) {
@@ -1061,9 +1097,12 @@ async function switchViewUser(userId) {
   // Clear previous user's cache to prevent data leak
   const prevId = viewingProfile?.id;
   if(prevId && prevId !== userId){
+    // Baska kullaniciya gecmeden once bekleyen beslenme kaydini tamamla,
+    // yoksa asagida cache silinince son yazilan degisiklikler kaybolabiliyordu
+    await flushNutritionSave(prevId, curNutDate);
     // Clear setCache for previous user
     Object.keys(setCache).forEach(k => { if(k.startsWith(prevId)) delete setCache[k]; });
-    // Clear nutCache for previous user  
+    // Clear nutCache for previous user
     Object.keys(nutCache).forEach(k => { if(k.startsWith(prevId)) delete nutCache[k]; });
   }
   viewingProfile = p;
