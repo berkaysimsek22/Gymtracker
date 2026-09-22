@@ -1246,10 +1246,12 @@ async function renderProfile(p) {
   // Hedefe tiklayinca Profil sekmesine gidilip program degistirilebiliyor.
   const weightLine = `${p.weight||'—'} kg${p.target_weight?` → ${p.target_weight} kg hedef`:''}`;
   const summaryEl = document.getElementById('hdProfileSummary');
-  const goToProfile = "showScreen('profile',document.querySelectorAll('.nav-btn')[5])";
+  // Hedef zaten profilde belli - buraya tiklaninca Workouts > Split'e gidip
+  // rutini (split'i) degistirebilsin, tekrar hedef secmeye gerek yok
+  const goToSplit = "showScreen('workouts',document.querySelectorAll('.nav-btn')[2])";
   const renderSummary = (devLine) => {
     if(!summaryEl) return;
-    summaryEl.innerHTML = `<span onclick="${goToProfile}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">🎯 ${goalLabel}</span> — ${weightLine} · Ort. ${devLine}`;
+    summaryEl.innerHTML = `<span onclick="${goToSplit}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">🎯 ${goalLabel}</span> — ${weightLine} · Ort. ${devLine}`;
   };
   renderSummary('… kcal');
   const avg = await avgKcalLast7Days(p.id);
