@@ -1223,9 +1223,13 @@ function selDW(i){
   renderDayContent(curDay);
 }
 
-function renderProfile(p) {
+async function renderProfile(p) {
   if(!p) return;
   const color = p.color||'#d4f53c', bg = `rgba(212,245,60,0.12)`;
+  // mainGoal (yeni sihirbazdan) ile eski goal alani senkron olmayabiliyordu -
+  // once mainGoal'a bak, GOALS listesinden etiketini bul, yoksa eski goal'a dus
+  const goalId = p.mainGoal || p.goal;
+  const goalLabel = GOALS.find(g=>g.id===goalId)?.label || p.goal || 'Hedef belirlenmedi';
   document.getElementById('profileCard').innerHTML = `
     <div class="p-av-big" style="background:${bg};color:${color}"><svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
   <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
@@ -1235,14 +1239,32 @@ function renderProfile(p) {
   <rect x="33" y="15" width="4" height="10" rx="2" fill="currentColor"/>
 </svg></div>
     <div style="flex:1;min-width:0">
-      <h3 style="font-size:14px;font-weight:600">${p.name||'İsimsiz'}</h3>
-      <p style="font-size:11px;color:var(--muted);margin-top:1px">${p.weight||'—'} kg</p>
-      <div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${p.goal||'Hedef belirlenmedi'}</div>
+      <p style="font-size:11px;color:var(--muted)">${p.weight||'—'} kg${p.target_weight?` <span style="color:${color}">→ ${p.target_weight} kg hedef</span>`:''}</p>
+      <div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${goalLabel}</div>
     </div>
     <div class="p-stats">
       <div class="pstat"><div class="val" style="color:${color}">${p.weight||'—'}</div><div class="lbl">Şimdi</div></div>
       ${p.target_weight?`<div class="pstat"><div class="val" style="color:${color}">${p.target_weight}</div><div class="lbl">Hedef</div></div>`:''}
+      <div class="pstat"><div class="val" style="color:${color}" id="profAvgKcal">…</div><div class="lbl">Ort. Kcal</div></div>
     </div>`;
+  const avg = await avgKcalLast7Days(p.id);
+  const avgEl = document.getElementById('profAvgKcal');
+  if(avgEl) avgEl.textContent = avg!==null ? avg : '—';
+}
+
+// Son 7 gunun (kayit girilmis olanlarin) ortalama kalori alimini hesaplar
+async function avgKcalLast7Days(userId){
+  const end = new Date(); const start = new Date(); start.setDate(end.getDate()-6);
+  const {data, error} = await sb.from('nutrition_logs').select('data')
+    .eq('user_id', userId).gte('date', localDateStr(start)).lte('date', localDateStr(end));
+  if(error){ console.error('avgKcalLast7Days error:', error); return null; }
+  let total=0, days=0;
+  (data||[]).forEach(row=>{
+    let dayKcal=0;
+    (row.data?.meals||[]).forEach(m=>(m.foods||[]).forEach(f=>dayKcal+=parseFloat(f.kcal||0)));
+    if(dayKcal>0){ total+=dayKcal; days++; }
+  });
+  return days ? Math.round(total/days) : null;
 }
 
 function renderDayTabs(){} // removed
