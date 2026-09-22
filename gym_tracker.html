@@ -1243,8 +1243,6 @@ async function renderProfile(p) {
       <div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${goalLabel}</div>
     </div>
     <div class="p-stats">
-      <div class="pstat"><div class="val" style="color:${color}">${p.weight||'—'}</div><div class="lbl">Şimdi</div></div>
-      ${p.target_weight?`<div class="pstat"><div class="val" style="color:${color}">${p.target_weight}</div><div class="lbl">Hedef</div></div>`:''}
       <div class="pstat"><div class="val" style="color:${color}" id="profAvgKcal">…</div><div class="lbl">Ort. Kcal</div></div>
     </div>`;
   const avg = await avgKcalLast7Days(p.id);
