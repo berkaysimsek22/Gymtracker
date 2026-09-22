@@ -766,7 +766,15 @@ let amrapIv = null, amrapRunning = false, amrapSecs = 1200, amrapRounds = 0, amr
 let curNutDate = todayStr();
 let saveTimer = {};
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+// toISOString() UTC tarihi verir - Turkiye UTC+3 oldugu icin gece yarisi ile
+// saat 03:00 arasinda girilen kayitlar bir onceki gunun tarihine kaydoluyordu.
+// localDateStr() cihazin yerel tarihini (Y-A-G) dogru hesaplar.
+function localDateStr(d) {
+  d = d || new Date();
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function todayStr() { return localDateStr(); }
 function dc(o) { return JSON.parse(JSON.stringify(o)); }
 function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
 function activeProfile() { return viewingProfile || currentProfile; }
@@ -1054,6 +1062,7 @@ function showMainApp() {
   curDay = todayJS === 0 ? 6 : todayJS - 1; // Convert to Mon=0...Sun=6
 
   renderAll();
+  restoreLastScreen();
 }
 
 function renderAdminTabs() {
@@ -1072,11 +1081,17 @@ function filterAdminUsers(query){
     sugg.innerHTML = '<div style="padding:10px 14px;font-size:11px;color:var(--muted)">Bulunamadı</div>';
     return;
   }
-  sugg.innerHTML = matches.map(p => `
-    <div onclick="selectAdminUser('${p.id}')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;${p.id===activeProfile()?.id?'color:var(--acc4);font-weight:700':'color:var(--text)'}"
+  // Ayni isimde birden fazla profil varsa (mukerrer kayit) karistirmamak icin kisa id ekle
+  const nameCounts = {};
+  list.forEach(p=>{ const n=p.name||''; nameCounts[n]=(nameCounts[n]||0)+1; });
+  sugg.innerHTML = matches.map(p => {
+    const dup = nameCounts[p.name||'']>1;
+    const label = (p.name||p.id.substring(0,6)) + (dup ? ` <span style="color:var(--muted);font-size:10px">#${p.id.substring(0,4)}</span>` : '');
+    return `<div onclick="selectAdminUser('${p.id}')" style="padding:9px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;${p.id===activeProfile()?.id?'color:var(--acc4);font-weight:700':'color:var(--text)'}"
       onmouseover="this.style.background='rgba(247,201,72,.08)'" onmouseout="this.style.background='none'">
-      ${p.name||p.id.substring(0,6)}
-    </div>`).join('');
+      ${label}
+    </div>`;
+  }).join('');
 }
 
 function hideAdminUserSugg(){
@@ -1908,7 +1923,7 @@ async function renderNutChart(p){
   for(let i=13; i>=0; i--){
     const d = new Date();
     d.setDate(d.getDate()-i);
-    const date = d.toISOString().split('T')[0];
+    const date = localDateStr(d);
     const k = p.id+'_'+date;
     const nd = nutCache[k];
     if(nd && nd.meals && nd.meals.length){
@@ -2001,7 +2016,13 @@ async function renderStats(){
 }
 
 // ── NUTRITION ──
-function changeNutDay(d){const dt=new Date(curNutDate);dt.setDate(dt.getDate()+d);curNutDate=dt.toISOString().split('T')[0];renderNutrition();}
+async function changeNutDay(d){
+  // Baska bir gune gecmeden once bekleyen (debounce'taki) kaydi tamamla,
+  // yoksa hizlica gun degistirince son degisiklikler kaybolabiliyordu.
+  const uid = activeProfile()?.id;
+  if(uid) await flushNutritionSave(uid, curNutDate);
+  const dt=new Date(curNutDate);dt.setDate(dt.getDate()+d);curNutDate=localDateStr(dt);renderNutrition();
+}
 async function saveDailyNote(v){const nd=await loadNutrition(activeProfile()?.id,curNutDate);nd.note=v;saveNutrition(activeProfile()?.id,curNutDate);}
 
 async function renderNutrition(){
@@ -2316,7 +2337,20 @@ async function addMeal(){
 }
 
 // ── NAV ──
+const NAV_SCREEN_ORDER = ['workout','nutrition','workouts','history','stats','profile'];
+
+function restoreLastScreen(){
+  let saved = null;
+  try{ saved = localStorage.getItem('gt_lastScreen'); }catch(e){}
+  if(!saved || saved==='workout') return; // varsayilan zaten workout, dokunmaya gerek yok
+  const idx = NAV_SCREEN_ORDER.indexOf(saved);
+  if(idx<0) return;
+  const btn = document.querySelectorAll('.nav-btn')[idx];
+  if(btn) showScreen(saved, btn);
+}
+
 function showScreen(name,btn){
+  try{ localStorage.setItem('gt_lastScreen', name); }catch(e){}
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
@@ -3295,7 +3329,7 @@ async function addWeightLog(uid){
   const inp = document.getElementById('newWeightInp');
   const w = parseFloat(inp?.value);
   if(!w) return;
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
   await sb.from('weight_logs').upsert({user_id: uid, weight: w, date: today}, {onConflict: 'user_id,date'});
   // Update profile weight
   const p = activeProfile();
@@ -3820,7 +3854,7 @@ async function saveProfileAll(){
     await sb.from('weight_logs').upsert({
       user_id: p.id,
       weight: p.weight,
-      date: new Date().toISOString().split('T')[0]
+      date: localDateStr()
     }, {onConflict: 'user_id,date'});
   }
   // Also update allProfiles cache
