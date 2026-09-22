@@ -597,6 +597,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div class="header-left">
       <h1>GYM TRACKER</h1>
       <p id="hdDate">...</p>
+      <p id="hdProfileSummary" style="font-size:10px;color:var(--acc);margin-top:2px;font-style:normal"></p>
     </div>
     <div class="header-right">
       <div class="badge" id="clockBadge">--:--</div>
@@ -1239,17 +1240,14 @@ async function renderProfile(p) {
   <rect x="33" y="15" width="4" height="10" rx="2" fill="currentColor"/>
 </svg></div>
     <div style="flex:1;min-width:0">
-      <p style="font-size:11px;color:var(--muted)">${p.weight||'—'} kg${p.target_weight?` <span style="color:${color}">→ ${p.target_weight} kg hedef</span>`:''}</p>
       <div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${goalLabel}</div>
-    </div>
-    <div class="p-stats">
-      <div class="pstat"><div class="val" style="color:${color}">${p.weight||'—'}</div><div class="lbl">Şimdi</div></div>
-      ${p.target_weight?`<div class="pstat"><div class="val" style="color:${color}">${p.target_weight}</div><div class="lbl">Hedef</div></div>`:''}
-      <div class="pstat"><div class="val" style="color:${color}" id="profAvgKcal">…</div><div class="lbl">Ort. Kcal</div></div>
     </div>`;
+  // Kilo -> hedef ve ortalama kalori artik ust basliktaki GYM TRACKER'in altina yaziliyor
+  const weightLine = `${p.weight||'—'} kg${p.target_weight?` → ${p.target_weight} kg hedef`:''}`;
+  const summaryEl = document.getElementById('hdProfileSummary');
+  if(summaryEl) summaryEl.textContent = `${weightLine} · Ort. … kcal`;
   const avg = await avgKcalLast7Days(p.id);
-  const avgEl = document.getElementById('profAvgKcal');
-  if(avgEl) avgEl.textContent = avg!==null ? avg : '—';
+  if(summaryEl) summaryEl.textContent = `${weightLine} · Ort. ${avg!==null?avg:'—'} kcal`;
 }
 
 // Son 7 gunun (kayit girilmis olanlarin) ortalama kalori alimini hesaplar
