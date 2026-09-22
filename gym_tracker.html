@@ -1242,12 +1242,49 @@ async function renderProfile(p) {
     <div style="flex:1;min-width:0">
       <div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${goalLabel}</div>
     </div>`;
-  // Kilo -> hedef ve ortalama kalori artik ust basliktaki GYM TRACKER'in altina yaziliyor
+  // Hedef, kilo->hedef ve ortalama kalori artik ust basliktaki GYM TRACKER'in altina yaziliyor.
+  // Hedefe tiklayinca Profil sekmesine gidilip program degistirilebiliyor.
   const weightLine = `${p.weight||'—'} kg${p.target_weight?` → ${p.target_weight} kg hedef`:''}`;
   const summaryEl = document.getElementById('hdProfileSummary');
-  if(summaryEl) summaryEl.textContent = `${weightLine} · Ort. … kcal`;
+  // Hedef zaten profilde belli - buraya tiklaninca Workouts > Split'e gidip
+  // rutini (split'i) degistirebilsin, tekrar hedef secmeye gerek yok
+  const goToSplit = "showScreen('workouts',document.querySelectorAll('.nav-btn')[2])";
+  const renderSummary = (devLine) => {
+    if(!summaryEl) return;
+    summaryEl.innerHTML = `<span onclick="${goToSplit}" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">🎯 ${goalLabel}</span> — ${weightLine} · Ort. ${devLine}`;
+  };
+  renderSummary('… kcal');
   const avg = await avgKcalLast7Days(p.id);
-  if(summaryEl) summaryEl.textContent = `${weightLine} · Ort. ${avg!==null?avg:'—'} kcal`;
+  const avgTxt = avg!==null ? `${avg} kcal` : '— kcal';
+  const goalKcal = computeGoalCalorieTarget(p);
+  let devTxt = avgTxt;
+  if(goalKcal && avg!==null){
+    const devPct = Math.round((avg-goalKcal)/goalKcal*100);
+    const devColor = Math.abs(devPct)<=5 ? '#34d399' : (devPct>0 ? '#ff5c38' : '#38b6ff');
+    const devLabel = Math.abs(devPct)<=5 ? 'hedefte ✓' : `${devPct>0?'+':''}%${devPct}`;
+    devTxt = `${avgTxt} <span style="color:${devColor}">(${devLabel}, hedef ~${goalKcal} kcal)</span>`;
+  }
+  renderSummary(devTxt);
+}
+
+// Mifflin-St Jeor BMR + aktivite carpanina gore gunluk korunum (TDEE) kalorisi
+function estimateMaintenanceKcal(p){
+  if(!p.age || !p.height || !p.weight || !p.gender) return null;
+  const bmr = p.gender==='female'
+    ? 10*p.weight + 6.25*p.height - 5*p.age - 161
+    : 10*p.weight + 6.25*p.height - 5*p.age + 5;
+  const actMap = {sedentary:1.2, light:1.375, moderate:1.55, active:1.725};
+  return Math.round(bmr * (actMap[p.activity] || 1.4));
+}
+
+// Hedef kiloya makul/saglikli bir hizla (haftada ~0.5 kg) ulasmak icin gereken gunluk kalori
+function computeGoalCalorieTarget(p){
+  const maint = estimateMaintenanceKcal(p);
+  if(maint===null || !p.weight || !p.target_weight) return null;
+  const diff = p.target_weight - p.weight;
+  if(Math.abs(diff) < 0.5) return maint;
+  const dailyAdj = 550; // ~0.5 kg/hafta yag degisimi icin gereken gunluk kalori farki
+  return diff < 0 ? maint - dailyAdj : maint + dailyAdj;
 }
 
 // Son 7 gunun (kayit girilmis olanlarin) ortalama kalori alimini hesaplar
