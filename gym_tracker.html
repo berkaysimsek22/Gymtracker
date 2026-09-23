@@ -3936,6 +3936,10 @@ async function saveProfileAll(){
   p.level = document.getElementById('pf_level')?.value || p.level;
   p.trainingDays = document.getElementById('pf_days')?.value || p.trainingDays;
   // Save all to Supabase
+  // trainingDays profiles tablosunda kolon olarak yok (sadece sihirbaz/program
+  // onerisi sirasinda bellekte kullanilan gecici bir alan) - DB'ye yazmaya
+  // calismak "Could not find the 'trainingDays' column" hatasiyla TUM profil
+  // kaydini basarisiz kiliyordu (admin/RLS ile ilgisi yoktu).
   const {error: profErr} = await sb.from('profiles').update({
     name: p.name,
     weight: p.weight,
@@ -3946,7 +3950,6 @@ async function saveProfileAll(){
     gender: p.gender,
     activity: p.activity,
     level: p.level,
-    trainingDays: p.trainingDays,
     mainGoal: p.mainGoal,
     muscleGoals: p.muscleGoals,
   }).eq('id', p.id);
