@@ -3413,13 +3413,18 @@ async function addWeightLog(uid){
   const w = parseFloat(inp?.value);
   if(!w) return;
   const today = localDateStr();
-  await sb.from('weight_logs').upsert({user_id: uid, weight: w, date: today}, {onConflict: 'user_id,date'});
+  const {error: logErr} = await sb.from('weight_logs').upsert({user_id: uid, weight: w, date: today}, {onConflict: 'user_id,date'});
+  if(logErr) console.error('addWeightLog weight_logs error:', logErr);
   // Update profile weight
   const p = activeProfile();
-  if(p){ p.weight = w; await sb.from('profiles').update({weight: w}).eq('id', uid); }
+  let profErr = null;
+  if(p){ p.weight = w; ({error: profErr} = await sb.from('profiles').update({weight: w}).eq('id', uid)); if(profErr) console.error('addWeightLog profiles error:', profErr); }
   inp.value = '';
   renderWeightLogCard(activeProfile());
   renderAll();
+  if(logErr || profErr){
+    alert('⚠️ Kilo kaydedilemedi (izin hatası olabilir): ' + (logErr?.message || profErr?.message || 'bilinmeyen hata'));
+  }
 }
 
 function renderProfileScreen(){
@@ -3931,24 +3936,33 @@ async function saveProfileAll(){
     muscleGoals: p.muscleGoals,
   }).eq('id', p.id);
   if(profErr) console.error('Profile save error:', profErr);
-  
+
   // Save weight measurement with date
+  let weightErr = null;
   if(p.weight){
-    await sb.from('weight_logs').upsert({
+    ({error: weightErr} = await sb.from('weight_logs').upsert({
       user_id: p.id,
       weight: p.weight,
       date: localDateStr()
-    }, {onConflict: 'user_id,date'});
+    }, {onConflict: 'user_id,date'}));
+    if(weightErr) console.error('Weight log save error:', weightErr);
   }
   // Also update allProfiles cache
   const idx = allProfiles.findIndex(x => x.id === p.id);
   if(idx >= 0) allProfiles[idx] = {...allProfiles[idx], ...p};
   renderAll();
   renderAdminTabs();
-  // Show toast
+  // Kaydetme basarisiz olduysa (ornegin RLS admin'in baska kullanicinin
+  // satirini guncellemesine izin vermiyorsa) sessizce "kaydedildi" demeyelim -
+  // aksi halde degisiklik sadece o an ekranda gorunur, sayfa yenilenince kaybolur.
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
-  t.textContent='✅ Profil kaydedildi!';
+  if(profErr || weightErr){
+    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(255,92,56,.4);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#ff5c38;white-space:nowrap';
+    t.textContent='⚠️ Kaydedilemedi (izin hatası olabilir)';
+  } else {
+    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+    t.textContent='✅ Profil kaydedildi!';
+  }
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2500);
 }
