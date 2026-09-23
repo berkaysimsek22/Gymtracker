@@ -938,10 +938,28 @@ async function loadNutrition(userId, date) {
   if(error) console.error('loadNutrition error:', error);
   const rows = data || [];
   const row = rows[rows.length-1];
-  const nd = row?.data || {meals:[], water:0, note:'', targets:{kcal:2000,protein:150,carb:200,fat:70}};
-  nd._dbId = row?.id || null;
+  let nd;
+  if(row){
+    nd = row.data;
+    nd._dbId = row.id;
+  } else {
+    // Yeni gun: gunluk hedef makrolari sifirdan (2000/150/200/70) baslatmak yerine
+    // kullanicinin en son girdigi hedeflerden devam ettir - her gun tekrar girmek
+    // zorunda kalinmasin.
+    nd = {meals:[], water:0, note:'', targets: await lastKnownTargets(userId, date)};
+    nd._dbId = null;
+  }
   nutCache[k] = nd;
   return nd;
+}
+
+async function lastKnownTargets(userId, excludeDate) {
+  const fallback = {kcal:2000, protein:150, carb:200, fat:70};
+  const {data, error} = await sb.from('nutrition_logs').select('data,date')
+    .eq('user_id', userId).neq('date', excludeDate).order('date', {ascending:false}).limit(1);
+  if(error){ console.error('lastKnownTargets error:', error); return fallback; }
+  const t = data?.[0]?.data?.targets;
+  return t ? {...fallback, ...t} : fallback;
 }
 
 let nutSaveTimer = {};
@@ -1233,7 +1251,9 @@ async function renderProfile(p) {
   // mainGoal (yeni sihirbazdan) ile eski goal alani senkron olmayabiliyordu -
   // once mainGoal'a bak, GOALS listesinden etiketini bul, yoksa eski goal'a dus
   const goalId = p.mainGoal || p.goal;
-  const goalLabel = GOALS.find(g=>g.id===goalId)?.label || p.goal || 'Hedef belirlenmedi';
+  // "Hedef" burada Profil sekmesindeki ANA HEDEF (Kilo Ver/Kas Kazan vb.) - Beslenme
+  // sekmesindeki gunluk kalori/makro hedefleriyle karistirilmasin diye "Amac" deniyor.
+  const goalLabel = GOALS.find(g=>g.id===goalId)?.label || p.goal || 'Amaç belirlenmedi';
   document.getElementById('profileCard').innerHTML = `
     <div class="p-av-big" style="background:${bg};color:${color}"><svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
   <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
