@@ -3408,13 +3408,28 @@ async function renderWeightLogCard(p){
     +'</div>';
 }
 
+// weight_logs.upsert(onConflict:'user_id,date') gercek bir unique constraint'e
+// dayaniyor; DB'de yoksa (nutrition_logs'ta yasadigimiz sorunun aynisi) upsert
+// hata firlatiyor. Bunun yerine elle bul/guncelle/ekle yapiyoruz.
+async function saveWeightLog(userId, weight, date){
+  const {data: existing, error: findErr} = await sb.from('weight_logs').select('id').eq('user_id', userId).eq('date', date);
+  if(findErr){ console.error('saveWeightLog find error:', findErr); return {error: findErr}; }
+  if(existing && existing.length){
+    const {error} = await sb.from('weight_logs').update({weight}).eq('id', existing[existing.length-1].id);
+    if(error) console.error('saveWeightLog update error:', error);
+    return {error};
+  }
+  const {error} = await sb.from('weight_logs').insert({user_id: userId, weight, date});
+  if(error) console.error('saveWeightLog insert error:', error);
+  return {error};
+}
+
 async function addWeightLog(uid){
   const inp = document.getElementById('newWeightInp');
   const w = parseFloat(inp?.value);
   if(!w) return;
   const today = localDateStr();
-  const {error: logErr} = await sb.from('weight_logs').upsert({user_id: uid, weight: w, date: today}, {onConflict: 'user_id,date'});
-  if(logErr) console.error('addWeightLog weight_logs error:', logErr);
+  const {error: logErr} = await saveWeightLog(uid, w, today);
   // Update profile weight
   const p = activeProfile();
   let profErr = null;
@@ -3940,12 +3955,7 @@ async function saveProfileAll(){
   // Save weight measurement with date
   let weightErr = null;
   if(p.weight){
-    ({error: weightErr} = await sb.from('weight_logs').upsert({
-      user_id: p.id,
-      weight: p.weight,
-      date: localDateStr()
-    }, {onConflict: 'user_id,date'}));
-    if(weightErr) console.error('Weight log save error:', weightErr);
+    ({error: weightErr} = await saveWeightLog(p.id, p.weight, localDateStr()));
   }
   // Also update allProfiles cache
   const idx = allProfiles.findIndex(x => x.id === p.id);
