@@ -938,10 +938,28 @@ async function loadNutrition(userId, date) {
   if(error) console.error('loadNutrition error:', error);
   const rows = data || [];
   const row = rows[rows.length-1];
-  const nd = row?.data || {meals:[], water:0, note:'', targets:{kcal:2000,protein:150,carb:200,fat:70}};
-  nd._dbId = row?.id || null;
+  let nd;
+  if(row){
+    nd = row.data;
+    nd._dbId = row.id;
+  } else {
+    // Yeni gun: gunluk hedef makrolari sifirdan (2000/150/200/70) baslatmak yerine
+    // kullanicinin en son girdigi hedeflerden devam ettir - her gun tekrar girmek
+    // zorunda kalinmasin.
+    nd = {meals:[], water:0, note:'', targets: await lastKnownTargets(userId, date)};
+    nd._dbId = null;
+  }
   nutCache[k] = nd;
   return nd;
+}
+
+async function lastKnownTargets(userId, excludeDate) {
+  const fallback = {kcal:2000, protein:150, carb:200, fat:70};
+  const {data, error} = await sb.from('nutrition_logs').select('data,date')
+    .eq('user_id', userId).neq('date', excludeDate).order('date', {ascending:false}).limit(1);
+  if(error){ console.error('lastKnownTargets error:', error); return fallback; }
+  const t = data?.[0]?.data?.targets;
+  return t ? {...fallback, ...t} : fallback;
 }
 
 let nutSaveTimer = {};
@@ -1233,7 +1251,9 @@ async function renderProfile(p) {
   // mainGoal (yeni sihirbazdan) ile eski goal alani senkron olmayabiliyordu -
   // once mainGoal'a bak, GOALS listesinden etiketini bul, yoksa eski goal'a dus
   const goalId = p.mainGoal || p.goal;
-  const goalLabel = GOALS.find(g=>g.id===goalId)?.label || p.goal || 'Hedef belirlenmedi';
+  // "Hedef" burada Profil sekmesindeki ANA HEDEF (Kilo Ver/Kas Kazan vb.) - Beslenme
+  // sekmesindeki gunluk kalori/makro hedefleriyle karistirilmasin diye "Amac" deniyor.
+  const goalLabel = GOALS.find(g=>g.id===goalId)?.label || p.goal || 'Amaç belirlenmedi';
   document.getElementById('profileCard').innerHTML = `
     <div class="p-av-big" style="background:${bg};color:${color}"><svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
   <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
@@ -3393,13 +3413,18 @@ async function addWeightLog(uid){
   const w = parseFloat(inp?.value);
   if(!w) return;
   const today = localDateStr();
-  await sb.from('weight_logs').upsert({user_id: uid, weight: w, date: today}, {onConflict: 'user_id,date'});
+  const {error: logErr} = await sb.from('weight_logs').upsert({user_id: uid, weight: w, date: today}, {onConflict: 'user_id,date'});
+  if(logErr) console.error('addWeightLog weight_logs error:', logErr);
   // Update profile weight
   const p = activeProfile();
-  if(p){ p.weight = w; await sb.from('profiles').update({weight: w}).eq('id', uid); }
+  let profErr = null;
+  if(p){ p.weight = w; ({error: profErr} = await sb.from('profiles').update({weight: w}).eq('id', uid)); if(profErr) console.error('addWeightLog profiles error:', profErr); }
   inp.value = '';
   renderWeightLogCard(activeProfile());
   renderAll();
+  if(logErr || profErr){
+    alert('⚠️ Kilo kaydedilemedi (izin hatası olabilir): ' + (logErr?.message || profErr?.message || 'bilinmeyen hata'));
+  }
 }
 
 function renderProfileScreen(){
@@ -3911,24 +3936,33 @@ async function saveProfileAll(){
     muscleGoals: p.muscleGoals,
   }).eq('id', p.id);
   if(profErr) console.error('Profile save error:', profErr);
-  
+
   // Save weight measurement with date
+  let weightErr = null;
   if(p.weight){
-    await sb.from('weight_logs').upsert({
+    ({error: weightErr} = await sb.from('weight_logs').upsert({
       user_id: p.id,
       weight: p.weight,
       date: localDateStr()
-    }, {onConflict: 'user_id,date'});
+    }, {onConflict: 'user_id,date'}));
+    if(weightErr) console.error('Weight log save error:', weightErr);
   }
   // Also update allProfiles cache
   const idx = allProfiles.findIndex(x => x.id === p.id);
   if(idx >= 0) allProfiles[idx] = {...allProfiles[idx], ...p};
   renderAll();
   renderAdminTabs();
-  // Show toast
+  // Kaydetme basarisiz olduysa (ornegin RLS admin'in baska kullanicinin
+  // satirini guncellemesine izin vermiyorsa) sessizce "kaydedildi" demeyelim -
+  // aksi halde degisiklik sadece o an ekranda gorunur, sayfa yenilenince kaybolur.
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
-  t.textContent='✅ Profil kaydedildi!';
+  if(profErr || weightErr){
+    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(255,92,56,.4);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#ff5c38;white-space:nowrap';
+    t.textContent='⚠️ Kaydedilemedi (izin hatası olabilir)';
+  } else {
+    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+    t.textContent='✅ Profil kaydedildi!';
+  }
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),2500);
 }
