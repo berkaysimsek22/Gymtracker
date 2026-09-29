@@ -1283,12 +1283,18 @@ async function renderProfile(p) {
   const avg = await avgKcalLast7Days(p.id);
   const avgTxt = avg!==null ? `${avg} kcal` : '— kcal';
   const goalKcal = computeGoalCalorieTarget(p);
+  // goalKcal profil bilgilerinden hesaplaniyor, avg (son 7 gunun ortalamasi)
+  // ise beslenme girisine bagli - avg olmadan da hedef kalori gosterilmeli,
+  // yoksa henuz hic ogun girmemis yeni bir uye icin hedef hicbir zaman
+  // gorunmuyordu ("profil dolu ama kalori hesabi dolmadi" sikayeti buydu).
   let devTxt = avgTxt;
   if(goalKcal && avg!==null){
     const devPct = Math.round((avg-goalKcal)/goalKcal*100);
     const devColor = Math.abs(devPct)<=5 ? '#34d399' : (devPct>0 ? '#ff5c38' : '#38b6ff');
     const devLabel = Math.abs(devPct)<=5 ? 'hedefte ✓' : `${devPct>0?'+':''}%${devPct}`;
     devTxt = `${avgTxt} <span style="color:${devColor}">(${devLabel}, hedef ~${goalKcal} kcal)</span>`;
+  } else if(goalKcal){
+    devTxt = `${avgTxt} <span style="color:var(--muted)">(hedef ~${goalKcal} kcal)</span>`;
   }
   renderSummary(devTxt);
 }
