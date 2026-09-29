@@ -1283,12 +1283,18 @@ async function renderProfile(p) {
   const avg = await avgKcalLast7Days(p.id);
   const avgTxt = avg!==null ? `${avg} kcal` : '— kcal';
   const goalKcal = computeGoalCalorieTarget(p);
+  // goalKcal profil bilgilerinden hesaplaniyor, avg (son 7 gunun ortalamasi)
+  // ise beslenme girisine bagli - avg olmadan da hedef kalori gosterilmeli,
+  // yoksa henuz hic ogun girmemis yeni bir uye icin hedef hicbir zaman
+  // gorunmuyordu ("profil dolu ama kalori hesabi dolmadi" sikayeti buydu).
   let devTxt = avgTxt;
   if(goalKcal && avg!==null){
     const devPct = Math.round((avg-goalKcal)/goalKcal*100);
     const devColor = Math.abs(devPct)<=5 ? '#34d399' : (devPct>0 ? '#ff5c38' : '#38b6ff');
     const devLabel = Math.abs(devPct)<=5 ? 'hedefte ✓' : `${devPct>0?'+':''}%${devPct}`;
     devTxt = `${avgTxt} <span style="color:${devColor}">(${devLabel}, hedef ~${goalKcal} kcal)</span>`;
+  } else if(goalKcal){
+    devTxt = `${avgTxt} <span style="color:var(--muted)">(hedef ~${goalKcal} kcal)</span>`;
   }
   renderSummary(devTxt);
 }
@@ -2806,7 +2812,7 @@ const EXERCISE_DB = [
   // TRICEPS
   {name:'Overhead Triceps Extension',muscle:'Triceps (Uzun Kafa)',muscles:['triceps'],sets:3,reps:'12',restSec:60,tip:'Uzun kafa gerilir'},
   {name:'Close Grip Bench',muscle:'Triceps · Pectoral',muscles:['triceps','chest'],sets:3,reps:'10',restSec:90,tip:null},
-  {name:'Skull Crusher',muscle:'Triceps (Uzun Kafa)',muscles:['triceps'],sets:3,reps:'12',restSec:60,tip:'Yavaş eksentrik'},
+  {name:'JM Press',muscle:'Triceps (Tum Kafalar)',muscles:['triceps'],sets:3,reps:'10',restSec:90,tip:'Skull crusher yerine dirsek-dostu alternatif (ATHLEAN-X)'},
   {name:'Tricep Pushdown',muscle:'Triceps (Lateral)',muscles:['triceps'],sets:3,reps:'15',restSec:60,tip:'Tepe kasılma'},
   {name:'Overhead Triceps',muscle:'Triceps',muscles:['triceps'],sets:3,reps:'12',restSec:60,tip:'Overhead → uzun kafa gerilir'},
   // CALVES
@@ -4160,11 +4166,14 @@ function generateFullProgram(p, suggestion){
       {name:'Hip Abduction',muscle:'Glute Medius',sets:4,reps:'15-20',restSec:60,tip:null},
       {name:'Cable Kickback',muscle:'Glute Maximus',sets:3,reps:'12-15',restSec:60,tip:null},
       {name:'Chest Supported Row',muscle:'Rhomboids · Mid Back',sets:4,reps:'8-10',restSec:90,tip:null},
+      {name:'Lat Pulldown',muscle:'Latissimus Dorsi',sets:3,reps:'10-12',restSec:90,tip:'Sirt kalinligi + A gunundeki Pull Up ile birlikte haftada 3 gune cikarir'},
       {name:'Weighted Dip',muscle:'Alt Pectoral · Triceps',sets:3,reps:'6-10',restSec:90,tip:null},
+      {name:'JM Press',muscle:'Triceps (Tum Kafalar)',sets:3,reps:'10-12',restSec:60,tip:'B gununde ayri bir triceps izolasyonu - A gunuyle birlikte haftada 3 gune cikarir. Skull crusher yerine dirsek-dostu alternatif (ATHLEAN-X)'},
       {name:'Face Pull',muscle:'Rear Deltoid · Trapezius',sets:4,reps:'15-20',restSec:60,tip:null},
       {name:'DB Lateral Raise',muscle:'Lateral Deltoid',sets:3,reps:'12-15',restSec:60,tip:null},
       {name:'Bayesian Cable Curl',muscle:'Biceps (Uzun Kafa)',sets:3,reps:'10-12',restSec:60,tip:null},
       {name:'Reverse Curl',muscle:'Brachialis · Brachioradialis',sets:3,reps:'12-15',restSec:60,tip:null},
+      {name:'Roman Chair Back Extension',muscle:'Bel (Erector Spinae)',sets:3,reps:'12-15',restSec:60,tip:'Programda daha once hic olmayan dogrudan bel/alt sirt hareketi'},
     ],
     'Hip Dominant':[
       {name:'Hip Thrust',muscle:'Glute Maximus',sets:4,reps:'8-10',restSec:120,tip:null},
