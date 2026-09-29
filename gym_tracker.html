@@ -2147,7 +2147,7 @@ async function updateTarget(field,val){
 async function toggleW(i){const uid=activeProfile()?.id;const nd=await loadNutrition(uid,curNutDate);nd.water=(nd.water===i+1)?i:i+1;saveNutrition(uid,curNutDate);renderNutrition();}
 
 async function calcMacros(){
-  const p=activeProfile(),w=p?.weight||70,protein=Math.round(w*2),fat=Math.round(w*1);
+  const p=activeProfile(),w=p?.weight||70,protein=Math.round(w*1.6),fat=Math.round(w*1);
   // Mumkunse ust basliktaki ile ayni kaynagi (Mifflin-St Jeor + aktivite +
   // hedef kilo) kullan - yas/boy/cinsiyet/hedef kilo eksikse eski kaba
   // w*carpan tahminine dus.
