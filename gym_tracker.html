@@ -2148,10 +2148,16 @@ async function toggleW(i){const uid=activeProfile()?.id;const nd=await loadNutri
 
 async function calcMacros(){
   const p=activeProfile(),w=p?.weight||70,protein=Math.round(w*2),fat=Math.round(w*1);
-  let kcal=p?.goal?.includes('ver')?Math.round(w*28):p?.goal?.includes('kas')||p?.goal?.includes('al')?Math.round(w*35):Math.round(w*30);
+  // Mumkunse ust basliktaki ile ayni kaynagi (Mifflin-St Jeor + aktivite +
+  // hedef kilo) kullan - yas/boy/cinsiyet/hedef kilo eksikse eski kaba
+  // w*carpan tahminine dus.
+  const goalId=p?.mainGoal||p?.goal;
+  const preciseKcal=computeGoalCalorieTarget(p);
+  const kcal=preciseKcal || (goalId?.includes('ver')?Math.round(w*28):goalId?.includes('kas')||goalId?.includes('al')?Math.round(w*35):Math.round(w*30));
   const carb=Math.round(Math.max(0,(kcal-protein*4-fat*9)/4));
   const uid=p?.id;const nd=await loadNutrition(uid,curNutDate);nd.targets={kcal,protein,carb,fat};saveNutrition(uid,curNutDate);renderNutrition();
-  alert(`Hedefler güncellendi!\n${kcal} kcal · ${protein}g protein · ${carb}g karb · ${fat}g yağ`);
+  const src=preciseKcal?' (BMR + aktivite + hedef kiloya göre)':' (yaş/boy/cinsiyet/hedef kilo eksik, kaba tahmin)';
+  alert(`Hedefler güncellendi!\n${kcal} kcal · ${protein}g protein · ${carb}g karb · ${fat}g yağ${src}`);
 }
 
 function renderMeals(nd){
