@@ -806,9 +806,16 @@ function isAltWeek(d) { return isoWeekNumber(d || new Date()) % 2 === 0; }
 // duzenleme/render/PR/gecmis gibi TUM mevcut kod hicbir degisiklik gerekmeden
 // "hangi hafta aktifse onu" dogru sekilde okur/duzenler.
 function activeProgram() {
+  return programForDate(new Date());
+}
+
+// activeProgram()'in tarih parametreli hali - haftalik grid'de weekOffset ile
+// gecmis/gelecek haftaya bakarken HER ZAMAN "bugunun" paritesini gostermek
+// yerine, gercekten o haftanin dogru A/B varyantini gostermek icin kullanilir.
+function programForDate(d) {
   const uid = activeProfile()?.id;
   if(!uid) return [];
-  if(altPrograms[uid] && isAltWeek()) return altPrograms[uid];
+  if(altPrograms[uid] && isAltWeek(d)) return altPrograms[uid];
   return programs[uid] || [];
 }
 
@@ -1264,8 +1271,6 @@ async function renderAll() {
 let weekOffset = 0; // 0 = this week, -1 = last week, +1 = next week
 
 function renderWeekGrid() {
-  const prog = activeProgram();
-  if(!prog) return;
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const today = new Date().getDay();
   // Check which program days have been completed (by day_name match)
@@ -1276,6 +1281,10 @@ function renderWeekGrid() {
   weekStartDisplay.setHours(0,0,0,0);
   const weekEndDisplay = new Date(weekStartDisplay);
   weekEndDisplay.setDate(weekStartDisplay.getDate() + 7);
+  // Alternan programlarda goruntulenen haftanin (weekOffset'e gore) dogru
+  // A/B varyantini goster - "bugunun" paritesini degil.
+  const prog = programForDate(weekStartDisplay);
+  if(!prog) return;
   const completedNames = new Set((sessionCache||[])
     .filter(s => { const d = new Date(s.logged_at); return d >= weekStartDisplay && d < weekEndDisplay; })
     .map(s => s.day_name));
