@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gizlilik Politikası — Gym Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0c0c0c;--surface:#141414;--surface2:#1a1a1a;
+  --acc:#d4f53c;--text:#f2f0e8;--muted:#999;--border:rgba(255,255,255,0.08);
+}
+body{background:var(--bg);color:var(--text);font-family:'Archivo',sans-serif;min-height:100vh;padding:32px 16px 60px}
+.wrap{max-width:640px;margin:0 auto}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:1px;background:linear-gradient(135deg,#f2f0e8,#d4f53c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+h1{font-size:18px;font-weight:700;margin:28px 0 4px}
+.updated{font-size:12px;color:var(--muted);margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:16px}
+.card h2{font-size:14px;margin-bottom:8px;color:var(--acc)}
+.card p{font-size:13.5px;line-height:1.7;color:var(--text)}
+.card p b{color:var(--acc)}
+a{color:var(--acc)}
+.back{display:inline-block;margin-bottom:20px;font-size:13px;color:var(--muted);text-decoration:none}
+.contact{font-size:13px;color:var(--muted);text-align:center;margin-top:28px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="gym_tracker.html">← Gym Tracker'a dön</a>
+  <div class="logo">GYM TRACKER</div>
+  <h1>GİZLİLİK POLİTİKASI</h1>
+  <div class="updated">Son güncelleme: Ekim 2024</div>
+
+  <div class="card">
+    <h2>1. Toplanan Veriler</h2>
+    <p>Ad, e-posta, boy, kilo, yaş, cinsiyet, antrenman ve beslenme verileri.</p>
+  </div>
+
+  <div class="card">
+    <h2>2. Kullanım Amacı</h2>
+    <p>Veriler yalnızca kişiselleştirilmiş antrenman ve beslenme takibi için kullanılır. Üçüncü taraflarla paylaşılmaz, satılmaz.</p>
+  </div>
+
+  <div class="card">
+    <h2>3. Veri Saklama</h2>
+    <p>Verileriniz Avrupa Birliği sınırları içindeki sunucularda (Frankfurt, Almanya — AWS eu-central-1) saklanmakta olup GDPR ve KVKK kapsamında korunmaktadır. Kayıt olarak bu aktarımı açıkça kabul etmiş sayılırsınız.</p>
+  </div>
+
+  <div class="card">
+    <h2>4. Kullanıcı Hakları</h2>
+    <p>Verilerinizi görme, düzeltme ve kalıcı olarak silme hakkınız vardır. Talep için: <a href="mailto:berkaysimsek1@gmail.com">berkaysimsek1@gmail.com</a></p>
+  </div>
+
+  <div class="card">
+    <h2>5. Güvenlik</h2>
+    <p>Tüm veriler HTTPS üzerinden iletilir. Şifreler Supabase Auth tarafından güvenli şekilde saklanır.</p>
+  </div>
+
+  <div class="contact">
+    İletişim: Berkay Şimşek — <a href="mailto:berkaysimsek1@gmail.com">berkaysimsek1@gmail.com</a>
+  </div>
+</div>
+</body>
+</html>

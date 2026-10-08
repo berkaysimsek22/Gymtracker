@@ -576,7 +576,11 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
         <div class="auth-field"><label>Ad Soyad</label><input class="auth-input" id="regName" type="text" placeholder="Ece Yılmaz"></div>
         <div class="auth-field"><label>E-posta</label><input class="auth-input" id="regEmail" type="email" placeholder="ornek@email.com"></div>
         <div class="auth-field"><label>Şifre</label><input class="auth-input" id="regPassword" type="password" placeholder="En az 6 karakter"></div>
-        <button class="auth-btn" onclick="register()">Kayıt Ol</button>
+        <div class="auth-field" style="display:flex;align-items:flex-start;gap:8px">
+          <input type="checkbox" id="regPrivacyAccept" style="margin-top:3px;width:16px;height:16px;flex-shrink:0;cursor:pointer" onchange="document.getElementById('regBtn').disabled = !this.checked">
+          <label for="regPrivacyAccept" style="font-size:11.5px;color:var(--muted);line-height:1.5;cursor:pointer;text-transform:none;letter-spacing:normal"><a href="privacy.html" target="_blank" style="color:var(--acc)">Gizlilik politikasını</a> okudum ve kabul ediyorum</label>
+        </div>
+        <button class="auth-btn" id="regBtn" onclick="register()" disabled>Kayıt Ol</button>
         <div class="auth-info">Kayıt olduktan sonra antrenörün seni sisteme ekleyecek.</div>
       </div>
       <div class="auth-err" id="authErr"></div>
@@ -708,7 +712,8 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div id="goalCard" style="margin:10px 16px 0"></div>
     <div id="muscleGoalCard" style="margin:10px 16px 0"></div>
     <div id="autoProgCard" style="margin:10px 16px 0"></div>
-    <div id="deleteProfileCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
+    <div id="deleteProfileCard" style="margin:10px 16px 0"></div>
+    <div id="selfDeleteAccountCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
   </div>
 
   <div class="screen" id="screen-workouts">
@@ -823,6 +828,7 @@ async function register() {
   const password = document.getElementById('regPassword').value;
   if(!name||!email||!password) return showAuthErr('Tüm alanlar zorunlu');
   if(password.length < 6) return showAuthErr('Şifre en az 6 karakter olmalı');
+  if(!document.getElementById('regPrivacyAccept')?.checked) return showAuthErr('Devam etmek için gizlilik politikasını kabul etmelisin');
   const btn = document.querySelector('#registerForm .auth-btn');
   btn.disabled = true; btn.textContent = 'Kayıt olunuyor...';
   const {error} = await sb.auth.signUp({email, password, options:{data:{name}}});
@@ -3463,6 +3469,36 @@ function renderProfileScreen(){
   renderMuscleGoalCard(p);
   renderAutoProgCard(p);
   renderDeleteProfileCard(p);
+  renderSelfDeleteCard(p);
+}
+
+function renderSelfDeleteCard(p){
+  const el = document.getElementById('selfDeleteAccountCard');
+  if(!el) return;
+  // Sadece kullanici kendi hesabini goruntulerken gorunsun (admin baskasinin
+  // profilini izlerken degil - o zaten ayri "Profili Sil" kartini goruyor)
+  if(!currentProfile || p.id !== currentProfile.id){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="prof-section" style="border-color:rgba(255,92,56,.25)">
+    <h3 style="color:var(--acc2)">⚠️ Hesabı Sil</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">Hesabını ve tüm antrenman/beslenme/ağırlık geçmişini kalıcı olarak siler. Bu işlem geri alınamaz.</p>
+    <button class="btn btn-danger" style="width:100%" onclick="deleteOwnAccount()">🗑 Hesabımı Sil</button>
+  </div>`;
+}
+
+async function deleteOwnAccount(){
+  const uid = currentUser?.id;
+  if(!uid) return;
+  if(!confirm('Hesabını ve TÜM verilerini (program, antrenman geçmişi, beslenme kayıtları, kilo takibi) kalıcı olarak sileceksin.\n\nDevam edilsin mi?')) return;
+  if(!confirm('Son onay: bu işlem geri alınamaz. Emin misin?')) return;
+  const {error} = await sb.from('profiles').delete().eq('id', uid);
+  if(error){ alert('Silme başarısız: '+error.message); return; }
+  await sb.from('workout_sets').delete().eq('user_id', uid);
+  await sb.from('session_logs').delete().eq('user_id', uid);
+  await sb.from('nutrition_logs').delete().eq('user_id', uid);
+  await sb.from('weight_logs').delete().eq('user_id', uid);
+  await sb.from('programs').delete().eq('user_id', uid);
+  alert('Hesap verilerin silindi. Çıkış yapılıyor...');
+  await logout();
 }
 
 function renderDeleteProfileCard(p){
