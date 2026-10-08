@@ -923,6 +923,7 @@ async function loadProfile() {
   await loadProgramForUser(currentProfile.id);
   await loadSessionLogs(currentProfile.id);
   showMainApp();
+  loadExerciseGifCache(); // arka planda, bekletmeden - tablo bos/yoksa sessizce atlanir
   // If came from password reset link, show change password modal
   if(window._needsPasswordReset){
     window._needsPasswordReset = false;
@@ -951,6 +952,39 @@ async function loadProgramForUser(userId) {
     });
   });
   if(fixed) saveProgram(userId);
+}
+
+// ExerciseDB GIF'leri icin basit, normalize-isim bazli onbellek. Tablo bos/yoksa
+// (henuz import script'i calistirilmamissa) sessizce bos kalir, egzersiz
+// kartlarinda GIF gorunmez ama hicbir sey bozulmaz.
+let exerciseGifCache = null; // normalizedName -> gifUrl
+function normalizeExName(s){
+  return (s||'').toLowerCase()
+    .replace(/[-_]/g,' ')
+    .replace(/[^\p{L}\p{N} ]/gu,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+async function loadExerciseGifCache(){
+  const {data, error} = await sb.from('exercises').select('name,gif_url');
+  if(error){ console.error('loadExerciseGifCache error:', error); return; }
+  exerciseGifCache = new Map();
+  (data||[]).forEach(row=>{
+    if(row.gif_url) exerciseGifCache.set(normalizeExName(row.name), row.gif_url);
+  });
+  // Cache arka planda, sayfa ilk acildiktan SONRA dolar - o an Antrenman
+  // ekranindaysa GIF'ler gorunsun diye bir kere yeniden ciz.
+  if(document.getElementById('dayContent')) renderDayContent(curDay);
+}
+function findExerciseGif(name){
+  if(!exerciseGifCache || !name) return null;
+  const n = normalizeExName(name);
+  if(exerciseGifCache.has(n)) return exerciseGifCache.get(n);
+  // Tam eslesme yoksa: biri digerini iceriyorsa esle (orn. "Weighted Pull Up" ~ "Pull Up")
+  for(const [key, url] of exerciseGifCache){
+    if(key.includes(n) || n.includes(key)) return url;
+  }
+  return null;
 }
 
 async function loadSessionLogs(userId) {
@@ -1500,6 +1534,8 @@ function buildExCard(ex, di, ei) {
     <div class="edit-field"><label>Dinlenme (sn)</label><input class="edit-input" type="number" value="${ex.restSec}" onchange="ex.restSec=parseInt(this.value)||60;saveProgram(activeProfile().id)"></div>
     <div class="edit-field" style="display:flex;align-items:flex-end"><button class="btn btn-danger btn-sm" onclick="delEx(${di},${ei})">🗑 Egzersizi Sil</button></div>
   </div></div>`:'';
+  const gifUrl = findExerciseGif(ex.name);
+  const gifHtml = gifUrl ? `<div class="ex-gif"><img src="${gifUrl}" alt="${ex.name}" loading="lazy" style="width:100%;max-width:280px;border-radius:8px;margin:0 auto 10px;display:block"></div>` : '';
   card.innerHTML = `<div class="ex-header" onclick="toggleEC('ec_${di}_${ei}')">
     <div class="ex-num-badge">${ei+1}</div>
     <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display"><span style="color:#ef4444;font-weight:500">${ex.muscle.split('·')[0].split('+')[0].trim()}</span>${ex.muscle.includes('·')||ex.muscle.includes('+')?'<span style="color:var(--muted)"> · '+ex.muscle.split(/[·+]/)[1].trim()+'</span>':''}</div></div>
@@ -1510,6 +1546,7 @@ function buildExCard(ex, di, ei) {
     <div class="expand-arr">⌄</div>
   </div>
   <div class="set-area">
+    ${gifHtml}
     <div class="set-grid-head"><div>Set</div><div style="text-align:center">KG</div><div style="text-align:center">Tekrar</div><div></div></div>
     ${setRows}
     ${canEdit()?`<div style="display:flex;gap:6px;padding:6px 14px 4px">
