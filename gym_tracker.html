@@ -2506,7 +2506,7 @@ async function analyzeFoodPhoto(input, targetMealIdx){
       return;
     }
     nd.meals.push({
-      name:result.meal_name||'Fotograflanan Ogun',
+      name:mealTypeByHour(hr),
       time:hr.toString().padStart(2,'0')+':'+mn.toString().padStart(2,'0'),
       foods:result.foods.map(function(f){return {name:f.name||'',amount:String(f.amount||''),unit:f.unit||'gram',kcal:String(f.kcal||''),protein:String(f.protein||''),carb:String(f.carb||''),fat:String(f.fat||'')};},),
       open:true
@@ -2526,9 +2526,18 @@ async function analyzeFoodPhoto(input, targetMealIdx){
 }
 
 
+// Oguna eklendigi saate gore otomatik kategori (Kahvalti/Ogle/Aksam vb.)
+function mealTypeByHour(h){
+  if(h>=5&&h<=10) return 'Kahvaltı';
+  if(h>=11&&h<=15) return 'Öğle Yemeği';
+  if(h>=16&&h<=17) return 'Ara Öğün';
+  if(h>=18&&h<=22) return 'Akşam Yemeği';
+  return 'Gece Atıştırması';
+}
+
 async function addMeal(){
   const nd=await getNd();const h=new Date().getHours(),m=new Date().getMinutes();
-  nd.meals.push({name:'Öğün '+(nd.meals.length+1),time:`${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`,foods:[],open:true});
+  nd.meals.push({name:mealTypeByHour(h),time:`${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`,foods:[],open:true});
   saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();
 }
 
