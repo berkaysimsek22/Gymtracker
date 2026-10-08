@@ -763,7 +763,8 @@ let currentUser = null;
 let currentProfile = null;
 let allProfiles = [];
 let viewingProfile = null; // admin viewing another user
-let programs = {}; // userId -> program array
+let programs = {}; // userId -> program array (haftalik alternasyon varsa "A haftasi")
+let altPrograms = {}; // userId -> "B haftasi" program array (sadece alternan programlarda dolu)
 let setCache = {}; // key -> set data
 let nutCache = {}; // userId_date -> nutrition data
 let sessionCache = []; // session logs for current view
@@ -787,7 +788,40 @@ function todayStr() { return localDateStr(); }
 function dc(o) { return JSON.parse(JSON.stringify(o)); }
 function isAdmin() { return currentUser?.email === ADMIN_EMAIL; }
 function activeProfile() { return viewingProfile || currentProfile; }
-function activeProgram() { return programs[activeProfile()?.id] || []; }
+
+// ISO 8601 hafta numarasi (haftalar Pazartesi baslar, yilin ilk Persembe'sini
+// iceren hafta = 1. hafta). Haftalik A/B alternasyonu bunun uzerine kurulu.
+function isoWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+// Tek ISO hafta = "A" (temel program), cift ISO hafta = "B" (alt program)
+function isAltWeek(d) { return isoWeekNumber(d || new Date()) % 2 === 0; }
+
+// activeProgram() alternan bir program icin, o anki ISO haftaya gore A ya da
+// B'yi dondurur - ikisi de normal, duz 7 gunluk dizi oldugu icin program
+// duzenleme/render/PR/gecmis gibi TUM mevcut kod hicbir degisiklik gerekmeden
+// "hangi hafta aktifse onu" dogru sekilde okur/duzenler.
+function activeProgram() {
+  const uid = activeProfile()?.id;
+  if(!uid) return [];
+  if(altPrograms[uid] && isAltWeek()) return altPrograms[uid];
+  return programs[uid] || [];
+}
+
+// Set kayitlari (workout_sets) sadece day_index+exercise_index ile tutuluyor;
+// alternan bir programda ayni gun (orn. Pazartesi) iki farkli hafta icin iki
+// farkli egzersiz listesi gosterebiliyor. Bellekteki setCache her zaman "o an
+// ekranda gorunen" mantiksal gun index'iyle (0-6) anahtarlanmaya devam eder -
+// degisen sadece Supabase'e YAZILAN/OKUNAN day_index: alt hafta aktifken +7
+// ofsetleniyor, boylece A haftasinin agirlik gecmisiyle B haftasininki ayni
+// veritabani satirini paylasip birbirinin uzerine yazmiyor.
+function storageDayIndex(userId, dayIdx) {
+  return (altPrograms[userId] && isAltWeek()) ? dayIdx + 7 : dayIdx;
+}
 
 // ── AUTH ──
 function switchAuthTab(tab) {
@@ -899,11 +933,22 @@ async function loadProfile() {
 
 async function loadProgramForUser(userId) {
   const {data} = await sb.from('programs').select('program_data').eq('user_id', userId).single();
-  programs[userId] = data?.program_data || dc(DEFAULT_PROGRAM);
+  const raw = data?.program_data;
+  // Haftalik alternasyonu olan programlar {a:[...], b:[...]} seklinde saklanir
+  // (ikisi de normal 7 gunluk dizi); duz dizi olanlar eskisi gibi tek program.
+  if(raw && !Array.isArray(raw) && raw.a && raw.b){
+    programs[userId] = raw.a;
+    altPrograms[userId] = raw.b;
+  } else {
+    programs[userId] = raw || dc(DEFAULT_PROGRAM);
+    delete altPrograms[userId];
+  }
   // Eski bir hatadan kalma: gün AMRAP/Challenge'a cevrilmis ama adi hala "Dinlenme" kalmis olabilir
   let fixed = false;
-  programs[userId].forEach(day=>{
-    if(day.type==='amrap' && (!day.name || day.name==='Dinlenme')){ day.name='Cindy'; fixed=true; }
+  [programs[userId], altPrograms[userId]].filter(Boolean).forEach(prog=>{
+    prog.forEach(day=>{
+      if(day.type==='amrap' && (!day.name || day.name==='Dinlenme')){ day.name='Cindy'; fixed=true; }
+    });
   });
   if(fixed) saveProgram(userId);
 }
@@ -914,7 +959,7 @@ async function loadSessionLogs(userId) {
 }
 
 async function loadSetsForDay(userId, dayIdx) {
-  const {data} = await sb.from('workout_sets').select('*').eq('user_id', userId).eq('day_index', dayIdx);
+  const {data} = await sb.from('workout_sets').select('*').eq('user_id', userId).eq('day_index', storageDayIndex(userId, dayIdx));
   // Get this week's Monday at 00:00
   const now = new Date();
   const monday = new Date(now);
@@ -1027,7 +1072,8 @@ async function saveNutritionNow(){
 }
 
 async function saveProgram(userId) {
-  await sb.from('programs').upsert({user_id: userId, program_data: programs[userId], updated_at: new Date().toISOString()}, {onConflict: 'user_id'});
+  const payload = altPrograms[userId] ? {a: programs[userId], b: altPrograms[userId]} : programs[userId];
+  await sb.from('programs').upsert({user_id: userId, program_data: payload, updated_at: new Date().toISOString()}, {onConflict: 'user_id'});
 }
 
 async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
@@ -1038,14 +1084,15 @@ async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
   clearTimeout(saveTimer[k]);
   saveTimer[k] = setTimeout(async () => {
     try {
-      const row = {user_id: userId, day_index: parseInt(dayIdx), exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...fields};
+      const storeDi = storageDayIndex(userId, parseInt(dayIdx));
+      const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...fields};
       if(setCache[k].db_id) {
         await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
       } else {
         // Try to find existing row first
         const {data: existing} = await sb.from('workout_sets')
           .select('id').eq('user_id', userId)
-          .eq('day_index', parseInt(dayIdx))
+          .eq('day_index', storeDi)
           .eq('exercise_index', parseInt(exIdx))
           .eq('set_index', parseInt(setIdx))
           .single();
@@ -1525,7 +1572,7 @@ async function removeSetFromEx(uid, di, ei){
   if(dbId){
     await sb.from('workout_sets').delete().eq('id', dbId);
   } else {
-    await sb.from('workout_sets').delete().eq('user_id', uid).eq('day_index', di).eq('exercise_index', ei).eq('set_index', si);
+    await sb.from('workout_sets').delete().eq('user_id', uid).eq('day_index', storageDayIndex(uid, di)).eq('exercise_index', ei).eq('set_index', si);
   }
   delete setCache[k];
   ex.sets -= 1;
@@ -1576,7 +1623,7 @@ async function clearDayConfirm(di){
   const uid = activeProfile()?.id;
   if(!uid) return;
   // Delete from Supabase
-  await sb.from('workout_sets').delete().eq('user_id', uid).eq('day_index', di);
+  await sb.from('workout_sets').delete().eq('user_id', uid).eq('day_index', storageDayIndex(uid, di));
   // Clear local cache
   const prog = activeProgram()[di];
   if(prog && prog.exercises){
@@ -1654,10 +1701,11 @@ async function moveExercise(di, ei, dir){
   if(tmpNote!==undefined) setCache[nb]=tmpNote; else delete setCache[nb];
   await saveProgram(uid);
   // 3) Supabase'deki set kayitlarinin exercise_index'ini de karsilikli degistir (gecici deger uzerinden, unique cakismasini onlemek icin)
+  const storeDi = storageDayIndex(uid, di);
   const TEMP = -999;
-  await sb.from('workout_sets').update({exercise_index:TEMP}).eq('user_id',uid).eq('day_index',di).eq('exercise_index',ei);
-  await sb.from('workout_sets').update({exercise_index:ei}).eq('user_id',uid).eq('day_index',di).eq('exercise_index',ej);
-  await sb.from('workout_sets').update({exercise_index:ej}).eq('user_id',uid).eq('day_index',di).eq('exercise_index',TEMP);
+  await sb.from('workout_sets').update({exercise_index:TEMP}).eq('user_id',uid).eq('day_index',storeDi).eq('exercise_index',ei);
+  await sb.from('workout_sets').update({exercise_index:ei}).eq('user_id',uid).eq('day_index',storeDi).eq('exercise_index',ej);
+  await sb.from('workout_sets').update({exercise_index:ej}).eq('user_id',uid).eq('day_index',storeDi).eq('exercise_index',TEMP);
   renderDayContent(di);
 }
 
@@ -1677,7 +1725,7 @@ function addEx(di){
 async function clearDaySets(di){
   if(!confirm('Bu günün tüm set kayıtları silinsin mi?'))return;
   const uid=activeProfile()?.id;
-  await sb.from('workout_sets').delete().eq('user_id',uid).eq('day_index',di);
+  await sb.from('workout_sets').delete().eq('user_id',uid).eq('day_index',storageDayIndex(uid, di));
   // clear cache
   Object.keys(setCache).filter(k=>k.startsWith(`${uid}_${di}_`)).forEach(k=>delete setCache[k]);
   renderDayContent(di);
@@ -2603,6 +2651,25 @@ const POPULAR_SPLITS = [
       {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
+  {id:'berkay_split', name:"Berkay's Split", days:3, tagline:"Kişisel 3 günlük program — haftalar arasında A/B/A ↔ B/A/B olarak dönüyor (ISO hafta numarasına göre otomatik, elle değiştirmen gerekmez).",
+    schedule:[
+      {name:'GÜN A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Hip Thrust','Glute Maximus',4,'8-10',120),_woEx('Incline Barbell Press','Pectoral (Üst)',4,'6-8',120),_woEx('Weighted Pull Up','Latissimus · Biceps',4,'6-10',90),_woEx('Seated DB Shoulder Press','Deltoid (Ön/Yan)',4,'10-12',90),_woEx('Overhead Cable Triceps','Triceps (Uzun Kafa)',3,'10-12',60),_woEx('Rope Pushdown','Triceps (Lateral)',2,'12-15',45),_woEx('Incline DB Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Hammer Curl','Brachialis · Biceps',4,'10-12',60),_woEx('Barbell Wrist Twist','Ön Kol (Brachioradialis)',2,'15-20',45)]},
+      {name:'Dinlenme',type:'rest',day:'Salı',warmup:null,exercises:[]},
+      {name:'GÜN B',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Romanian Deadlift','Hamstring · Glute',4,'8-10',120),_woEx('Weighted Dip','Alt Pectoral · Triceps',4,'6-10',90),_woEx('Chest Supported Row','Rhomboids · Mid Back',4,'8-10',90),_woEx('Bulgarian Split Squat','Glute Max · Quad',3,'10-12',90),_woEx('Face Pull','Rear Deltoid · Trapezius',4,'15-20',60),_woEx('DB Lateral Raise','Lateral Deltoid',4,'12-15',60),_woEx('Bayesian Cable Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Reverse Curl','Brachialis · Brachioradialis',4,'12-15',60),_woEx('Barbell Wrist Twist','Ön Kol (Brachioradialis)',2,'15-20',45)]},
+      {name:'Dinlenme',type:'rest',day:'Perşembe',warmup:null,exercises:[]},
+      {name:'GÜN A',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Hip Thrust','Glute Maximus',4,'8-10',120),_woEx('Incline Barbell Press','Pectoral (Üst)',4,'6-8',120),_woEx('Weighted Pull Up','Latissimus · Biceps',4,'6-10',90),_woEx('Seated DB Shoulder Press','Deltoid (Ön/Yan)',4,'10-12',90),_woEx('Overhead Cable Triceps','Triceps (Uzun Kafa)',3,'10-12',60),_woEx('Rope Pushdown','Triceps (Lateral)',2,'12-15',45),_woEx('Incline DB Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Hammer Curl','Brachialis · Biceps',4,'10-12',60),_woEx('Barbell Wrist Twist','Ön Kol (Brachioradialis)',2,'15-20',45)]},
+      {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
+      {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
+    ],
+    altSchedule:[
+      {name:'GÜN B',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Romanian Deadlift','Hamstring · Glute',4,'8-10',120),_woEx('Weighted Dip','Alt Pectoral · Triceps',4,'6-10',90),_woEx('Chest Supported Row','Rhomboids · Mid Back',4,'8-10',90),_woEx('Bulgarian Split Squat','Glute Max · Quad',3,'10-12',90),_woEx('Face Pull','Rear Deltoid · Trapezius',4,'15-20',60),_woEx('DB Lateral Raise','Lateral Deltoid',4,'12-15',60),_woEx('Bayesian Cable Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Reverse Curl','Brachialis · Brachioradialis',4,'12-15',60),_woEx('Barbell Wrist Twist','Ön Kol (Brachioradialis)',2,'15-20',45)]},
+      {name:'Dinlenme',type:'rest',day:'Salı',warmup:null,exercises:[]},
+      {name:'GÜN A',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Hip Thrust','Glute Maximus',4,'8-10',120),_woEx('Incline Barbell Press','Pectoral (Üst)',4,'6-8',120),_woEx('Weighted Pull Up','Latissimus · Biceps',4,'6-10',90),_woEx('Seated DB Shoulder Press','Deltoid (Ön/Yan)',4,'10-12',90),_woEx('Overhead Cable Triceps','Triceps (Uzun Kafa)',3,'10-12',60),_woEx('Rope Pushdown','Triceps (Lateral)',2,'12-15',45),_woEx('Incline DB Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Hammer Curl','Brachialis · Biceps',4,'10-12',60),_woEx('Barbell Wrist Twist','Ön Kol (Brachioradialis)',2,'15-20',45)]},
+      {name:'Dinlenme',type:'rest',day:'Perşembe',warmup:null,exercises:[]},
+      {name:'GÜN B',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Romanian Deadlift','Hamstring · Glute',4,'8-10',120),_woEx('Weighted Dip','Alt Pectoral · Triceps',4,'6-10',90),_woEx('Chest Supported Row','Rhomboids · Mid Back',4,'8-10',90),_woEx('Bulgarian Split Squat','Glute Max · Quad',3,'10-12',90),_woEx('Face Pull','Rear Deltoid · Trapezius',4,'15-20',60),_woEx('DB Lateral Raise','Lateral Deltoid',4,'12-15',60),_woEx('Bayesian Cable Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Reverse Curl','Brachialis · Brachioradialis',4,'12-15',60),_woEx('Barbell Wrist Twist','Ön Kol (Brachioradialis)',2,'15-20',45)]},
+      {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
+      {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
+    ]},
 ];
 
 function renderWoSplit(el){
@@ -2623,18 +2690,28 @@ function renderWoSplit(el){
 // Hafta tablosu + gün detayı: hem "Şu Anki Programım" hem her split detayı bunu kullanır
 let _woSchedule = null;
 let _woSplitMeta = null;
+let _woShowAlt = false; // alternan split onizlemesinde Hafta A/B secimi
 
 function renderMyCurrentProgram(){
   _woSchedule = activeProgram();
   _woSplitMeta = null;
+  _woShowAlt = false;
   renderWoWeekTable();
 }
 
 function showPopularSplitDetail(id){
   const split = POPULAR_SPLITS.find(s=>s.id===id);
   if(!split) return;
-  _woSchedule = split.schedule;
   _woSplitMeta = split;
+  _woShowAlt = false;
+  _woSchedule = split.schedule;
+  renderWoWeekTable();
+}
+
+function toggleWoAltPreview(){
+  if(!_woSplitMeta?.altSchedule) return;
+  _woShowAlt = !_woShowAlt;
+  _woSchedule = _woShowAlt ? _woSplitMeta.altSchedule : _woSplitMeta.schedule;
   renderWoWeekTable();
 }
 
@@ -2661,7 +2738,8 @@ function renderWoWeekTable(){
       ${isRest?'':'<div class="arr">›</div>'}
     </div>`;
   }).join('');
-  const header = _woSplitMeta ? `<h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>` : '';
+  const altToggle = _woSplitMeta?.altSchedule ? `<button class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="toggleWoAltPreview()">🔁 ${_woShowAlt?'Hafta A\'yı Gör':'Hafta B\'yi Gör'} <span style="color:var(--muted);font-weight:400">(şu an: Hafta ${_woShowAlt?'B':'A'})</span></button>` : '';
+  const header = _woSplitMeta ? `<h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>${altToggle}` : '';
   const applyBtn = _woSplitMeta && canEdit() ? `<button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="applyPopularSplit('${_woSplitMeta.id}')">🚀 Bu Split'i Uygula</button>` : '';
   el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>
     ${header}
@@ -2695,6 +2773,8 @@ async function applyPopularSplit(id){
   if(!split || !p) return;
   if(!confirm(`Mevcut programın silinip "${split.name}" ile değiştirilecek. Devam edilsin mi?`)) return;
   programs[p.id] = dc(split.schedule);
+  if(split.altSchedule){ altPrograms[p.id] = dc(split.altSchedule); }
+  else { delete altPrograms[p.id]; }
   await saveProgram(p.id);
   curDay = new Date().getDay()===0?6:new Date().getDay()-1;
   showScreen('workout', document.querySelector('.nav-btn'));
@@ -2815,6 +2895,7 @@ const EXERCISE_DB = [
   {name:'Lateral Raise',muscle:'Lateral Deltoid',muscles:['side_delt'],sets:3,reps:'15',restSec:60,tip:'DB veya kablo'},
   {name:'Cable Lateral Raise',muscle:'Lateral Deltoid',muscles:['side_delt'],sets:4,reps:'15-20',restSec:60,tip:'Sabit gerilim'},
   {name:'Reverse Pec Deck',muscle:'Posterior Deltoid',muscles:['rear_delt'],sets:3,reps:'15',restSec:60,tip:'Arka delt'},
+  {name:'Seated DB Shoulder Press',muscle:'Deltoid (Ön/Yan)',muscles:['front_delt','side_delt'],sets:4,reps:'10-12',restSec:90,tip:'Oturarak, kontrollü in'},
   // BICEPS
   {name:'Barbell Curl',muscle:'Biceps Brachii',muscles:['biceps'],sets:3,reps:'10,10,8',restSec:60,tip:'Wall strict'},
   {name:'Incline DB Curl',muscle:'Biceps (Uzun Kafa)',muscles:['biceps'],sets:3,reps:'12',restSec:60,tip:'Stretch bias'},
@@ -2827,6 +2908,9 @@ const EXERCISE_DB = [
   {name:'JM Press',muscle:'Triceps (Tum Kafalar)',muscles:['triceps'],sets:3,reps:'10',restSec:90,tip:'Skull crusher yerine dirsek-dostu alternatif (ATHLEAN-X)'},
   {name:'Tricep Pushdown',muscle:'Triceps (Lateral)',muscles:['triceps'],sets:3,reps:'15',restSec:60,tip:'Tepe kasılma'},
   {name:'Overhead Triceps',muscle:'Triceps',muscles:['triceps'],sets:3,reps:'12',restSec:60,tip:'Overhead → uzun kafa gerilir'},
+  // FOREARM
+  {name:'Barbell Wrist Twist',muscle:'Ön Kol (Brachioradialis)',muscles:['forearm'],sets:3,reps:'15-20',restSec:45,tip:'Yavaş, kontrollü rotasyon'},
+  {name:'Wrist Curl',muscle:'Ön Kol (Fleksör)',muscles:['forearm'],sets:3,reps:'15-20',restSec:45,tip:'Tam ROM'},
   // CALVES
   {name:'Calf Raise',muscle:'Gastrocnemius · Soleus',muscles:['calves'],sets:4,reps:'15',restSec:45,tip:'Tam aşağı kadar in'},
   {name:'Seated Calf Raise',muscle:'Soleus',muscles:['calves'],sets:4,reps:'15',restSec:45,tip:'Diz bükülü → soleus'},
