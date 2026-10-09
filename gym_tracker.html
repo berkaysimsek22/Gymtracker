@@ -2439,11 +2439,14 @@ async function addFood(mi){const nd=await getNd();nd.meals[mi].foods.push({name:
 async function toggleMeal(mi){const nd=await getNd();nd.meals[mi].open=!nd.meals[mi].open;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
 // gemini-proxy artik Authorization header'inda gecerli bir oturum
 // token'i istiyor (anonim erisim kapatildi) - her cagriyi bu helper'dan
-// gecir ki token eklemeyi unutmayalim.
+// gecir ki token eklemeyi unutmayalim. Google'in "model su an yogun"
+// (503/UNAVAILABLE) hatasi genelde birkaç saniye icinde geciyor - bunu
+// kullaniciya ciplak JSON olarak gostermek yerine birkaç kez otomatik
+// tekrar deniyoruz.
 async function geminiFetch(body){
   const {data:{session}} = await sb.auth.getSession();
   if(!session) throw new Error('Oturum bulunamadi, lutfen tekrar giris yap.');
-  return fetch('https://iuanbkucwzvldrcksuek.supabase.co/functions/v1/gemini-proxy', {
+  const doFetch = () => fetch('https://iuanbkucwzvldrcksuek.supabase.co/functions/v1/gemini-proxy', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -2451,6 +2454,13 @@ async function geminiFetch(body){
     },
     body: JSON.stringify(body),
   });
+  const MAX_RETRIES = 2, RETRY_DELAY_MS = 1500;
+  let response = await doFetch();
+  for(let attempt=0; attempt<MAX_RETRIES && response.status===503; attempt++){
+    await new Promise(r=>setTimeout(r, RETRY_DELAY_MS));
+    response = await doFetch();
+  }
+  return response;
 }
 async function analyzeFoodPhoto(input, targetMealIdx){
   const file=input.files[0];
