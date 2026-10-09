@@ -2481,7 +2481,7 @@ async function analyzeFoodPhoto(input, targetMealIdx){
         {inline_data:{mime_type:'image/jpeg',data:base64}},
         {text:prompt}
       ]}],
-      generationConfig:{temperature:0.1,maxOutputTokens:1000}
+      generationConfig:{temperature:0.1,maxOutputTokens:2048}
     };
     const response=await geminiFetch(body);
     if(!response.ok){
@@ -2490,12 +2490,19 @@ async function analyzeFoodPhoto(input, targetMealIdx){
     }
     const data=await response.json();
     if(data.error){throw new Error(data.error.message||'API hatasi');}
+    const finishReason=data.candidates&&data.candidates[0]&&data.candidates[0].finishReason;
     const text=data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]?data.candidates[0].content.parts[0].text:'';
     const clean=text.replace(/```json|```/g,'').trim();
     const firstBrace=clean.indexOf('{');
     const lastBrace=clean.lastIndexOf('}');
     if(firstBrace<0||lastBrace<0)throw new Error('JSON bulunamadi: '+text.substring(0,100));
-    const result=JSON.parse(clean.substring(firstBrace,lastBrace+1));
+    let result;
+    try{
+      result=JSON.parse(clean.substring(firstBrace,lastBrace+1));
+    }catch(parseErr){
+      const hint=finishReason==='MAX_TOKENS'?' (yanit kesilmis olabilir, cok fazla besin algilanmis olabilir)':'';
+      throw new Error('JSON ayristirma hatasi'+hint+': '+parseErr.message+' | Yanit: '+clean.substring(0,200));
+    }
     document.getElementById('photoAnalyzing').style.display='none';
     if(!result.foods||!result.foods.length){alert('Yemek tespit edilemedi, tekrar deneyin.');return;}
     const nd=await loadNutrition(activeProfile()&&activeProfile().id,curNutDate);
