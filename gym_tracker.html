@@ -806,9 +806,16 @@ function isAltWeek(d) { return isoWeekNumber(d || new Date()) % 2 === 0; }
 // duzenleme/render/PR/gecmis gibi TUM mevcut kod hicbir degisiklik gerekmeden
 // "hangi hafta aktifse onu" dogru sekilde okur/duzenler.
 function activeProgram() {
+  return programForDate(new Date());
+}
+
+// activeProgram()'in tarih parametreli hali - haftalik grid'de weekOffset ile
+// gecmis/gelecek haftaya bakarken HER ZAMAN "bugunun" paritesini gostermek
+// yerine, gercekten o haftanin dogru A/B varyantini gostermek icin kullanilir.
+function programForDate(d) {
   const uid = activeProfile()?.id;
   if(!uid) return [];
-  if(altPrograms[uid] && isAltWeek()) return altPrograms[uid];
+  if(altPrograms[uid] && isAltWeek(d)) return altPrograms[uid];
   return programs[uid] || [];
 }
 
@@ -1264,8 +1271,6 @@ async function renderAll() {
 let weekOffset = 0; // 0 = this week, -1 = last week, +1 = next week
 
 function renderWeekGrid() {
-  const prog = activeProgram();
-  if(!prog) return;
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const today = new Date().getDay();
   // Check which program days have been completed (by day_name match)
@@ -1276,6 +1281,10 @@ function renderWeekGrid() {
   weekStartDisplay.setHours(0,0,0,0);
   const weekEndDisplay = new Date(weekStartDisplay);
   weekEndDisplay.setDate(weekStartDisplay.getDate() + 7);
+  // Alternan programlarda goruntulenen haftanin (weekOffset'e gore) dogru
+  // A/B varyantini goster - "bugunun" paritesini degil.
+  const prog = programForDate(weekStartDisplay);
+  if(!prog) return;
   const completedNames = new Set((sessionCache||[])
     .filter(s => { const d = new Date(s.logged_at); return d >= weekStartDisplay && d < weekEndDisplay; })
     .map(s => s.day_name));
@@ -2430,11 +2439,14 @@ async function addFood(mi){const nd=await getNd();nd.meals[mi].foods.push({name:
 async function toggleMeal(mi){const nd=await getNd();nd.meals[mi].open=!nd.meals[mi].open;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
 // gemini-proxy artik Authorization header'inda gecerli bir oturum
 // token'i istiyor (anonim erisim kapatildi) - her cagriyi bu helper'dan
-// gecir ki token eklemeyi unutmayalim.
+// gecir ki token eklemeyi unutmayalim. Google'in "model su an yogun"
+// (503/UNAVAILABLE) hatasi genelde birkaç saniye icinde geciyor - bunu
+// kullaniciya ciplak JSON olarak gostermek yerine birkaç kez otomatik
+// tekrar deniyoruz.
 async function geminiFetch(body){
   const {data:{session}} = await sb.auth.getSession();
   if(!session) throw new Error('Oturum bulunamadi, lutfen tekrar giris yap.');
-  return fetch('https://iuanbkucwzvldrcksuek.supabase.co/functions/v1/gemini-proxy', {
+  const doFetch = () => fetch('https://iuanbkucwzvldrcksuek.supabase.co/functions/v1/gemini-proxy', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -2442,6 +2454,13 @@ async function geminiFetch(body){
     },
     body: JSON.stringify(body),
   });
+  const MAX_RETRIES = 2, RETRY_DELAY_MS = 1500;
+  let response = await doFetch();
+  for(let attempt=0; attempt<MAX_RETRIES && response.status===503; attempt++){
+    await new Promise(r=>setTimeout(r, RETRY_DELAY_MS));
+    response = await doFetch();
+  }
+  return response;
 }
 async function analyzeFoodPhoto(input, targetMealIdx){
   const file=input.files[0];
@@ -2472,7 +2491,7 @@ async function analyzeFoodPhoto(input, targetMealIdx){
         {inline_data:{mime_type:'image/jpeg',data:base64}},
         {text:prompt}
       ]}],
-      generationConfig:{temperature:0.1,maxOutputTokens:1000}
+      generationConfig:{temperature:0.1,maxOutputTokens:2048}
     };
     const response=await geminiFetch(body);
     if(!response.ok){
@@ -2481,12 +2500,19 @@ async function analyzeFoodPhoto(input, targetMealIdx){
     }
     const data=await response.json();
     if(data.error){throw new Error(data.error.message||'API hatasi');}
+    const finishReason=data.candidates&&data.candidates[0]&&data.candidates[0].finishReason;
     const text=data.candidates&&data.candidates[0]&&data.candidates[0].content&&data.candidates[0].content.parts&&data.candidates[0].content.parts[0]?data.candidates[0].content.parts[0].text:'';
     const clean=text.replace(/```json|```/g,'').trim();
     const firstBrace=clean.indexOf('{');
     const lastBrace=clean.lastIndexOf('}');
     if(firstBrace<0||lastBrace<0)throw new Error('JSON bulunamadi: '+text.substring(0,100));
-    const result=JSON.parse(clean.substring(firstBrace,lastBrace+1));
+    let result;
+    try{
+      result=JSON.parse(clean.substring(firstBrace,lastBrace+1));
+    }catch(parseErr){
+      const hint=finishReason==='MAX_TOKENS'?' (yanit kesilmis olabilir, cok fazla besin algilanmis olabilir)':'';
+      throw new Error('JSON ayristirma hatasi'+hint+': '+parseErr.message+' | Yanit: '+clean.substring(0,200));
+    }
     document.getElementById('photoAnalyzing').style.display='none';
     if(!result.foods||!result.foods.length){alert('Yemek tespit edilemedi, tekrar deneyin.');return;}
     const nd=await loadNutrition(activeProfile()&&activeProfile().id,curNutDate);
