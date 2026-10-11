@@ -16,6 +16,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>GYM TRACKER</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
@@ -709,6 +710,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     </div>
     <div id="profileEditCard" style="margin:12px 16px 0"></div>
     <div id="weightLogCard" style="margin:10px 16px 0"></div>
+    <div id="adminReportCard" style="margin:10px 16px 0"></div>
     <div id="autoProgCard" style="margin:10px 16px 0"></div>
     <div id="deleteProfileCard" style="margin:10px 16px 0"></div>
     <div id="selfDeleteAccountCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
@@ -1411,6 +1413,179 @@ function computeGoalCalorieTarget(p){
   if(Math.abs(diff) < 0.5) return maint;
   const dailyAdj = 550; // ~0.5 kg/hafta yag degisimi icin gereken gunluk kalori farki
   return diff < 0 ? maint - dailyAdj : maint + dailyAdj;
+}
+
+// ── TUM UYELER EXCEL RAPORU ──
+// Not: bu hesaplar uygulama icindeki canli "Otomatik Hesapla" (calcMacros)
+// butonundan KASITLI olarak ayri tutuldu - rapor icin istenen formul farkli
+// (sabit -500/+200/TDEE kalori ayari, 2.0/1.8 protein, antrenman/dinlenme
+// gunu karb ayari).
+function reportBMR(p){
+  if(!p.age||!p.height||!p.weight||!p.gender) return null;
+  return p.gender==='female'
+    ? 10*p.weight + 6.25*p.height - 5*p.age - 161
+    : 10*p.weight + 6.25*p.height - 5*p.age + 5;
+}
+function reportTDEE(p){
+  const bmr = reportBMR(p);
+  if(bmr===null) return null;
+  const actMap = {sedentary:1.2, light:1.375, moderate:1.55, active:1.725};
+  return Math.round(bmr * (actMap[p.activity] || 1.4));
+}
+function reportCalorieGoal(goalId, tdee){
+  if(tdee===null) return null;
+  if(goalId==='weight_loss') return tdee - 500;
+  if(goalId==='muscle_gain') return tdee + 200;
+  return tdee; // recomp ve diger hedefler: korunum (TDEE)
+}
+function reportProtein(p, goalId){
+  const w = p.target_weight || p.weight || 0;
+  return Math.round(w * (goalId==='weight_loss' ? 2.0 : 1.8));
+}
+function reportFat(p){
+  return Math.round((p.target_weight || p.weight || 0) * 1);
+}
+function reportCarb(kcal, protein, fat){
+  if(kcal===null) return null;
+  return Math.round(Math.max(0, (kcal - protein*4 - fat*9) / 4));
+}
+// "Glute Maximus · Biceps" ya da "Quad + Glute" gibi stringlerden sadece
+// birincil (ilk yazilan) kas grubunu alir.
+function reportPrimaryMuscle(muscleStr){
+  if(!muscleStr) return 'Diğer';
+  return muscleStr.split(/[·+]/)[0].trim() || 'Diğer';
+}
+// Bir programin (7 gunluk duz dizi) haftalik kas grubu basina toplam set
+// sayisini hesaplar. Alternan programlarda sadece "A haftasi" baz alinir.
+function reportWeeklyMuscleSets(days){
+  const totals = {};
+  (days||[]).forEach(day=>{
+    if(day.type!=='full') return;
+    (day.exercises||[]).forEach(ex=>{
+      const m = reportPrimaryMuscle(ex.muscle);
+      totals[m] = (totals[m]||0) + (parseInt(ex.sets)||0);
+    });
+  });
+  return totals;
+}
+function reportSplitName(days){
+  const names = [...new Set((days||[]).filter(d=>d.type==='full').map(d=>d.name).filter(Boolean))];
+  return names.length ? names.join(' / ') : '—';
+}
+function reportTrainingDaysCount(days){
+  return (days||[]).filter(d=>d.type==='full'||d.type==='hiit'||d.type==='cardio'||d.type==='amrap').length;
+}
+// Excel sayfa adlari: max 31 karakter, : \ / ? * [ ] yasak, tekrarlarda
+// numaralandir (profil isimleri cakisabiliyordu, bu oturumda daha once de
+// gorulmustu).
+function reportSheetName(name, usedNames){
+  let base = (name||'Uye').replace(/[:\\/?*\[\]]/g,'').trim().substring(0,28) || 'Uye';
+  let candidate = base, n = 2;
+  while(usedNames.has(candidate)){ candidate = (base.substring(0,28-String(n).length-1))+'_'+n; n++; }
+  usedNames.add(candidate);
+  return candidate;
+}
+
+async function exportAllUsersExcel(){
+  const btn = document.getElementById('adminReportBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Hazırlanıyor...'; }
+  try{
+    const [{data: profiles, error: profErr}, {data: progs, error: progErr}] = await Promise.all([
+      sb.from('profiles').select('*'),
+      sb.from('programs').select('user_id,program_data'),
+    ]);
+    if(profErr) throw profErr;
+    if(progErr) throw progErr;
+    const progByUser = {};
+    (progs||[]).forEach(row=>{
+      const raw = row.program_data;
+      const days = (raw && !Array.isArray(raw) && raw.a) ? raw.a : (Array.isArray(raw) ? raw : []);
+      progByUser[row.user_id] = days;
+    });
+
+    const wb = XLSX.utils.book_new();
+    const summaryRows = [];
+    const usedSheetNames = new Set(['Özet']);
+
+    (profiles||[]).forEach(p=>{
+      const goalId = p.mainGoal || p.goal || '';
+      const tdee = reportTDEE(p);
+      const bmr = reportBMR(p);
+      const kcal = reportCalorieGoal(goalId, tdee);
+      const protein = reportProtein(p, goalId);
+      const fat = reportFat(p);
+      const carb = reportCarb(kcal, protein, fat);
+      const days = progByUser[p.id] || [];
+      const splitName = reportSplitName(days);
+      const dayCount = reportTrainingDaysCount(days);
+      const muscleSets = reportWeeklyMuscleSets(days);
+
+      summaryRows.push({
+        'İsim': p.name || '—',
+        'Kalori (kcal)': kcal ?? '—',
+        'Protein (g)': protein || '—',
+        'Karb (g)': carb ?? '—',
+        'Yağ (g)': fat || '—',
+        'Program Adı': splitName,
+        'Gün Sayısı': dayCount || '—',
+      });
+
+      const sheetName = reportSheetName(p.name, usedSheetNames);
+      const aoa = [
+        ['KİŞİSEL BİLGİLER'],
+        ['Ad', p.name||'—'],
+        ['Yaş', p.age||'—'],
+        ['Boy (cm)', p.height||'—'],
+        ['Kilo (kg)', p.weight||'—'],
+        ['Hedef Kilo (kg)', p.target_weight||'—'],
+        ['Cinsiyet', p.gender==='female'?'Kadın':p.gender==='male'?'Erkek':'—'],
+        ['Aktivite', p.activity||'—'],
+        ['Ana Hedef', goalId||'—'],
+        [],
+        ['MAKROLAR'],
+        ['BMR (kcal)', bmr!==null?Math.round(bmr):'—'],
+        ['TDEE (kcal)', tdee ?? '—'],
+        ['Kalori Hedefi (kcal)', kcal ?? '—'],
+        ['Protein (g)', protein || '—'],
+        ['Yağ (g)', fat || '—'],
+        ['Karbonhidrat (g)', carb ?? '—'],
+        ['Antrenman Günü Karb (g)', carb!==null?carb+20:'—'],
+        ['Dinlenme Günü Karb (g)', carb!==null?Math.max(0,carb-30):'—'],
+        [],
+        ['PROGRAM DETAYI'],
+        ['Gün', 'Tip', 'Hareket', 'Kas Grubu', 'Set', 'Tekrar'],
+      ];
+      days.forEach(day=>{
+        if(day.type!=='full'){
+          aoa.push([day.day||day.name||'—', day.type||'rest', '—', '—', '—', '—']);
+          return;
+        }
+        (day.exercises||[]).forEach((ex,i)=>{
+          aoa.push([i===0?(day.day||day.name||'—'):'', i===0?day.name||'':'', ex.name||'—', ex.muscle||'—', ex.sets||'—', ex.reps||'—']);
+        });
+      });
+      aoa.push([]);
+      aoa.push(['HAFTALIK KAS GRUBU SET ÖZETİ']);
+      aoa.push(['Kas Grubu', 'Toplam Set']);
+      Object.entries(muscleSets).sort((a,b)=>b[1]-a[1]).forEach(([m,s])=>aoa.push([m,s]));
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    });
+
+    const summaryWs = XLSX.utils.json_to_sheet(summaryRows);
+    XLSX.utils.book_append_sheet(wb, summaryWs, 'Özet');
+    // Ozet sayfasi her zaman ilk sirada olsun
+    wb.SheetNames.unshift(wb.SheetNames.pop());
+
+    const today = localDateStr();
+    XLSX.writeFile(wb, `gym-tracker-rapor-${today}.xlsx`);
+  }catch(e){
+    console.error('exportAllUsersExcel error:', e);
+    alert('Rapor oluşturulamadı: '+(e.message||e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '⬇️ Excel Raporu İndir'; }
+  }
 }
 
 // Son 7 gunun (kayit girilmis olanlarin) ortalama kalori alimini hesaplar
@@ -3630,9 +3805,21 @@ function renderProfileScreen(){
   if(!p) return;
   renderProfileEditCard(p);
   renderWeightLogCard(p);
+  renderAdminReportCard();
   renderAutoProgCard(p);
   renderDeleteProfileCard(p);
   renderSelfDeleteCard(p);
+}
+
+function renderAdminReportCard(){
+  const el = document.getElementById('adminReportCard');
+  if(!el) return;
+  if(!isAdmin()){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="prof-section">
+    <h3>📊 Tüm Üyeler Raporu</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">Her üye için makro hedefleri (BMR/TDEE bazlı) ve program/kas grubu özetini içeren bir Excel dosyası indirir.</p>
+    <button class="btn btn-acc" id="adminReportBtn" style="width:100%" onclick="exportAllUsersExcel()">⬇️ Excel Raporu İndir</button>
+  </div>`;
 }
 
 function renderSelfDeleteCard(p){
