@@ -2245,11 +2245,16 @@ async function updateTarget(field,val){
 async function toggleW(i){const uid=activeProfile()?.id;const nd=await loadNutrition(uid,curNutDate);nd.water=(nd.water===i+1)?i:i+1;saveNutrition(uid,curNutDate);renderNutrition();}
 
 async function calcMacros(){
-  const p=activeProfile(),w=p?.weight||70,protein=Math.round(w*1.6),fat=Math.round(w*1);
+  const p=activeProfile(),w=p?.weight||70,fat=Math.round(w*1);
+  const goalId=p?.mainGoal||p?.goal;
+  // Protein hedef kiloya gore hesaplaniyor (hedef kilo yoksa mevcut kiloya
+  // dusuyor) - kilo verme hedefinde (weight_loss) kas kaybini onlemek icin
+  // daha yuksek 1.8g/kg, diger hedeflerde 1.6g/kg.
+  const proteinBaseWeight=p?.target_weight||w;
+  const protein=Math.round(proteinBaseWeight*(goalId==='weight_loss'?1.8:1.6));
   // Mumkunse ust basliktaki ile ayni kaynagi (Mifflin-St Jeor + aktivite +
   // hedef kilo) kullan - yas/boy/cinsiyet/hedef kilo eksikse eski kaba
   // w*carpan tahminine dus.
-  const goalId=p?.mainGoal||p?.goal;
   const preciseKcal=computeGoalCalorieTarget(p);
   const kcal=preciseKcal || (goalId?.includes('ver')?Math.round(w*28):goalId?.includes('kas')||goalId?.includes('al')?Math.round(w*35):Math.round(w*30));
   const carb=Math.round(Math.max(0,(kcal-protein*4-fat*9)/4));
