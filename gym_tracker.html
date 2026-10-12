@@ -3569,6 +3569,33 @@ function rememberFood(uid, name, entry){
   try{ localStorage.setItem('customFoodDB_'+uid, JSON.stringify(customFoodDB)); }catch(e){ console.error('persist customFoodDB error:', e); }
 }
 
+async function lookupOpenFoodFacts(name){
+  try{
+    const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(name) + '&search_simple=1&action=process&json=1&page_size=5&lc=tr';
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const products = data.products || [];
+    for(const p of products){
+      const n = p.nutriments || {};
+      const kcal = n['energy-kcal_100g'];
+      if(kcal === undefined || kcal === null) continue;
+      return {
+        kcal: Math.round(kcal),
+        protein: Math.round((n.proteins_100g||0) * 10) / 10,
+        carb: Math.round((n.carbohydrates_100g||0) * 10) / 10,
+        fat: Math.round((n.fat_100g||0) * 10) / 10,
+        per: 100,
+        unit: 'gram',
+      };
+    }
+    return null;
+  }catch(e){
+    console.log('OpenFoodFacts lookup failed:', e);
+    return null;
+  }
+}
+
 async function autoLookupFood(mi, fi, name) {
   if(!name || name.length < 2) return;
   const key = name.toLowerCase().trim();
@@ -3613,7 +3640,42 @@ async function autoLookupFood(mi, fi, name) {
     updateNutTotals();
     return;
   }
-  
+
+  // Not in local DB - try OpenFoodFacts before asking AI
+  if(name.length >= 3){
+    const offFound = await lookupOpenFoodFacts(name);
+    if(offFound){
+      const nd = await loadNutrition(activeProfile()?.id, curNutDate);
+      if(!nd.meals[mi] || !nd.meals[mi].foods[fi]) return;
+      const food = nd.meals[mi].foods[fi];
+      food._baseKcal = offFound.kcal;
+      food._baseProtein = offFound.protein;
+      food._baseCarb = offFound.carb;
+      food._baseFat = offFound.fat;
+      food._basePer = offFound.per;
+      const currentAmount = parseFloat(food.amount) || offFound.per;
+      const ratio = currentAmount / offFound.per;
+      food.kcal = String(Math.round(offFound.kcal * ratio));
+      food.protein = String(Math.round(offFound.protein * ratio * 10) / 10);
+      food.carb = String(Math.round(offFound.carb * ratio * 10) / 10);
+      food.fat = String(Math.round(offFound.fat * ratio * 10) / 10);
+      if(!food.amount) food.amount = String(offFound.per);
+      if(!food.unit) food.unit = 'gram';
+      rememberFood(activeProfile()?.id, key, offFound);
+      saveNutrition(activeProfile()?.id, curNutDate);
+      const kcE=document.getElementById('food_kcal_'+mi+'_'+fi);
+      const prE=document.getElementById('food_prot_'+mi+'_'+fi);
+      const caE=document.getElementById('food_carb_'+mi+'_'+fi);
+      const faE=document.getElementById('food_fat_'+mi+'_'+fi);
+      if(kcE)kcE.value=food.kcal||'';
+      if(prE)prE.value=food.protein||'';
+      if(caE)caE.value=food.carb||'';
+      if(faE)faE.value=food.fat||'';
+      updateNutTotals();
+      return;
+    }
+  }
+
   // Show save to DB button
   const existingBtn = document.getElementById('saveToDb_'+mi+'_'+fi);
   if(existingBtn) existingBtn.remove();
@@ -3624,8 +3686,8 @@ async function autoLookupFood(mi, fi, name) {
   saveBtn.onclick = function(){saveFoodToDB(mi,fi);this.remove();};
   const inp = document.getElementById('finp_'+mi+'_'+fi);
   if(inp && inp.parentElement) inp.parentElement.appendChild(saveBtn);
-  
-  // If not in local DB, ask AI
+
+  // If not in local DB or OpenFoodFacts, ask AI
   if(name.length < 3) return;
   try {
     const response = await geminiFetch({
