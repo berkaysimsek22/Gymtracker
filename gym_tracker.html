@@ -1035,6 +1035,12 @@ async function loadNutrition(userId, date) {
   if(row){
     nd = row.data;
     nd._dbId = row.id;
+    // Gun ilk kez yuklenirken (sayfa acilisi/sekme degisimi) tum ogunler
+    // kapali baslasin - uzun besin listeleri ekrani kaplamasin. Bu sadece
+    // "taze yukleme" aninda uygulanir; kullanici o oturum icinde bir ogunu
+    // acarsa (ya da besin eklerse, ki bu da otomatik acar) nutCache'teki
+    // nesne degistigi icin tekrar kapanmaz.
+    nd.meals?.forEach(m=>{ m.open = false; });
   } else {
     // Yeni gun: gunluk hedef makrolari sifirdan (2000/150/200/70) baslatmak yerine
     // kullanicinin en son girdigi hedeflerden devam ettir - her gun tekrar girmek
