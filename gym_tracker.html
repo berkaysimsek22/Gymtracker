@@ -1285,10 +1285,15 @@ function renderWeekGrid() {
   // A/B varyantini goster - "bugunun" paritesini degil.
   const prog = programForDate(weekStartDisplay);
   if(!prog) return;
-  const completedNames = new Set((sessionCache||[])
+  // Tamamlanma, o session'in GERCEKTEN LOGLANDIGI TAKVIM GUNUNE gore
+  // eslestiriliyor (sadece hafta icinde + isim eslesmesi degil) - eskiden
+  // "Gün B" gibi bir isim haftanin birden fazla gununde (ör. hem Sali hem
+  // Cuma) kullanildiginda, bir gunu tamamlamak isim eslesmesi yuzunden
+  // HENUZ GELMEMIS diger gunu de (Cuma) "tamamlandi" gosteriyordu.
+  const completedByDate = new Set((sessionCache||[])
     .filter(s => { const d = new Date(s.logged_at); return d >= weekStartDisplay && d < weekEndDisplay; })
-    .map(s => s.day_name));
-  
+    .map(s => localDateStr(new Date(s.logged_at))));
+
   // Week label
   const baseDate = new Date();
   baseDate.setDate(baseDate.getDate() + weekOffset * 7);
@@ -1302,25 +1307,26 @@ function renderWeekGrid() {
 
   document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
+    // Bu hucrenin gercek takvim tarihi (hafta ofsetiyle) - tamamlanma
+    // kontrolu artik bu tarihe gore yapiliyor, isim eslesmesine gore degil.
+    const now = new Date();
+    const dayDiff = i - now.getDay() + weekOffset * 7;
+    const dayDate = new Date(now);
+    dayDate.setDate(now.getDate() + dayDiff);
+    const isDone = completedByDate.has(localDateStr(dayDate));
     let dc = 'rest-d', lbl = 'Rest';
     const shortName = day.name ? (day.type==='rest'?'Rest':day.name.replace(/Dinlenme/gi,'Rest').replace(/Gün /gi,'G').substring(0,6)) : 'Rest';
     if(day.type!=='rest'){dc='gym';lbl=shortName}
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
     if(day.type==='amrap'){dc='amrap-d';lbl=(day.name||'WOD').substring(0,6)}
-    if(completedNames.has(day.name)){dc='done-d';lbl='✓'}
+    if(isDone){dc='done-d';lbl='✓'}
     if(i===today){dc+=' today-d';lbl=(day.type==='rest'?'Rest':shortName)}
     const isToday = i===today;
     const dayLabel = editMode && canEdit()
       ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
       : `<div class="wday-lbl">${lbl}</div>`;
-    // Calculate date for this day (with week offset)
-    const now = new Date();
-    const dayDiff = i - now.getDay() + weekOffset * 7;
-    const dayDate = new Date(now);
-    dayDate.setDate(now.getDate() + dayDiff);
     const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
     const isSelected = pi === curDay;
-    const isDone = completedNames.has(day.name);
     const boxStyle = isDone
       ? 'background:rgba(52,211,153,.25);border-color:#34d399;box-shadow:0 0 8px rgba(52,211,153,.2)'
       : isSelected
@@ -1639,7 +1645,7 @@ async function renderDayContent(di) {
       ${canEdit()&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
       ${isDayDoneThisWeek(day.name)?
-        '<button class="finish-day-btn" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399;cursor:default">✓ Tamamlandı</button>':
+        '<button class="finish-day-btn" onclick="confirmUnfinishDay('+di+')" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399" title="Tamamlanmayı kaldır">✓ Tamamlandı</button>':
         '<button class="finish-day-btn" onclick="confirmFinishDay('+di+')">🏁 Günü Tamamla</button>'
       }
     </div>
@@ -2022,6 +2028,37 @@ async function undoFinish(logId){
   t.textContent='↩ Antrenman kaydı geri alındı';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
+}
+
+// "✓ Tamamlandı" butonuna (gun zaten tamamlanmisken) tekrar basilinca o
+// gunun tamamlanma kaydini kaldirir - once onay istiyor.
+async function confirmUnfinishDay(di){
+  const prog = activeProgram()[di];
+  const uid = activeProfile()?.id;
+  if(!prog || !uid) return;
+  const now = new Date();
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - (now.getDay()===0?6:now.getDay()-1));
+  mon.setHours(0,0,0,0);
+  const nextMon = new Date(mon);
+  nextMon.setDate(mon.getDate()+7);
+  const candidates = sessionCache.filter(s=>{
+    const d = new Date(s.logged_at);
+    return s.day_name===prog.name && d>=mon && d<nextMon;
+  });
+  if(!candidates.length) return;
+  // Bugun loglanmis bir kayit varsa onu hedefle, yoksa bu hafta ayni isimle
+  // loglanmis en son kaydi hedefle (buton zaten bu kritere gore gosteriliyor).
+  const todayKey = localDateStr(now);
+  const target = candidates.find(s=>localDateStr(new Date(s.logged_at))===todayKey)
+    || candidates.sort((a,b)=>new Date(b.logged_at)-new Date(a.logged_at))[0];
+  if(!confirm(`"${prog.name}" için tamamlanma kaydı kaldırılsın mı?`)) return;
+  const {error} = await sb.from('session_logs').delete().eq('id', target.id);
+  if(error){ alert('Kaldırılamadı: '+error.message); return; }
+  await loadSessionLogs(uid);
+  document.getElementById('streakBadge').textContent=`🔥 ${sessionCache.length} antrenman`;
+  renderWeekGrid();
+  await renderDayContent(di);
 }
 
 function renderHIITDay(el,day,di){
@@ -2452,8 +2489,8 @@ function renderMeals(nd){
           onblur="setTimeout(()=>{hideFoodSugg(${mi},${fi});autoLookupFood(${mi},${fi},this.value);},250)">
         <div id="fsugg_${mi}_${fi}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a1a;border:1px solid rgba(212,245,60,.3);border-radius:8px;max-height:200px;overflow-y:auto;z-index:9999;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.8)"></div>
       </div>
-      <input class="food-inp num" placeholder="100" type="number" value="${f.amount||''}" oninput="updFoodAmount(${mi},${fi},this.value)">
-      <select class="food-inp" style="font-size:10px;padding:4px 3px" onchange="updFoodUnitOnly(${mi},${fi},this.value)">
+      <input class="food-inp num" placeholder="100" type="number" value="${f.amount||''}" id="food_amt_${mi}_${fi}" oninput="updFoodAmount(${mi},${fi},this.value)">
+      <select class="food-inp" id="food_unit_${mi}_${fi}" style="font-size:10px;padding:4px 3px" onchange="updFoodUnitOnly(${mi},${fi},this.value,this)">
         <option value="gram" ${(f.unit||'gram')==='gram'?'selected':''}>gram</option>
         <option value="adet" ${(f.unit||'')==='adet'?'selected':''}>adet</option>
         <option value="ml" ${(f.unit||'')==='ml'?'selected':''}>ml</option>
@@ -2496,37 +2533,64 @@ async function getNd(){return await loadNutrition(activeProfile()?.id,curNutDate
 async function updMeal(mi,f,v){const nd=await getNd();nd.meals[mi][f]=v;saveNutrition(activeProfile()?.id,curNutDate);}
 async function delMeal(mi){if(!confirm('Öğün silinsin mi?'))return;const nd=await getNd();nd.meals.splice(mi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
 
-async function updFoodUnitOnly(mi,fi,v){
+async function updFoodUnitOnly(mi,fi,v,selEl){
   const nd=await getNd();
   const food=nd.meals[mi].foods[fi];
-  food.unit=v;
+  const prevUnit=food.unit||'gram';
   const name=(food.name||'').toLowerCase().trim();
   const found=FOOD_DB[name]||FOOD_DB[Object.keys(FOOD_DB).find(k=>name.includes(k)||k.includes(name))||''];
   if(found){
-    // Per unit değerlerini hesapla
+    // Besinin "1 adedi kac gram" bilgisi (per_adet, 1g'den buyuk gercek bir
+    // deger olarak) tanimli degilse adet<->gram donusumu yapilamaz - eskiden
+    // bu durumda 1 adet, besinin TUM per-100g degerine esitleniyordu (ornek:
+    // zeytin icin "9 adet" = 9*115g'lik kalori sayiliyor, 1035 kcal gibi
+    // absurt sonuclar cikiyordu). Artik bilgi yoksa donusume izin verilmiyor,
+    // secim eski birime geri alinip kullaniciya bilgi veriliyor.
+    const nativeIsPiece = !!(found.unit && found.unit.includes('adet'));
+    const gramsPerPiece = (found.per_adet && found.per_adet > 1) ? found.per_adet : null;
     let kcalPer1, protPer1, carbPer1, fatPer1, defaultAmt;
     if(v==='adet'){
-      const g=found.per_adet||found.per; // 1 adet kaç gram
-      const r=g/found.per;
-      kcalPer1=Math.round(found.kcal*r);
-      protPer1=Math.round(found.protein*r*10)/10;
-      carbPer1=Math.round(found.carb*r*10)/10;
-      fatPer1=Math.round((found.fat||0)*r*10)/10;
-      defaultAmt=parseFloat(food.amount)||1;
-    } else if(v==='ml'){
-      kcalPer1=found.kcal/found.per; // per 1ml
-      protPer1=found.protein/found.per;
-      carbPer1=found.carb/found.per;
-      fatPer1=(found.fat||0)/found.per;
-      defaultAmt=parseFloat(food.amount)||100;
+      if(nativeIsPiece){
+        // Besin zaten adet bazli (ör. yumurta: per=1, unit='adet') - native degerler kullanilir
+        kcalPer1=found.kcal/found.per;
+        protPer1=found.protein/found.per;
+        carbPer1=found.carb/found.per;
+        fatPer1=(found.fat||0)/found.per;
+      } else if(gramsPerPiece){
+        const r=gramsPerPiece/found.per;
+        kcalPer1=found.kcal*r;
+        protPer1=found.protein*r;
+        carbPer1=found.carb*r;
+        fatPer1=(found.fat||0)*r;
+      } else {
+        if(selEl) selEl.value = prevUnit;
+        alert('Bu besin için adet bilgisi tanımlı değil, gram/ml kullan.');
+        return;
+      }
+      defaultAmt=1;
     } else {
-      // gram - per 1g
-      kcalPer1=found.kcal/found.per;
-      protPer1=found.protein/found.per;
-      carbPer1=found.carb/found.per;
-      fatPer1=(found.fat||0)/found.per;
-      defaultAmt=parseFloat(food.amount)||100;
+      // gram/ml/porsiyon vb.
+      if(!nativeIsPiece){
+        kcalPer1=found.kcal/found.per;
+        protPer1=found.protein/found.per;
+        carbPer1=found.carb/found.per;
+        fatPer1=(found.fat||0)/found.per;
+      } else if(gramsPerPiece){
+        // Once 1 adedin degerini, sonra 1 gramlik degerini bul
+        const kcalPerPiece=found.kcal/found.per, protPerPiece=found.protein/found.per;
+        const carbPerPiece=found.carb/found.per, fatPerPiece=(found.fat||0)/found.per;
+        kcalPer1=kcalPerPiece/gramsPerPiece;
+        protPer1=protPerPiece/gramsPerPiece;
+        carbPer1=carbPerPiece/gramsPerPiece;
+        fatPer1=fatPerPiece/gramsPerPiece;
+      } else {
+        if(selEl) selEl.value = prevUnit;
+        alert('Bu besin için gram bilgisi tanımlı değil, adet kullan.');
+        return;
+      }
+      defaultAmt=100;
     }
+    food.unit=v;
     food._kcalPer1=kcalPer1;
     food._protPer1=protPer1;
     food._carbPer1=carbPer1;
@@ -2536,11 +2600,15 @@ async function updFoodUnitOnly(mi,fi,v){
     food.protein=String(Math.round(protPer1*defaultAmt*10)/10);
     food.carb=String(Math.round(carbPer1*defaultAmt*10)/10);
     food.fat=String(Math.round(fatPer1*defaultAmt*10)/10);
+  } else {
+    food.unit=v;
   }
+  const ae=document.getElementById('food_amt_'+mi+'_'+fi);
   const ke=document.getElementById('food_kcal_'+mi+'_'+fi);
   const pe=document.getElementById('food_prot_'+mi+'_'+fi);
   const ce=document.getElementById('food_carb_'+mi+'_'+fi);
   const fe=document.getElementById('food_fat_'+mi+'_'+fi);
+  if(ae)ae.value=food.amount||'';
   if(ke)ke.value=food.kcal||'';
   if(pe)pe.value=food.protein||'';
   if(ce)ce.value=food.carb||'';
@@ -2613,7 +2681,7 @@ async function updFoodAmount(mi,fi,newAmount){
   updateNutTotals();
 }
 async function delFood(mi,fi){const nd=await getNd();nd.meals[mi].foods.splice(fi,1);saveNutrition(activeProfile()?.id,curNutDate);renderNutrition();}
-async function addFood(mi){const nd=await getNd();nd.meals[mi].foods.push({name:'',amount:'',kcal:'',protein:'',carb:''});nd.meals[mi].open=true;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
+async function addFood(mi){const nd=await getNd();nd.meals[mi].foods.push({name:'',amount:'',kcal:'',protein:'',carb:'',fat:'',unit:'gram'});nd.meals[mi].open=true;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
 async function toggleMeal(mi){const nd=await getNd();nd.meals[mi].open=!nd.meals[mi].open;saveNutrition(activeProfile()?.id,curNutDate);renderMeals(nd);}
 // gemini-proxy artik Authorization header'inda gecerli bir oturum
 // token'i istiyor (anonim erisim kapatildi) - her cagriyi bu helper'dan
@@ -3569,6 +3637,33 @@ function rememberFood(uid, name, entry){
   try{ localStorage.setItem('customFoodDB_'+uid, JSON.stringify(customFoodDB)); }catch(e){ console.error('persist customFoodDB error:', e); }
 }
 
+async function lookupOpenFoodFacts(name){
+  try{
+    const url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + encodeURIComponent(name) + '&search_simple=1&action=process&json=1&page_size=5&lc=tr';
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const products = data.products || [];
+    for(const p of products){
+      const n = p.nutriments || {};
+      const kcal = n['energy-kcal_100g'];
+      if(kcal === undefined || kcal === null) continue;
+      return {
+        kcal: Math.round(kcal),
+        protein: Math.round((n.proteins_100g||0) * 10) / 10,
+        carb: Math.round((n.carbohydrates_100g||0) * 10) / 10,
+        fat: Math.round((n.fat_100g||0) * 10) / 10,
+        per: 100,
+        unit: 'gram',
+      };
+    }
+    return null;
+  }catch(e){
+    console.log('OpenFoodFacts lookup failed:', e);
+    return null;
+  }
+}
+
 async function autoLookupFood(mi, fi, name) {
   if(!name || name.length < 2) return;
   const key = name.toLowerCase().trim();
@@ -3605,15 +3700,57 @@ async function autoLookupFood(mi, fi, name) {
     const prE=document.getElementById('food_prot_'+mi+'_'+fi);
     const caE=document.getElementById('food_carb_'+mi+'_'+fi);
     const faE=document.getElementById('food_fat_'+mi+'_'+fi);
-    const amE=document.getElementById ? document.querySelector('#finp_'+mi+'_'+fi) : null;
+    const amE=document.getElementById('food_amt_'+mi+'_'+fi);
+    const unE=document.getElementById('food_unit_'+mi+'_'+fi);
     if(kcE)kcE.value=food.kcal||'';
     if(prE)prE.value=food.protein||'';
     if(caE)caE.value=food.carb||'';
     if(faE)faE.value=food.fat||'';
+    if(amE)amE.value=food.amount||'';
+    if(unE)unE.value=food.unit||'gram';
     updateNutTotals();
     return;
   }
-  
+
+  // Not in local DB - try OpenFoodFacts before asking AI
+  if(name.length >= 3){
+    const offFound = await lookupOpenFoodFacts(name);
+    if(offFound){
+      const nd = await loadNutrition(activeProfile()?.id, curNutDate);
+      if(!nd.meals[mi] || !nd.meals[mi].foods[fi]) return;
+      const food = nd.meals[mi].foods[fi];
+      food._baseKcal = offFound.kcal;
+      food._baseProtein = offFound.protein;
+      food._baseCarb = offFound.carb;
+      food._baseFat = offFound.fat;
+      food._basePer = offFound.per;
+      const currentAmount = parseFloat(food.amount) || offFound.per;
+      const ratio = currentAmount / offFound.per;
+      food.kcal = String(Math.round(offFound.kcal * ratio));
+      food.protein = String(Math.round(offFound.protein * ratio * 10) / 10);
+      food.carb = String(Math.round(offFound.carb * ratio * 10) / 10);
+      food.fat = String(Math.round(offFound.fat * ratio * 10) / 10);
+      if(!food.amount) food.amount = String(offFound.per);
+      if(!food.unit) food.unit = 'gram';
+      rememberFood(activeProfile()?.id, key, offFound);
+      saveNutrition(activeProfile()?.id, curNutDate);
+      const kcE=document.getElementById('food_kcal_'+mi+'_'+fi);
+      const prE=document.getElementById('food_prot_'+mi+'_'+fi);
+      const caE=document.getElementById('food_carb_'+mi+'_'+fi);
+      const faE=document.getElementById('food_fat_'+mi+'_'+fi);
+      const amE=document.getElementById('food_amt_'+mi+'_'+fi);
+      const unE=document.getElementById('food_unit_'+mi+'_'+fi);
+      if(kcE)kcE.value=food.kcal||'';
+      if(prE)prE.value=food.protein||'';
+      if(caE)caE.value=food.carb||'';
+      if(faE)faE.value=food.fat||'';
+      if(amE)amE.value=food.amount||'';
+      if(unE)unE.value=food.unit||'gram';
+      updateNutTotals();
+      return;
+    }
+  }
+
   // Show save to DB button
   const existingBtn = document.getElementById('saveToDb_'+mi+'_'+fi);
   if(existingBtn) existingBtn.remove();
@@ -3624,8 +3761,8 @@ async function autoLookupFood(mi, fi, name) {
   saveBtn.onclick = function(){saveFoodToDB(mi,fi);this.remove();};
   const inp = document.getElementById('finp_'+mi+'_'+fi);
   if(inp && inp.parentElement) inp.parentElement.appendChild(saveBtn);
-  
-  // If not in local DB, ask AI
+
+  // If not in local DB or OpenFoodFacts, ask AI
   if(name.length < 3) return;
   try {
     const response = await geminiFetch({
