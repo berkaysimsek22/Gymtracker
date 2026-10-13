@@ -1285,10 +1285,15 @@ function renderWeekGrid() {
   // A/B varyantini goster - "bugunun" paritesini degil.
   const prog = programForDate(weekStartDisplay);
   if(!prog) return;
-  const completedNames = new Set((sessionCache||[])
+  // Tamamlanma, o session'in GERCEKTEN LOGLANDIGI TAKVIM GUNUNE gore
+  // eslestiriliyor (sadece hafta icinde + isim eslesmesi degil) - eskiden
+  // "Gün B" gibi bir isim haftanin birden fazla gununde (ör. hem Sali hem
+  // Cuma) kullanildiginda, bir gunu tamamlamak isim eslesmesi yuzunden
+  // HENUZ GELMEMIS diger gunu de (Cuma) "tamamlandi" gosteriyordu.
+  const completedByDate = new Set((sessionCache||[])
     .filter(s => { const d = new Date(s.logged_at); return d >= weekStartDisplay && d < weekEndDisplay; })
-    .map(s => s.day_name));
-  
+    .map(s => localDateStr(new Date(s.logged_at))));
+
   // Week label
   const baseDate = new Date();
   baseDate.setDate(baseDate.getDate() + weekOffset * 7);
@@ -1302,25 +1307,26 @@ function renderWeekGrid() {
 
   document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
+    // Bu hucrenin gercek takvim tarihi (hafta ofsetiyle) - tamamlanma
+    // kontrolu artik bu tarihe gore yapiliyor, isim eslesmesine gore degil.
+    const now = new Date();
+    const dayDiff = i - now.getDay() + weekOffset * 7;
+    const dayDate = new Date(now);
+    dayDate.setDate(now.getDate() + dayDiff);
+    const isDone = completedByDate.has(localDateStr(dayDate));
     let dc = 'rest-d', lbl = 'Rest';
     const shortName = day.name ? (day.type==='rest'?'Rest':day.name.replace(/Dinlenme/gi,'Rest').replace(/Gün /gi,'G').substring(0,6)) : 'Rest';
     if(day.type!=='rest'){dc='gym';lbl=shortName}
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
     if(day.type==='amrap'){dc='amrap-d';lbl=(day.name||'WOD').substring(0,6)}
-    if(completedNames.has(day.name)){dc='done-d';lbl='✓'}
+    if(isDone){dc='done-d';lbl='✓'}
     if(i===today){dc+=' today-d';lbl=(day.type==='rest'?'Rest':shortName)}
     const isToday = i===today;
     const dayLabel = editMode && canEdit()
       ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
       : `<div class="wday-lbl">${lbl}</div>`;
-    // Calculate date for this day (with week offset)
-    const now = new Date();
-    const dayDiff = i - now.getDay() + weekOffset * 7;
-    const dayDate = new Date(now);
-    dayDate.setDate(now.getDate() + dayDiff);
     const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
     const isSelected = pi === curDay;
-    const isDone = completedNames.has(day.name);
     const boxStyle = isDone
       ? 'background:rgba(52,211,153,.25);border-color:#34d399;box-shadow:0 0 8px rgba(52,211,153,.2)'
       : isSelected
