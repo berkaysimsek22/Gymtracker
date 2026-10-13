@@ -319,6 +319,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .meal-cals{font-size:12px;font-weight:500;color:var(--acc);flex-shrink:0;font-family:'Archivo',monospace}
 .meal-arr{color:var(--muted);font-size:12px;transition:transform .2s;flex-shrink:0}
 .meal-card.open .meal-arr{transform:rotate(180deg)}
+.meal-macro-sum{display:flex;gap:10px;padding:0 13px 10px;font-size:10px;font-family:'Archivo',monospace;cursor:pointer}
 .meal-items{display:none;border-top:1px solid var(--border)}
 .meal-card.open .meal-items{display:block}
 .food-row{display:grid;grid-template-columns:1fr 58px 52px 26px;gap:4px;padding:7px 13px 4px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
@@ -1320,7 +1321,7 @@ function renderWeekGrid() {
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
     if(day.type==='amrap'){dc='amrap-d';lbl=(day.name||'WOD').substring(0,6)}
     if(isDone){dc='done-d';lbl='✓'}
-    if(i===today){dc+=' today-d';lbl=(day.type==='rest'?'Rest':shortName)}
+    if(i===today){dc+=' today-d';if(!isDone)lbl=(day.type==='rest'?'Rest':shortName)}
     const isToday = i===today;
     const dayLabel = editMode && canEdit()
       ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
@@ -1644,7 +1645,7 @@ async function renderDayContent(di) {
       <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">💪</button>
       ${canEdit()&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
-      ${isDayDoneThisWeek(day.name)?
+      ${isDayDoneThisWeek(day.name, di)?
         '<button class="finish-day-btn" onclick="confirmUnfinishDay('+di+')" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399" title="Tamamlanmayı kaldır">✓ Tamamlandı</button>':
         '<button class="finish-day-btn" onclick="confirmFinishDay('+di+')">🏁 Günü Tamamla</button>'
       }
@@ -1957,17 +1958,25 @@ async function clearDaySets(di){
 }
 
 
-function isDayDoneThisWeek(dayName){
+// Program dizisindeki "di" indeksinin (prog[di]) BU HAFTA icindeki gercek
+// takvim tarihini dondurur - renderWeekGrid'in hucre tarihi hesabiyla ayni
+// mantik (pi -> haftanin gunu -> tarih), saat 12:00'ye sabitlenmis (gun
+// sinirinda UTC kaymasi olmasin diye).
+function dateForDayIndex(di){
+  const i = (di+1) % 7; // pi -> haftanin günü (0=Paz..6=Cmt, Date.getDay() ile ayni)
   const now = new Date();
-  const mon = new Date(now);
-  mon.setDate(now.getDate() - (now.getDay()===0?6:now.getDay()-1));
-  mon.setHours(0,0,0,0);
-  const nextMon = new Date(mon);
-  nextMon.setDate(mon.getDate()+7);
-  return sessionCache.some(s=>{
-    const d = new Date(s.logged_at);
-    return s.day_name===dayName && d>=mon && d<nextMon;
-  });
+  const d = new Date(now);
+  d.setDate(now.getDate() + (i - now.getDay()));
+  d.setHours(12,0,0,0);
+  return d;
+}
+
+// "di" gunu, o gunun GERCEK TAKVIM TARIHINDE tamamlanmis mi? (sadece isim +
+// bu hafta degil - eskiden ayni isimli (ör. "Gün B") baska bir gun bu hafta
+// loglandiysa, ilgisiz bir gun de yanlislikla "tamamlandi" gosteriyordu.)
+function isDayDoneThisWeek(dayName, di){
+  const targetKey = localDateStr(dateForDayIndex(di));
+  return sessionCache.some(s=>s.day_name===dayName && localDateStr(new Date(s.logged_at))===targetKey);
 }
 
 function confirmFinishDay(di){
@@ -2002,7 +2011,12 @@ function confirmFinishDay(di){
 async function finishDay(di,sets,vol){
   document.getElementById('finishModal')?.remove();
   const prog=activeProgram()[di],uid=activeProfile()?.id;
-  const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol}).select().single();
+  // logged_at'i bu gunun (di) GERCEK TAKVIM TARIHINE sabitliyoruz - eskiden
+  // bos birakilinca Supabase'in varsayilani (insert anindaki "simdi") kullaniliyordu,
+  // bu da butona basilan an baska bir gunun icerigini goruntuluyorsan (ör. curDay
+  // Pazartesi'de kalmisken Sali gunu basmak) tamamlanmayi YANLIS takvim gunune
+  // (Sali) yaziyordu.
+  const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,logged_at:dateForDayIndex(di).toISOString()}).select().single();
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
   document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
@@ -2036,22 +2050,11 @@ async function confirmUnfinishDay(di){
   const prog = activeProgram()[di];
   const uid = activeProfile()?.id;
   if(!prog || !uid) return;
-  const now = new Date();
-  const mon = new Date(now);
-  mon.setDate(now.getDate() - (now.getDay()===0?6:now.getDay()-1));
-  mon.setHours(0,0,0,0);
-  const nextMon = new Date(mon);
-  nextMon.setDate(mon.getDate()+7);
-  const candidates = sessionCache.filter(s=>{
-    const d = new Date(s.logged_at);
-    return s.day_name===prog.name && d>=mon && d<nextMon;
-  });
-  if(!candidates.length) return;
-  // Bugun loglanmis bir kayit varsa onu hedefle, yoksa bu hafta ayni isimle
-  // loglanmis en son kaydi hedefle (buton zaten bu kritere gore gosteriliyor).
-  const todayKey = localDateStr(now);
-  const target = candidates.find(s=>localDateStr(new Date(s.logged_at))===todayKey)
-    || candidates.sort((a,b)=>new Date(b.logged_at)-new Date(a.logged_at))[0];
+  // Buton zaten isDayDoneThisWeek(day.name, di) kriterine gore gosteriliyor -
+  // ayni mantikla, di'nin gercek takvim tarihine ait kaydi hedefliyoruz.
+  const targetKey = localDateStr(dateForDayIndex(di));
+  const target = sessionCache.find(s=>s.day_name===prog.name && localDateStr(new Date(s.logged_at))===targetKey);
+  if(!target) return;
   if(!confirm(`"${prog.name}" için tamamlanma kaydı kaldırılsın mı?`)) return;
   const {error} = await sb.from('session_logs').delete().eq('id', target.id);
   if(error){ alert('Kaldırılamadı: '+error.message); return; }
@@ -2479,7 +2482,8 @@ function renderMeals(nd){
   const el=document.getElementById('mealsList');
   if(!nd.meals?.length){el.innerHTML='<div class="empty-state">Henüz öğün eklenmedi.</div>';return;}
   el.innerHTML=nd.meals.map((meal,mi)=>{
-    let mc=0;meal.foods?.forEach(f=>mc+=parseFloat(f.kcal||0));
+    let mc=0,mp=0,mcb=0,mf=0;
+    meal.foods?.forEach(f=>{mc+=parseFloat(f.kcal||0);mp+=parseFloat(f.protein||0);mcb+=parseFloat(f.carb||0);mf+=parseFloat(f.fat||0);});
     const foods=(meal.foods||[]).map((f,fi)=>`<div class="food-row">
       <div style="position:relative;z-index:100">
         <input class="food-inp" placeholder="Yemek ara..." value="${f.name||''}" 
@@ -2514,6 +2518,12 @@ function renderMeals(nd){
         <div class="meal-cals" id="meal_kcal_${mi}">${Math.round(mc)} kcal</div>
         <button class="del-btn" onclick="event.stopPropagation();delMeal(${mi})">🗑</button>
         <div class="meal-arr">⌄</div>
+      </div>
+      <div class="meal-macro-sum" id="meal_macrosum_${mi}" onclick="toggleMeal(${mi})">
+        <span style="color:#ef4444">${Math.round(mp*10)/10}g P</span>
+        <span style="color:#f59e0b">${Math.round(mcb*10)/10}g K</span>
+        <span style="color:#8b5cf6">${Math.round(mf*10)/10}g Y</span>
+        <span style="color:var(--muted)">· ${meal.foods?.length||0} besin</span>
       </div>
       <div class="meal-items">
         <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Birim</div><div class="fh"></div></div>
@@ -2638,7 +2648,14 @@ function updateNutTotals(){
   const ct=document.getElementById('calTotal');
   const pct=Math.min(100,Math.round(tk/t.kcal*100));
   if(ct){ct.innerHTML='<div><div class="cv" style="color:'+(pct>100?'var(--acc2)':'var(--acc)')+'">'+tk+'</div><div style="font-size:11px;color:var(--muted)">/ '+t.kcal+' kcal ('+pct+'%)</div></div><div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:'+(t.kcal-tk<0?'var(--acc2)':'var(--muted)')+'">'+( t.kcal-tk)+'</div></div>';}
-  nd.meals&&nd.meals.forEach(function(m,mi){let mc=0;m.foods&&m.foods.forEach(function(f){mc+=parseFloat(f.kcal||0);});const badge=document.getElementById('meal_kcal_'+mi);if(badge)badge.textContent=Math.round(mc)+' kcal';});
+  nd.meals&&nd.meals.forEach(function(m,mi){
+    let mc=0,mp=0,mcb=0,mf=0;
+    m.foods&&m.foods.forEach(function(f){mc+=parseFloat(f.kcal||0);mp+=parseFloat(f.protein||0);mcb+=parseFloat(f.carb||0);mf+=parseFloat(f.fat||0);});
+    const badge=document.getElementById('meal_kcal_'+mi);
+    if(badge)badge.textContent=Math.round(mc)+' kcal';
+    const sumEl=document.getElementById('meal_macrosum_'+mi);
+    if(sumEl)sumEl.innerHTML='<span style="color:#ef4444">'+(Math.round(mp*10)/10)+'g P</span><span style="color:#f59e0b">'+(Math.round(mcb*10)/10)+'g K</span><span style="color:#8b5cf6">'+(Math.round(mf*10)/10)+'g Y</span><span style="color:var(--muted)">· '+(m.foods?.length||0)+' besin</span>';
+  });
 }
 
 async function updFoodAmount(mi,fi,newAmount){
