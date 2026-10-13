@@ -319,6 +319,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .meal-cals{font-size:12px;font-weight:500;color:var(--acc);flex-shrink:0;font-family:'Archivo',monospace}
 .meal-arr{color:var(--muted);font-size:12px;transition:transform .2s;flex-shrink:0}
 .meal-card.open .meal-arr{transform:rotate(180deg)}
+.meal-macro-sum{display:flex;gap:10px;padding:0 13px 10px;font-size:10px;font-family:'Archivo',monospace;cursor:pointer}
 .meal-items{display:none;border-top:1px solid var(--border)}
 .meal-card.open .meal-items{display:block}
 .food-row{display:grid;grid-template-columns:1fr 58px 52px 26px;gap:4px;padding:7px 13px 4px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
@@ -2479,7 +2480,8 @@ function renderMeals(nd){
   const el=document.getElementById('mealsList');
   if(!nd.meals?.length){el.innerHTML='<div class="empty-state">Henüz öğün eklenmedi.</div>';return;}
   el.innerHTML=nd.meals.map((meal,mi)=>{
-    let mc=0;meal.foods?.forEach(f=>mc+=parseFloat(f.kcal||0));
+    let mc=0,mp=0,mcb=0,mf=0;
+    meal.foods?.forEach(f=>{mc+=parseFloat(f.kcal||0);mp+=parseFloat(f.protein||0);mcb+=parseFloat(f.carb||0);mf+=parseFloat(f.fat||0);});
     const foods=(meal.foods||[]).map((f,fi)=>`<div class="food-row">
       <div style="position:relative;z-index:100">
         <input class="food-inp" placeholder="Yemek ara..." value="${f.name||''}" 
@@ -2514,6 +2516,12 @@ function renderMeals(nd){
         <div class="meal-cals" id="meal_kcal_${mi}">${Math.round(mc)} kcal</div>
         <button class="del-btn" onclick="event.stopPropagation();delMeal(${mi})">🗑</button>
         <div class="meal-arr">⌄</div>
+      </div>
+      <div class="meal-macro-sum" id="meal_macrosum_${mi}" onclick="toggleMeal(${mi})">
+        <span style="color:#ef4444">${Math.round(mp*10)/10}g P</span>
+        <span style="color:#f59e0b">${Math.round(mcb*10)/10}g K</span>
+        <span style="color:#8b5cf6">${Math.round(mf*10)/10}g Y</span>
+        <span style="color:var(--muted)">· ${meal.foods?.length||0} besin</span>
       </div>
       <div class="meal-items">
         <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Birim</div><div class="fh"></div></div>
@@ -2638,7 +2646,14 @@ function updateNutTotals(){
   const ct=document.getElementById('calTotal');
   const pct=Math.min(100,Math.round(tk/t.kcal*100));
   if(ct){ct.innerHTML='<div><div class="cv" style="color:'+(pct>100?'var(--acc2)':'var(--acc)')+'">'+tk+'</div><div style="font-size:11px;color:var(--muted)">/ '+t.kcal+' kcal ('+pct+'%)</div></div><div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:'+(t.kcal-tk<0?'var(--acc2)':'var(--muted)')+'">'+( t.kcal-tk)+'</div></div>';}
-  nd.meals&&nd.meals.forEach(function(m,mi){let mc=0;m.foods&&m.foods.forEach(function(f){mc+=parseFloat(f.kcal||0);});const badge=document.getElementById('meal_kcal_'+mi);if(badge)badge.textContent=Math.round(mc)+' kcal';});
+  nd.meals&&nd.meals.forEach(function(m,mi){
+    let mc=0,mp=0,mcb=0,mf=0;
+    m.foods&&m.foods.forEach(function(f){mc+=parseFloat(f.kcal||0);mp+=parseFloat(f.protein||0);mcb+=parseFloat(f.carb||0);mf+=parseFloat(f.fat||0);});
+    const badge=document.getElementById('meal_kcal_'+mi);
+    if(badge)badge.textContent=Math.round(mc)+' kcal';
+    const sumEl=document.getElementById('meal_macrosum_'+mi);
+    if(sumEl)sumEl.innerHTML='<span style="color:#ef4444">'+(Math.round(mp*10)/10)+'g P</span><span style="color:#f59e0b">'+(Math.round(mcb*10)/10)+'g K</span><span style="color:#8b5cf6">'+(Math.round(mf*10)/10)+'g Y</span><span style="color:var(--muted)">· '+(m.foods?.length||0)+' besin</span>';
+  });
 }
 
 async function updFoodAmount(mi,fi,newAmount){
