@@ -2515,8 +2515,7 @@ function renderMeals(nd){
         <input class="food-inp num" placeholder="karb" type="number" value="${f.carb||''}" id="food_carb_${mi}_${fi}" oninput="updFood(${mi},${fi},'carb',this.value)" style="border-color:rgba(245,158,11,.15)">
         <input class="food-inp num" placeholder="yağ" type="number" value="${f.fat||''}" id="food_fat_${mi}_${fi}" oninput="updFood(${mi},${fi},'fat',this.value)" style="border-color:rgba(139,92,246,.15)">
         <button class="del-btn" onclick="delFood(${mi},${fi})">✕</button>
-      </div>
-    </div>`).join('');
+      </div>`).join('');
     return `<div class="meal-card${meal.open?' open':''}">
       <div class="meal-head" onclick="toggleMeal(${mi})">
         <input class="meal-time-inp" value="${meal.time||''}" placeholder="00:00" onclick="event.stopPropagation()" onchange="updMeal(${mi},'time',this.value)">
