@@ -1645,7 +1645,7 @@ async function renderDayContent(di) {
       ${canEdit()&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
       ${isDayDoneThisWeek(day.name)?
-        '<button class="finish-day-btn" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399;cursor:default">✓ Tamamlandı</button>':
+        '<button class="finish-day-btn" onclick="confirmUnfinishDay('+di+')" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399" title="Tamamlanmayı kaldır">✓ Tamamlandı</button>':
         '<button class="finish-day-btn" onclick="confirmFinishDay('+di+')">🏁 Günü Tamamla</button>'
       }
     </div>
@@ -2028,6 +2028,37 @@ async function undoFinish(logId){
   t.textContent='↩ Antrenman kaydı geri alındı';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
+}
+
+// "✓ Tamamlandı" butonuna (gun zaten tamamlanmisken) tekrar basilinca o
+// gunun tamamlanma kaydini kaldirir - once onay istiyor.
+async function confirmUnfinishDay(di){
+  const prog = activeProgram()[di];
+  const uid = activeProfile()?.id;
+  if(!prog || !uid) return;
+  const now = new Date();
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - (now.getDay()===0?6:now.getDay()-1));
+  mon.setHours(0,0,0,0);
+  const nextMon = new Date(mon);
+  nextMon.setDate(mon.getDate()+7);
+  const candidates = sessionCache.filter(s=>{
+    const d = new Date(s.logged_at);
+    return s.day_name===prog.name && d>=mon && d<nextMon;
+  });
+  if(!candidates.length) return;
+  // Bugun loglanmis bir kayit varsa onu hedefle, yoksa bu hafta ayni isimle
+  // loglanmis en son kaydi hedefle (buton zaten bu kritere gore gosteriliyor).
+  const todayKey = localDateStr(now);
+  const target = candidates.find(s=>localDateStr(new Date(s.logged_at))===todayKey)
+    || candidates.sort((a,b)=>new Date(b.logged_at)-new Date(a.logged_at))[0];
+  if(!confirm(`"${prog.name}" için tamamlanma kaydı kaldırılsın mı?`)) return;
+  const {error} = await sb.from('session_logs').delete().eq('id', target.id);
+  if(error){ alert('Kaldırılamadı: '+error.message); return; }
+  await loadSessionLogs(uid);
+  document.getElementById('streakBadge').textContent=`🔥 ${sessionCache.length} antrenman`;
+  renderWeekGrid();
+  await renderDayContent(di);
 }
 
 function renderHIITDay(el,day,di){
