@@ -319,7 +319,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .meal-cals{font-size:12px;font-weight:500;color:var(--acc);flex-shrink:0;font-family:'Archivo',monospace}
 .meal-arr{color:var(--muted);font-size:12px;transition:transform .2s;flex-shrink:0}
 .meal-card.open .meal-arr{transform:rotate(180deg)}
-.meal-macro-sum{display:flex;gap:10px;padding:8px 13px;font-size:10px;font-family:'Archivo',monospace}
+.meal-macro-sum{display:flex;gap:10px;padding:0 13px 10px;font-size:10px;font-family:'Archivo',monospace;cursor:pointer}
 .meal-items{display:none;border-top:1px solid var(--border)}
 .meal-card.open .meal-items{display:block}
 .food-row{display:grid;grid-template-columns:1fr 58px 52px 26px;gap:4px;padding:7px 13px 4px;align-items:center;border-top:1px solid rgba(255,255,255,.03)}
@@ -2525,13 +2525,13 @@ function renderMeals(nd){
         <button class="del-btn" onclick="event.stopPropagation();delMeal(${mi})">🗑</button>
         <div class="meal-arr">⌄</div>
       </div>
+      <div class="meal-macro-sum" id="meal_macrosum_${mi}" onclick="toggleMeal(${mi})">
+        <span style="color:#ef4444">${Math.round(mp*10)/10}g P</span>
+        <span style="color:#f59e0b">${Math.round(mcb*10)/10}g K</span>
+        <span style="color:#8b5cf6">${Math.round(mf*10)/10}g Y</span>
+        <span style="color:var(--muted)">· ${meal.foods?.length||0} besin</span>
+      </div>
       <div class="meal-items">
-        <div class="meal-macro-sum" id="meal_macrosum_${mi}">
-          <span style="color:#ef4444">${Math.round(mp*10)/10}g P</span>
-          <span style="color:#f59e0b">${Math.round(mcb*10)/10}g K</span>
-          <span style="color:#8b5cf6">${Math.round(mf*10)/10}g Y</span>
-          <span style="color:var(--muted)">· ${meal.foods?.length||0} besin</span>
-        </div>
         <div class="food-grid-head"><div class="fh" style="text-align:left">Besin</div><div class="fh">Miktar</div><div class="fh">Birim</div><div class="fh"></div></div>
       <div class="food-grid-head-macros"><div class="fh" style="color:#ef4444">Kcal</div><div class="fh" style="color:#ef4444">Prot</div><div class="fh" style="color:#f59e0b">Karb</div><div class="fh" style="color:#8b5cf6">Yağ</div></div>
         ${foods}
