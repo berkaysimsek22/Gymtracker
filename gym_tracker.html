@@ -347,15 +347,10 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .wcup.filled{background:rgba(56,182,255,.15);border-color:rgba(56,182,255,.4)}
 .water-lbl{font-size:11px;color:var(--muted);margin-top:7px}
 
-/* HISTORY / STATS */
-.history-header,.stats-header{padding:18px 16px 0}
-.history-header h2,.stats-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;margin-bottom:10px}
+/* STATS */
+.stats-header{padding:18px 16px 0}
+.stats-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;margin-bottom:10px}
 .empty-state{text-align:center;padding:36px 20px;color:var(--muted);font-size:12px;font-style:italic}
-.hist-card{margin:0 16px 6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px}
-.hc-day{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:.3px}
-.hc-date{font-size:10px;color:var(--muted)}
-.hc-stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
-.hcs{font-size:11px;color:var(--muted)}
 .hcs strong{color:var(--text);font-weight:500}
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:0 16px;margin-bottom:14px}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px}
@@ -442,14 +437,6 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
 .prog-suggestion{border-radius:12px;padding:16px}
 .prog-day-row{padding:8px 0;font-size:12px}
 .prof-row{gap:10px}
-
-/* ── HISTORY MOBILE ── */
-.hist-card{border-radius:14px;padding:16px;margin-bottom:10px}
-.hc-day{font-size:15px;font-weight:700}
-.hc-date{font-size:12px;margin-top:3px}
-.hc-stats{margin-top:10px;gap:12px}
-.hcs{font-size:12px}
-.hcs strong{font-size:16px}
 
 /* ── STATS MOBILE ── */
 .stat-card{padding:18px 16px;border-radius:14px}
@@ -660,11 +647,6 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div class="day-content" id="dayContent"></div>
   </div>
 
-  <div class="screen" id="screen-history">
-    <div class="history-header"><h2>Geçmiş Seanslar</h2></div>
-    <div id="historyList"></div>
-  </div>
-
   <div class="screen" id="screen-stats">
     <div class="stats-header"><h2>İstatistikler</h2></div>
     <div class="stats-grid" id="statsGrid"></div>
@@ -742,7 +724,6 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <button class="nav-btn" onclick="showScreen('workout',this)"><div class="nav-icon">🏋️</div>Antrenman</button>
     <button class="nav-btn" onclick="showScreen('nutrition',this)"><div class="nav-icon">🥗</div>Beslenme</button>
     <button class="nav-btn" onclick="showScreen('workouts',this)"><div class="nav-icon">📚</div>Workouts</button>
-    <button class="nav-btn" onclick="showScreen('history',this)"><div class="nav-icon">📋</div>Geçmiş</button>
     <button class="nav-btn" onclick="showScreen('stats',this)"><div class="nav-icon">📊</div>İstatistik</button>
     <button class="nav-btn" onclick="showScreen('profile',this)"><div class="nav-icon">👤</div>Profil</button>
   </div>
@@ -1270,7 +1251,6 @@ async function switchViewUser(userId) {
     if(screenId==='screen-dashboard') renderDashboard();
     if(screenId==='screen-nutrition') renderNutrition();
     if(screenId==='screen-stats') renderStats();
-    if(screenId==='screen-history') renderHistory();
     if(screenId==='screen-profile') renderProfileScreen();
     if(screenId==='screen-workout') {renderDayTabs();renderDayContent(curDay);}
   }
@@ -2519,28 +2499,6 @@ function updRT(){const m=Math.floor(restSecs/60),s=restSecs%60;document.getEleme
 function stopRest(){clearInterval(restIv);document.getElementById('restTimer').classList.remove('show');}
 function addRest(s){restSecs+=s;updRT();}
 
-// ── HISTORY ──
-function renderHistory(){
-  const el=document.getElementById('historyList');
-  if(!sessionCache.length){el.innerHTML='<div class="empty-state">Henüz tamamlanan antrenman yok.</div>';return;}
-  el.innerHTML=sessionCache.map((l,i)=>`<div class="hist-card" style="position:relative">
-    <div class="hc-day">${l.day_name}</div>
-    <div class="hc-date">${new Date(l.logged_at).toLocaleDateString('tr-TR')} ${new Date(l.logged_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</div>
-    <div class="hc-stats"><span class="hcs"><strong>${l.sets_done}</strong> set</span><span class="hcs"><strong>${l.volume}</strong> kg hacim</span></div>
-    <button onclick="deleteSession('${l.id}')" style="position:absolute;top:8px;right:8px;background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.2);color:#ff5c38;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer">Sil</button>
-  </div>`).join('');
-}
-
-async function deleteSession(id){
-  if(!confirm('Bu antrenman kaydı silinsin mi?')) return;
-  const {error} = await sb.from('session_logs').delete().eq('id', id);
-  if(error){alert('Silinemedi: '+error.message);return;}
-  await loadSessionLogs(activeProfile()?.id);
-  document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
-  renderHistory();
-  renderWeekGrid();
-}
-
 async function renderWeightChart(p){
   const el = document.getElementById('weightChartSection');
   if(!el) return;
@@ -3216,7 +3174,7 @@ async function addMeal(){
 }
 
 // ── NAV ──
-const NAV_SCREEN_ORDER = ['dashboard','workout','nutrition','workouts','history','stats','profile'];
+const NAV_SCREEN_ORDER = ['dashboard','workout','nutrition','workouts','stats','profile'];
 
 // Bir ekranin nav-btn elementini, index'i elle (sirasi degisebilen) hesaplamak
 // yerine NAV_SCREEN_ORDER'dan bulur - "workout"/"workouts" gibi ekranlara
@@ -3243,7 +3201,6 @@ function showScreen(name,btn){
   document.getElementById('screen-'+name).classList.add('active');
   btn.classList.add('active');
   if(name==='dashboard')renderDashboard();
-  if(name==='history')renderHistory();
   if(name==='stats')renderStats();
   if(name==='nutrition')renderNutrition();
   if(name==='profile')renderProfileScreen();
