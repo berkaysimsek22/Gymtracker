@@ -643,7 +643,19 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
   </div>
   <div class="week-grid" id="weekGrid"></div>
 
-  <div class="screen active" id="screen-workout">
+  <div class="screen active" id="screen-dashboard">
+    <div style="padding:18px 16px 0">
+      <h2 id="dashGreeting" style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.5px">Merhaba 👋</h2>
+      <div id="dashDate" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+    </div>
+    <div id="dashTodayCard" style="margin:14px 16px 0"></div>
+    <div id="dashCalCard" style="margin:12px 16px 0"></div>
+    <div id="dashWeekDots" style="margin:12px 16px 0"></div>
+    <div id="dashStatsRow" style="margin:12px 16px 0"></div>
+    <div id="dashWaterCard" style="margin:12px 16px 0;padding-bottom:20px"></div>
+  </div>
+
+  <div class="screen" id="screen-workout">
     <div id="profileCard" style="margin:12px 16px 0"></div>
     <div class="day-content" id="dayContent"></div>
   </div>
@@ -675,11 +687,6 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
     <div class="nut-targets">
       <div class="nt-head"><h3>Günlük Hedefler</h3><button class="btn btn-outline btn-sm" onclick="calcMacros()">🧮 Otomatik Hesapla</button></div>
       <div class="target-row" id="targetRow"></div>
-    </div>
-    <div class="water-track">
-      <label>💧 Su Takibi</label>
-      <div class="water-cups" id="waterCups"></div>
-      <div class="water-lbl" id="waterLbl">0 / 8 bardak</div>
     </div>
     <div class="meals-section">
       <div class="ms-head"><h3>Öğünler</h3>
@@ -731,7 +738,8 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
   </div>
 
   <div class="bottom-nav">
-    <button class="nav-btn active" onclick="showScreen('workout',this)"><div class="nav-icon">🏋️</div>Antrenman</button>
+    <button class="nav-btn active" onclick="showScreen('dashboard',this)"><div class="nav-icon">🏠</div>Ana Sayfa</button>
+    <button class="nav-btn" onclick="showScreen('workout',this)"><div class="nav-icon">🏋️</div>Antrenman</button>
     <button class="nav-btn" onclick="showScreen('nutrition',this)"><div class="nav-icon">🥗</div>Beslenme</button>
     <button class="nav-btn" onclick="showScreen('workouts',this)"><div class="nav-icon">📚</div>Workouts</button>
     <button class="nav-btn" onclick="showScreen('history',this)"><div class="nav-icon">📋</div>Geçmiş</button>
@@ -1186,6 +1194,7 @@ function showMainApp() {
   curDay = todayJS === 0 ? 6 : todayJS - 1; // Convert to Mon=0...Sun=6
 
   renderAll();
+  renderDashboard();
   restoreLastScreen();
 }
 
@@ -1258,6 +1267,7 @@ async function switchViewUser(userId) {
   const activeScreen = document.querySelector('.screen.active');
   if(activeScreen){
     const screenId = activeScreen.id;
+    if(screenId==='screen-dashboard') renderDashboard();
     if(screenId==='screen-nutrition') renderNutrition();
     if(screenId==='screen-stats') renderStats();
     if(screenId==='screen-history') renderHistory();
@@ -1275,6 +1285,279 @@ async function renderAll() {
   renderDayTabs();
   await renderDayContent(curDay);
   document.getElementById('streakBadge').textContent = `🔥 ${sessionCache.length} antrenman`;
+}
+
+// ── ANA SAYFA (DASHBOARD) ──
+const ACTIVITY_METS = {
+  'Koşu': 8,
+  'Bisiklet': 6,
+  'Yürüyüş': 3.5,
+  'Yüzme': 6,
+  'HIIT': 8,
+  'Ağırlık Antrenmanı': 5,
+};
+const ACTIVITY_ICONS = {
+  'Koşu':'🏃', 'Bisiklet':'🚴', 'Yürüyüş':'🚶', 'Yüzme':'🏊', 'HIIT':'🔥', 'Ağırlık Antrenmanı':'🏋️',
+};
+
+async function renderDashboard(){
+  if(!activeProfile()) return;
+  renderDashGreeting();
+  renderDashTodayCard();
+  renderDashWeekDots();
+  await Promise.all([
+    renderDashCalCard(),
+    renderDashStatsRow(),
+    renderDashWater(),
+  ]);
+}
+
+function renderDashGreeting(){
+  const p = activeProfile();
+  const greetEl = document.getElementById('dashGreeting');
+  const dateEl = document.getElementById('dashDate');
+  if(greetEl) greetEl.textContent = `Merhaba ${(p?.name||'').split(' ')[0]||''} 👋`;
+  if(dateEl) dateEl.textContent = new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
+}
+
+function goToTodayWorkout(){
+  curDay = new Date().getDay()===0?6:new Date().getDay()-1;
+  showScreen('workout', navBtnFor('workout'));
+  renderWeekGrid();
+  renderDayContent(curDay);
+}
+
+function renderDashTodayCard(){
+  const el = document.getElementById('dashTodayCard');
+  if(!el) return;
+  const todayIdx = new Date().getDay()===0?6:new Date().getDay()-1;
+  const prog = activeProgram();
+  const day = prog[todayIdx] || {type:'rest'};
+  const isRest = day.type==='rest';
+  const exCount = isRest?0:(day.type==='amrap'?((day.amrap&&day.amrap.exercises)||[]).length:(day.type==='hiit'||day.type==='cardio')?0:(day.exercises||[]).length);
+  const typeLabel = isRest?'Dinlenme Günü':(day.type==='hiit'||day.type==='cardio')?'HIIT':day.type==='amrap'?'AMRAP':'Antrenman Günü';
+  el.innerHTML = `<div onclick="goToTodayWorkout()" style="background:linear-gradient(135deg,rgba(212,245,60,.1),rgba(212,245,60,.02));border:1px solid rgba(212,245,60,.25);border-radius:14px;padding:18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <div style="min-width:0">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--acc);margin-bottom:4px">Bugünün Programı</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${day.name||typeLabel}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">${isRest?'Bugün dinlenme günü 😴':`${typeLabel} · ${exCount} egzersiz`}</div>
+    </div>
+    <div style="font-size:30px;flex-shrink:0">${isRest?'😴':'🏋️'}</div>
+  </div>`;
+}
+
+function renderDashWeekDots(){
+  const el = document.getElementById('dashWeekDots');
+  if(!el) return;
+  const prog = activeProgram();
+  const now = new Date();
+  const todayIdx = now.getDay()===0?6:now.getDay()-1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate()-todayIdx);
+  const completedDates = new Set(sessionCache.map(s=>localDateStr(new Date(s.logged_at))));
+  const labels = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+  const dots = (prog.length?prog:Array(7).fill({type:'rest'})).map((day,i)=>{
+    const d = new Date(monday);
+    d.setDate(monday.getDate()+i);
+    const key = localDateStr(d);
+    const isRest = day.type==='rest';
+    const isToday = i===todayIdx;
+    const isDone = completedDates.has(key);
+    let bg='rgba(255,255,255,.08)', txt='var(--muted)', content=isRest?'·':'';
+    if(isDone){ bg='#34d399'; txt='#0c0c0c'; content='✓'; }
+    else if(isToday){ bg='#d4f53c'; txt='#0c0c0c'; content=labels[i][0]; }
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="width:28px;height:28px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${txt}">${content}</div>
+      <div style="font-size:8px;color:var(--muted)">${labels[i]}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px">Bu Hafta</div>
+    <div style="display:flex;justify-content:space-between">${dots}</div>
+  </div>`;
+}
+
+async function loadTodayActivityLogs(uid){
+  if(!uid) return [];
+  const {data, error} = await sb.from('activity_logs').select('*').eq('user_id', uid).eq('date', todayStr()).order('created_at', {ascending:false});
+  if(error){ console.error('loadTodayActivityLogs error:', error); return []; }
+  return data||[];
+}
+
+async function renderDashCalCard(){
+  const el = document.getElementById('dashCalCard');
+  if(!el) return;
+  const p = activeProfile();
+  const uid = p?.id;
+  if(!uid){ el.innerHTML=''; return; }
+  const nd = await loadNutrition(uid, todayStr());
+  let alinan = 0;
+  nd.meals?.forEach(m=>m.foods?.forEach(f=>alinan+=parseFloat(f.kcal||0)));
+  alinan = Math.round(alinan);
+  const maint = estimateMaintenanceKcal(p);
+  const activities = await loadTodayActivityLogs(uid);
+  const extraBurn = activities.reduce((s,a)=>s+parseFloat(a.kcal_burned||0),0);
+  const yakilan = Math.round((maint||0) + extraBurn);
+  const net = alinan - yakilan;
+  const target = computeGoalCalorieTarget(p);
+  // Renk, ALINAN'in gunluk hedef kaloriye (profildeki ayni hedef) ne kadar
+  // yakin oldugunu gosterir - "Net" (Alinan-Yakilan) merkezdeki buyuk sayi,
+  // ama renklendirme kullanicinin asil takip ettigi "ne kadar yedim" sorusuna
+  // gore yapiliyor.
+  let color = 'var(--muted)';
+  if(target){
+    const diff = Math.abs(alinan - target);
+    color = diff<=100 ? '#34d399' : diff<=200 ? '#f7c948' : '#ff5c38';
+  }
+  const actList = activities.length ? '<div style="margin-top:12px">' + activities.map(a=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="font-size:12px">${ACTIVITY_ICONS[a.activity_type]||'🏃'} ${a.activity_type} · ${a.duration_min} dk</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:12px;color:#ff5c38">-${Math.round(a.kcal_burned)} kcal</div>
+        <button onclick="deleteActivityLog('${a.id}')" style="background:none;border:none;color:#555;cursor:pointer;font-size:13px;padding:2px">✕</button>
+      </div>
+    </div>`).join('') + '</div>' : '';
+  const maintNote = maint===null ? '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px">Yaş/boy/kilo eksik, BMR tam hesaplanamadı</div>' : '';
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Kalori Dengesi</div>
+      <button onclick="openActivityModal()" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);color:var(--acc);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap">+ Aktivite Ekle</button>
+    </div>
+    <div style="text-align:center;margin:10px 0 14px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:44px;line-height:1;color:${color}">${net>0?'+':''}${net}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">net kcal</div>
+      ${maintNote}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+      <div><div style="font-size:17px;font-weight:700;color:#34d399">${alinan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Alınan</div></div>
+      <div><div style="font-size:17px;font-weight:700;color:#ff5c38">${yakilan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Yakılan</div></div>
+      <div><div style="font-size:17px;font-weight:700;color:${color}">${net}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Net</div></div>
+    </div>
+    ${actList}
+  </div>`;
+}
+
+function openActivityModal(){
+  document.getElementById('activityModal')?.remove();
+  const options = Object.keys(ACTIVITY_METS).map(k=>`<option value="${k}">${ACTIVITY_ICONS[k]} ${k}</option>`).join('');
+  const modal = document.createElement('div');
+  modal.id = 'activityModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
+  modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+  modal.innerHTML = `<div style="background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:16px;padding:22px;max-width:340px;width:100%">
+    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.5px;margin-bottom:14px">+ Aktivite Ekle</h3>
+    <label style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:5px">Aktivite</label>
+    <select id="actTypeSel" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;margin-bottom:12px;outline:none">${options}</select>
+    <label style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:5px">Süre (dakika)</label>
+    <input id="actDurationInp" type="number" placeholder="30" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;margin-bottom:6px;outline:none">
+    <div id="actKcalPreview" style="font-size:11px;color:var(--acc);margin-bottom:14px">~0 kcal yakılacak</div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('activityModal').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid #333;background:none;color:#888;cursor:pointer;font-size:12px">İptal</button>
+      <button onclick="saveActivityLog()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#d4f53c;color:#0c0c0c;cursor:pointer;font-size:12px;font-weight:700">Kaydet</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  const updatePreview = ()=>{
+    const type = document.getElementById('actTypeSel').value;
+    const dur = parseFloat(document.getElementById('actDurationInp').value)||0;
+    const w = activeProfile()?.weight||70;
+    const kcal = Math.round((ACTIVITY_METS[type]||5) * w * (dur/60));
+    document.getElementById('actKcalPreview').textContent = `~${kcal} kcal yakılacak`;
+  };
+  document.getElementById('actTypeSel').addEventListener('change', updatePreview);
+  document.getElementById('actDurationInp').addEventListener('input', updatePreview);
+  updatePreview();
+}
+
+async function saveActivityLog(){
+  const p = activeProfile();
+  const uid = p?.id;
+  if(!uid) return;
+  const type = document.getElementById('actTypeSel').value;
+  const dur = parseFloat(document.getElementById('actDurationInp').value)||0;
+  if(!dur){ alert('Süre gir!'); return; }
+  const w = p.weight||70;
+  const kcal = Math.round((ACTIVITY_METS[type]||5) * w * (dur/60));
+  const {error} = await sb.from('activity_logs').insert({user_id:uid, date:todayStr(), activity_type:type, duration_min:dur, kcal_burned:kcal});
+  document.getElementById('activityModal')?.remove();
+  if(error){ alert('Kaydedilemedi: '+error.message); return; }
+  renderDashCalCard();
+}
+
+async function deleteActivityLog(id){
+  if(!confirm('Bu aktivite silinsin mi?')) return;
+  const {error} = await sb.from('activity_logs').delete().eq('id', id);
+  if(error){ alert('Silinemedi: '+error.message); return; }
+  renderDashCalCard();
+}
+
+function computeWorkoutStreak(){
+  if(!sessionCache.length) return 0;
+  const doneDates = new Set(sessionCache.map(s=>localDateStr(new Date(s.logged_at))));
+  let streak = 0;
+  let d = new Date();
+  // Bugun henuz tamamlanmadiysa dunden saymaya basla - bugun henuz bitmedigi
+  // icin seri "kirilmis" sayilmaz.
+  if(!doneDates.has(localDateStr(d))) d.setDate(d.getDate()-1);
+  while(doneDates.has(localDateStr(d))){
+    streak++;
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
+}
+
+async function renderDashStatsRow(){
+  const el = document.getElementById('dashStatsRow');
+  if(!el) return;
+  const p = activeProfile();
+  const uid = p?.id;
+  let lastWeight = p?.weight || null;
+  if(uid){
+    const {data} = await sb.from('weight_logs').select('weight,date').eq('user_id', uid).order('date', {ascending:false}).limit(1);
+    if(data && data.length) lastWeight = data[0].weight;
+  }
+  const streak = computeWorkoutStreak();
+  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-size:22px">🔥</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px">${streak}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Gün Seri</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-size:22px">🏋️</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px">${sessionCache.length}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Toplam</div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
+      <div style="font-size:22px">⚖️</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px">${lastWeight?lastWeight+' kg':'—'}</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Son Kilo</div>
+    </div>
+  </div>`;
+}
+
+async function renderDashWater(){
+  const el = document.getElementById('dashWaterCard');
+  if(!el) return;
+  const uid = activeProfile()?.id;
+  if(!uid){ el.innerHTML=''; return; }
+  const nd = await loadNutrition(uid, todayStr());
+  const wc = nd.water||0;
+  const cups = Array.from({length:8},(_,i)=>`<div onclick="toggleDashWater(${i})" style="font-size:22px;cursor:pointer;opacity:${i<wc?1:.25};transition:opacity .15s">💧</div>`).join('');
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px">💧 Su Takibi</div>
+    <div style="display:flex;gap:6px;justify-content:space-between">${cups}</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">${wc} / 8 bardak — ${wc*250}ml</div>
+  </div>`;
+}
+
+async function toggleDashWater(i){
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  const nd = await loadNutrition(uid, todayStr());
+  nd.water = (nd.water===i+1) ? i : i+1;
+  saveNutrition(uid, todayStr());
+  renderDashWater();
 }
 
 let weekOffset = 0; // 0 = this week, -1 = last week, +1 = next week
@@ -1351,7 +1634,7 @@ function renderWeekGrid() {
 }
 function selDW(i){
   curDay=i;
-  showScreen('workout',document.querySelector('.nav-btn'));
+  showScreen('workout',navBtnFor('workout'));
   renderWeekGrid();
   renderDayContent(curDay);
 }
@@ -1382,7 +1665,7 @@ async function renderProfile(p) {
   const summaryEl = document.getElementById('hdProfileSummary');
   // Hedef zaten profilde belli - buraya tiklaninca Workouts > Split'e gidip
   // rutini (split'i) degistirebilsin, tekrar hedef secmeye gerek yok
-  const goToSplit = "showScreen('workouts',document.querySelectorAll('.nav-btn')[2])";
+  const goToSplit = "showScreen('workouts',navBtnFor('workouts'))";
   const renderSummary = (devLine) => {
     if(!summaryEl) return;
     summaryEl.innerHTML = `
@@ -2522,16 +2805,12 @@ async function renderNutrition(){
     <div class="target-box"><label>Protein</label><input value="${t.protein}" type="number" onchange="updateTarget('protein',this.value)"><div class="tu">gram</div></div>
     <div class="target-box"><label>Karb</label><input value="${t.carb}" type="number" onchange="updateTarget('carb',this.value)"><div class="tu">gram</div></div>
     <div class="target-box"><label>Yağ</label><input value="${t.fat}" type="number" onchange="updateTarget('fat',this.value)"><div class="tu">gram</div></div>`;
-  const wc=nd.water||0;
-  document.getElementById('waterCups').innerHTML=Array.from({length:8},(_,i)=>`<div class="wcup${i<wc?' filled':''}" onclick="toggleW(${i})">💧</div>`).join('');
-  document.getElementById('waterLbl').textContent=`${wc} / 8 bardak — ${wc*250}ml`;
   renderMeals(nd);
   const noteEl=document.getElementById('dailyNoteInp');if(noteEl)noteEl.value=nd.note||'';
 }
 
 async function updateTarget(field,val){
   const uid=activeProfile()?.id;const nd=await loadNutrition(uid,curNutDate);nd.targets[field]=parseFloat(val)||0;saveNutrition(uid,curNutDate);renderNutrition();}
-async function toggleW(i){const uid=activeProfile()?.id;const nd=await loadNutrition(uid,curNutDate);nd.water=(nd.water===i+1)?i:i+1;saveNutrition(uid,curNutDate);renderNutrition();}
 
 async function calcMacros(){
   const p=activeProfile(),w=p?.weight||70,fat=Math.round(w*1);
@@ -2937,12 +3216,20 @@ async function addMeal(){
 }
 
 // ── NAV ──
-const NAV_SCREEN_ORDER = ['workout','nutrition','workouts','history','stats','profile'];
+const NAV_SCREEN_ORDER = ['dashboard','workout','nutrition','workouts','history','stats','profile'];
+
+// Bir ekranin nav-btn elementini, index'i elle (sirasi degisebilen) hesaplamak
+// yerine NAV_SCREEN_ORDER'dan bulur - "workout"/"workouts" gibi ekranlara
+// kod icinden programatik gecis yapan yerler (gun secimi, split uygulama vb.)
+// bunu kullanir.
+function navBtnFor(screenName){
+  return document.querySelectorAll('.nav-btn')[NAV_SCREEN_ORDER.indexOf(screenName)];
+}
 
 function restoreLastScreen(){
   let saved = null;
   try{ saved = localStorage.getItem('gt_lastScreen'); }catch(e){}
-  if(!saved || saved==='workout') return; // varsayilan zaten workout, dokunmaya gerek yok
+  if(!saved || saved==='dashboard') return; // varsayilan zaten dashboard, dokunmaya gerek yok
   const idx = NAV_SCREEN_ORDER.indexOf(saved);
   if(idx<0) return;
   const btn = document.querySelectorAll('.nav-btn')[idx];
@@ -2955,6 +3242,7 @@ function showScreen(name,btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   btn.classList.add('active');
+  if(name==='dashboard')renderDashboard();
   if(name==='history')renderHistory();
   if(name==='stats')renderStats();
   if(name==='nutrition')renderNutrition();
@@ -3228,7 +3516,7 @@ async function applyPopularSplit(id){
   else { delete altPrograms[p.id]; }
   await saveProgram(p.id);
   curDay = new Date().getDay()===0?6:new Date().getDay()-1;
-  showScreen('workout', document.querySelector('.nav-btn'));
+  showScreen('workout', navBtnFor('workout'));
   renderAll();
   const t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
@@ -4451,7 +4739,7 @@ async function applyEditableProgram(){
   programs[p.id] = editableProg;
   await saveProgram(p.id);
   curDay = new Date().getDay()===0?6:new Date().getDay()-1;
-  showScreen('workout', document.querySelector('.nav-btn'));
+  showScreen('workout', navBtnFor('workout'));
   renderAll();
   const t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c';
