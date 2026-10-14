@@ -914,7 +914,7 @@ async function loadProfile() {
   }
   currentProfile = prof;
   viewingProfile = prof;
-  loadCustomFoodDB(currentProfile.id);
+  await loadCustomFoodDB(currentProfile.id);
   try{ currentProfile.splitType = localStorage.getItem('splitType_'+currentProfile.id) || null; }catch(e){ console.error('splitType load error:', e); }
 
   // Admin: load all profiles
@@ -1247,6 +1247,7 @@ async function switchViewUser(userId) {
   if(!programs[userId]) await loadProgramForUser(userId);
   await loadSessionLogs(userId);
   await loadNutrition(userId, curNutDate);
+  await loadCustomFoodDB(userId);
   const _todayJS = new Date().getDay();
   curDay = _todayJS === 0 ? 6 : _todayJS - 1;
   editMode = false;
@@ -3640,23 +3641,33 @@ const FOOD_DB = {
   'hindistan cevizi':{kcal:354,protein:3.3,carb:15,  fat:33,  per:100, unit:'gram'},
 };
 
-// ── CUSTOM FOOD DB (kullanıcının kaydettiği/AI'dan öğrenilen besinler, cihaz genelinde kalıcı) ──
+// ── CUSTOM FOOD DB (kullanıcının kaydettiği/AI'dan öğrenilen besinler) ──
+// Supabase'deki 'custom_foods' tablosunda tutulur (scripts/custom-foods-table.sql) -
+// eskiden sadece localStorage'a yaziliyordu, cihaz degisince/tarayici verisi
+// temizlenince kayboluyordu.
 let customFoodDB = {};
 
-function loadCustomFoodDB(uid){
+async function loadCustomFoodDB(uid){
   if(!uid) return;
-  try{
-    const raw = localStorage.getItem('customFoodDB_'+uid);
-    customFoodDB = raw ? JSON.parse(raw) : {};
-    Object.assign(FOOD_DB, customFoodDB);
-  }catch(e){ console.error('loadCustomFoodDB error:', e); customFoodDB = {}; }
+  const {data, error} = await sb.from('custom_foods').select('name,kcal,protein,carb,fat,per,unit').eq('user_id', uid);
+  if(error){ console.error('loadCustomFoodDB error:', error); return; }
+  customFoodDB = {};
+  (data||[]).forEach(row=>{
+    customFoodDB[row.name] = {kcal:row.kcal, protein:row.protein, carb:row.carb, fat:row.fat, per:row.per, unit:row.unit};
+  });
+  Object.assign(FOOD_DB, customFoodDB);
 }
 
-function rememberFood(uid, name, entry){
+async function rememberFood(uid, name, entry){
   if(!uid || !name) return;
   FOOD_DB[name] = entry;
   customFoodDB[name] = entry;
-  try{ localStorage.setItem('customFoodDB_'+uid, JSON.stringify(customFoodDB)); }catch(e){ console.error('persist customFoodDB error:', e); }
+  const {error} = await sb.from('custom_foods').upsert({
+    user_id: uid, name,
+    kcal: entry.kcal||0, protein: entry.protein||0, carb: entry.carb||0, fat: entry.fat||0,
+    per: entry.per||100, unit: entry.unit||'gram',
+  }, {onConflict: 'user_id,name'});
+  if(error) console.error('rememberFood (custom_foods) error:', error);
 }
 
 async function lookupOpenFoodFacts(name){
