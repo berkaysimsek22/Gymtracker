@@ -2684,6 +2684,15 @@ async function updFoodUnitOnly(mi,fi,v,selEl){
     food.protein=String(Math.round(protPer1*defaultAmt*10)/10);
     food.carb=String(Math.round(carbPer1*defaultAmt*10)/10);
     food.fat=String(Math.round(fatPer1*defaultAmt*10)/10);
+  } else if(v==='adet'){
+    // Fotografla Analiz (AI) gibi FOOD_DB'de kaydi olmayan bir besin icin
+    // "1 adedi kac gram" bilmiyoruz - mevcut miktar/makro degerlerini
+    // oldugu gibi "adet" etiketi altinda birakmak yaniltici olurdu (ör.
+    // "100 adet" = AI'nin bulduğu kalori gibi absurt bir gorunum). Bu
+    // besinler icin miktari gram/ml olarak girmeye devam etmesi gerekiyor.
+    if(selEl) selEl.value = prevUnit;
+    alert('Bu besin için adet bilgisi tanımlı değil, miktarı gram/ml olarak gir.');
+    return;
   } else {
     food.unit=v;
   }
@@ -3557,7 +3566,7 @@ const FOOD_DB = {
   'protein tozu':  {kcal:120, protein:24,  carb:3,   fat:1.5, per:30,  unit:'gram (1 ölçek)'},
   'whey protein':  {kcal:120, protein:24,  carb:3,   fat:1.5, per:30,  unit:'gram'},
   'badem':         {kcal:579, protein:21,  carb:22,  fat:50,  per:100, unit:'gram'},
-  'ceviz':         {kcal:654, protein:15,  carb:14,  fat:65,  per:100, unit:'gram'},
+  'ceviz':         {kcal:654, protein:15,  carb:14,  fat:65,  per:100, unit:'gram', per_adet:5},
   'muz':           {kcal:89,  protein:1.1, carb:23,  fat:0.3, per:100, unit:'gram', per_adet:120},
   'elma':          {kcal:52,  protein:0.3, carb:14,  fat:0.2, per:100, unit:'gram', per_adet:150},
   'portakal':      {kcal:47,  protein:0.9, carb:12,  fat:0.1, per:100, unit:'gram', per_adet:180},
