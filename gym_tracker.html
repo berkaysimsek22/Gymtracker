@@ -666,7 +666,7 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
       <h2>Beslenme</h2>
       <div style="display:flex;gap:6px;align-items:center">
         <button class="btn btn-outline btn-sm" onclick="changeNutDay(-1)">◀</button>
-        <span id="nutDateLbl" style="font-size:11px;color:var(--muted)"></span>
+        <span id="nutDateLbl" onclick="openNutDatePicker()" style="font-size:11px;color:var(--muted);cursor:pointer;text-decoration:underline;text-decoration-style:dotted"></span>
         <button class="btn btn-outline btn-sm" onclick="changeNutDay(1)">▶</button>
       </div>
     </div>
@@ -685,11 +685,12 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
       <div class="ms-head"><h3>Öğünler</h3>
         <div style="display:flex;gap:6px">
           <button class="btn btn-sm" style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399" onclick="saveNutritionNow()">💾 Kaydet</button>
-          <button class="btn btn-sm" style="background:rgba(56,182,255,.1);border:1px solid rgba(56,182,255,.2);color:#38b6ff" onclick="document.getElementById('foodPhotoInput').click()">📸 Fotoğrafla Analiz</button>
+          <button class="btn btn-sm" style="background:rgba(56,182,255,.1);border:1px solid rgba(56,182,255,.2);color:#38b6ff" onclick="showPhotoSourceMenu(this,'foodPhotoInputCam','foodPhotoInputGal')">📸 Fotoğrafla Analiz</button>
           <button class="btn btn-acc btn-sm" onclick="addMeal()">+ Öğün Ekle</button>
         </div>
       </div>
-      <input type="file" id="foodPhotoInput" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this)">
+      <input type="file" id="foodPhotoInputCam" accept="image/*" capture="environment" style="display:none" onchange="analyzeFoodPhoto(this)">
+      <input type="file" id="foodPhotoInputGal" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this)">
       <div id="photoAnalyzing" style="display:none;margin-bottom:8px;background:rgba(56,182,255,.06);border:1px solid rgba(56,182,255,.15);border-radius:10px;padding:14px;text-align:center">
         <div style="font-size:24px;margin-bottom:6px">🔍</div>
         <div style="font-size:12px;color:#38b6ff;margin-bottom:4px">AI yemeği analiz ediyor...</div>
@@ -2434,6 +2435,72 @@ async function changeNutDay(d){
 }
 async function saveDailyNote(v){const nd=await loadNutrition(activeProfile()?.id,curNutDate);nd.note=v;saveNutrition(activeProfile()?.id,curNutDate);}
 
+// ── BESLENME TARIH SECICI (gun etiketine dokununca ayin tum gunleri acilir) ──
+let _nutCalMonth = null; // {y, m} - m: 0-11
+
+function openNutDatePicker(){
+  const cur = new Date(curNutDate);
+  _nutCalMonth = {y: cur.getFullYear(), m: cur.getMonth()};
+  renderNutDatePicker();
+}
+
+function shiftNutCalMonth(delta){
+  let {y, m} = _nutCalMonth;
+  m += delta;
+  if(m<0){ m=11; y--; } else if(m>11){ m=0; y++; }
+  _nutCalMonth = {y, m};
+  renderNutDatePicker();
+}
+
+function renderNutDatePicker(){
+  document.getElementById('nutDateModal')?.remove();
+  const {y, m} = _nutCalMonth;
+  const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  const firstOfMonth = new Date(y, m, 1);
+  const startOffset = firstOfMonth.getDay()===0 ? 6 : firstOfMonth.getDay()-1; // Pzt=0 basliyor
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const todayKey = localDateStr(new Date());
+  const cells = [];
+  for(let i=0;i<startOffset;i++) cells.push('<div></div>');
+  for(let d=1; d<=daysInMonth; d++){
+    const key = localDateStr(new Date(y, m, d));
+    const isToday = key===todayKey;
+    const isSelected = key===curNutDate;
+    const style = isSelected
+      ? 'background:#d4f53c;color:#0c0c0c;font-weight:700'
+      : isToday
+        ? 'border:1px solid rgba(212,245,60,.5);color:#d4f53c'
+        : 'color:#ddd';
+    cells.push(`<div onclick="selectNutDate('${key}')" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;font-size:12px;${style}">${d}</div>`);
+  }
+  const weekdayHead = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'].map(w=>`<div style="font-size:9px;color:var(--muted);text-align:center;padding:4px 0">${w}</div>`).join('');
+  const modal = document.createElement('div');
+  modal.id = 'nutDateModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
+  modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
+  modal.innerHTML = `<div style="background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:16px;padding:20px;max-width:320px;width:100%">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <button onclick="shiftNutCalMonth(-1)" style="background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:4px 10px">‹</button>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:.5px">${monthNames[m]} ${y}</div>
+      <button onclick="shiftNutCalMonth(1)" style="background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:4px 10px">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+      ${weekdayHead}
+      ${cells.join('')}
+    </div>
+    <button onclick="selectNutDate('${todayKey}')" style="width:100%;margin-top:14px;padding:10px;border-radius:8px;border:1px solid rgba(212,245,60,.3);background:none;color:#d4f53c;cursor:pointer;font-size:12px">Bugün</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function selectNutDate(dateKey){
+  document.getElementById('nutDateModal')?.remove();
+  const uid = activeProfile()?.id;
+  if(uid) await flushNutritionSave(uid, curNutDate);
+  curNutDate = dateKey;
+  renderNutrition();
+}
+
 async function renderNutrition(){
   const uid=activeProfile()?.id;if(!uid)return;
   const nd=await loadNutrition(uid,curNutDate);
@@ -2537,8 +2604,9 @@ function renderMeals(nd){
         ${foods}
         <div style="display:flex;gap:6px;margin:8px 13px">
           <div class="add-food-btn" style="flex:1;margin:0" onclick="addFood(${mi})">+ Manuel Ekle</div>
-          <div class="add-food-btn" style="flex:1;margin:0;border-color:rgba(56,182,255,.2);color:rgba(56,182,255,.5)" onclick="document.getElementById('mealPhotoInput_${mi}').click()">📸 Fotoğraf</div>
-          <input type="file" id="mealPhotoInput_${mi}" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this,${mi})">
+          <div class="add-food-btn" style="flex:1;margin:0;border-color:rgba(56,182,255,.2);color:rgba(56,182,255,.5)" onclick="showPhotoSourceMenu(this,'mealPhotoInputCam_${mi}','mealPhotoInputGal_${mi}')">📸 Fotoğraf</div>
+          <input type="file" id="mealPhotoInputCam_${mi}" accept="image/*" capture="environment" style="display:none" onchange="analyzeFoodPhoto(this,${mi})">
+          <input type="file" id="mealPhotoInputGal_${mi}" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this,${mi})">
         </div>
       </div>
     </div>`;
@@ -2616,6 +2684,15 @@ async function updFoodUnitOnly(mi,fi,v,selEl){
     food.protein=String(Math.round(protPer1*defaultAmt*10)/10);
     food.carb=String(Math.round(carbPer1*defaultAmt*10)/10);
     food.fat=String(Math.round(fatPer1*defaultAmt*10)/10);
+  } else if(v==='adet'){
+    // Fotografla Analiz (AI) gibi FOOD_DB'de kaydi olmayan bir besin icin
+    // "1 adedi kac gram" bilmiyoruz - mevcut miktar/makro degerlerini
+    // oldugu gibi "adet" etiketi altinda birakmak yaniltici olurdu (ör.
+    // "100 adet" = AI'nin bulduğu kalori gibi absurt bir gorunum). Bu
+    // besinler icin miktari gram/ml olarak girmeye devam etmesi gerekiyor.
+    if(selEl) selEl.value = prevUnit;
+    alert('Bu besin için adet bilgisi tanımlı değil, miktarı gram/ml olarak gir.');
+    return;
   } else {
     food.unit=v;
   }
@@ -2731,6 +2808,29 @@ async function geminiFetch(body){
   }
   return response;
 }
+// "📸 Fotoğraf" butonuna basinca kamera/galeri secimi gostersin - Android'de
+// accept="image/*" tek basina bazi cihaz/tarayicilarda kamerayi dogrudan
+// acmiyor, sadece dosya secici (galeri) gosteriyordu. capture="environment"
+// alan AYRI bir input ile kamera, capture'siz baska bir input ile galeri
+// garanti altina alindi; kullanici ikisinden birini seciyor.
+function showPhotoSourceMenu(btnEl, camId, galId){
+  document.getElementById('photoSrcMenu')?.remove();
+  const rect = btnEl.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.id = 'photoSrcMenu';
+  menu.style.cssText = `position:fixed;top:${rect.bottom+6}px;left:${Math.max(8,Math.min(rect.left,window.innerWidth-180))}px;background:#1a1a1a;border:1px solid rgba(56,182,255,.3);border-radius:10px;overflow:hidden;z-index:600;box-shadow:0 8px 24px rgba(0,0,0,.6)`;
+  menu.innerHTML = `
+    <div onclick="document.getElementById('photoSrcMenu').remove();document.getElementById('${camId}').click()" style="padding:12px 18px;font-size:12px;color:#f2f0e8;cursor:pointer;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.06)">📷 Kameradan Çek</div>
+    <div onclick="document.getElementById('photoSrcMenu').remove();document.getElementById('${galId}').click()" style="padding:12px 18px;font-size:12px;color:#f2f0e8;cursor:pointer;white-space:nowrap">🖼️ Galeriden Seç</div>
+  `;
+  document.body.appendChild(menu);
+  setTimeout(()=>{
+    document.addEventListener('click', function closeMenu(e){
+      if(!menu.contains(e.target)){ menu.remove(); document.removeEventListener('click', closeMenu); }
+    });
+  },0);
+}
+
 async function analyzeFoodPhoto(input, targetMealIdx){
   const file=input.files[0];
   if(!file)return;
@@ -3466,7 +3566,7 @@ const FOOD_DB = {
   'protein tozu':  {kcal:120, protein:24,  carb:3,   fat:1.5, per:30,  unit:'gram (1 ölçek)'},
   'whey protein':  {kcal:120, protein:24,  carb:3,   fat:1.5, per:30,  unit:'gram'},
   'badem':         {kcal:579, protein:21,  carb:22,  fat:50,  per:100, unit:'gram'},
-  'ceviz':         {kcal:654, protein:15,  carb:14,  fat:65,  per:100, unit:'gram'},
+  'ceviz':         {kcal:654, protein:15,  carb:14,  fat:65,  per:100, unit:'gram', per_adet:5},
   'muz':           {kcal:89,  protein:1.1, carb:23,  fat:0.3, per:100, unit:'gram', per_adet:120},
   'elma':          {kcal:52,  protein:0.3, carb:14,  fat:0.2, per:100, unit:'gram', per_adet:150},
   'portakal':      {kcal:47,  protein:0.9, carb:12,  fat:0.1, per:100, unit:'gram', per_adet:180},
