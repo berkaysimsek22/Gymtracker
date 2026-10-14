@@ -685,11 +685,12 @@ input,textarea,select,button{font-family:'Archivo',sans-serif}
       <div class="ms-head"><h3>Öğünler</h3>
         <div style="display:flex;gap:6px">
           <button class="btn btn-sm" style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:#34d399" onclick="saveNutritionNow()">💾 Kaydet</button>
-          <button class="btn btn-sm" style="background:rgba(56,182,255,.1);border:1px solid rgba(56,182,255,.2);color:#38b6ff" onclick="document.getElementById('foodPhotoInput').click()">📸 Fotoğrafla Analiz</button>
+          <button class="btn btn-sm" style="background:rgba(56,182,255,.1);border:1px solid rgba(56,182,255,.2);color:#38b6ff" onclick="showPhotoSourceMenu(this,'foodPhotoInputCam','foodPhotoInputGal')">📸 Fotoğrafla Analiz</button>
           <button class="btn btn-acc btn-sm" onclick="addMeal()">+ Öğün Ekle</button>
         </div>
       </div>
-      <input type="file" id="foodPhotoInput" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this)">
+      <input type="file" id="foodPhotoInputCam" accept="image/*" capture="environment" style="display:none" onchange="analyzeFoodPhoto(this)">
+      <input type="file" id="foodPhotoInputGal" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this)">
       <div id="photoAnalyzing" style="display:none;margin-bottom:8px;background:rgba(56,182,255,.06);border:1px solid rgba(56,182,255,.15);border-radius:10px;padding:14px;text-align:center">
         <div style="font-size:24px;margin-bottom:6px">🔍</div>
         <div style="font-size:12px;color:#38b6ff;margin-bottom:4px">AI yemeği analiz ediyor...</div>
@@ -2603,8 +2604,9 @@ function renderMeals(nd){
         ${foods}
         <div style="display:flex;gap:6px;margin:8px 13px">
           <div class="add-food-btn" style="flex:1;margin:0" onclick="addFood(${mi})">+ Manuel Ekle</div>
-          <div class="add-food-btn" style="flex:1;margin:0;border-color:rgba(56,182,255,.2);color:rgba(56,182,255,.5)" onclick="document.getElementById('mealPhotoInput_${mi}').click()">📸 Fotoğraf</div>
-          <input type="file" id="mealPhotoInput_${mi}" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this,${mi})">
+          <div class="add-food-btn" style="flex:1;margin:0;border-color:rgba(56,182,255,.2);color:rgba(56,182,255,.5)" onclick="showPhotoSourceMenu(this,'mealPhotoInputCam_${mi}','mealPhotoInputGal_${mi}')">📸 Fotoğraf</div>
+          <input type="file" id="mealPhotoInputCam_${mi}" accept="image/*" capture="environment" style="display:none" onchange="analyzeFoodPhoto(this,${mi})">
+          <input type="file" id="mealPhotoInputGal_${mi}" accept="image/*" style="display:none" onchange="analyzeFoodPhoto(this,${mi})">
         </div>
       </div>
     </div>`;
@@ -2797,6 +2799,29 @@ async function geminiFetch(body){
   }
   return response;
 }
+// "📸 Fotoğraf" butonuna basinca kamera/galeri secimi gostersin - Android'de
+// accept="image/*" tek basina bazi cihaz/tarayicilarda kamerayi dogrudan
+// acmiyor, sadece dosya secici (galeri) gosteriyordu. capture="environment"
+// alan AYRI bir input ile kamera, capture'siz baska bir input ile galeri
+// garanti altina alindi; kullanici ikisinden birini seciyor.
+function showPhotoSourceMenu(btnEl, camId, galId){
+  document.getElementById('photoSrcMenu')?.remove();
+  const rect = btnEl.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.id = 'photoSrcMenu';
+  menu.style.cssText = `position:fixed;top:${rect.bottom+6}px;left:${Math.max(8,Math.min(rect.left,window.innerWidth-180))}px;background:#1a1a1a;border:1px solid rgba(56,182,255,.3);border-radius:10px;overflow:hidden;z-index:600;box-shadow:0 8px 24px rgba(0,0,0,.6)`;
+  menu.innerHTML = `
+    <div onclick="document.getElementById('photoSrcMenu').remove();document.getElementById('${camId}').click()" style="padding:12px 18px;font-size:12px;color:#f2f0e8;cursor:pointer;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,.06)">📷 Kameradan Çek</div>
+    <div onclick="document.getElementById('photoSrcMenu').remove();document.getElementById('${galId}').click()" style="padding:12px 18px;font-size:12px;color:#f2f0e8;cursor:pointer;white-space:nowrap">🖼️ Galeriden Seç</div>
+  `;
+  document.body.appendChild(menu);
+  setTimeout(()=>{
+    document.addEventListener('click', function closeMenu(e){
+      if(!menu.contains(e.target)){ menu.remove(); document.removeEventListener('click', closeMenu); }
+    });
+  },0);
+}
+
 async function analyzeFoodPhoto(input, targetMealIdx){
   const file=input.files[0];
   if(!file)return;
