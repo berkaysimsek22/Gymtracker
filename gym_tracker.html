@@ -2003,7 +2003,7 @@ function buildExCard(ex, di, ei) {
       <div class="meta-pill${comp?' done-pill':''}" id="mp_${di}_${ei}">${done}/${ex.sets}</div>
       <div class="meta-pill">${ex.reps}×${ex.sets}</div>
     </div>
-    <button onclick="event.stopPropagation();copyExerciseInfo(${di},${ei},this)" title="Hareketi kopyala" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;padding:4px 7px;cursor:pointer;flex-shrink:0;line-height:1">📋</button>
+    <button onclick="event.stopPropagation();copyExerciseInfo(${di},${ei},this)" title="Hareket adını kopyala" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);padding:5px 6px;cursor:pointer;flex-shrink:0;line-height:0;display:flex;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
     <div class="expand-arr">⌄</div>
   </div>
   <div class="set-area">
@@ -2044,12 +2044,11 @@ async function copyTextToClipboard(text){
 async function copyExerciseInfo(di, ei, btnEl){
   const ex = activeProgram()[di]?.exercises?.[ei];
   if(!ex) return;
-  const text = [ex.name, ex.muscle, (ex.sets&&ex.reps)?`${ex.sets}×${ex.reps}`:null].filter(Boolean).join(' — ');
-  const ok = await copyTextToClipboard(text);
+  const ok = await copyTextToClipboard(ex.name);
   if(btnEl){
-    const orig = btnEl.textContent;
-    btnEl.textContent = ok ? '✓' : '✕';
-    setTimeout(()=>{ btnEl.textContent = orig; }, 1200);
+    const orig = btnEl.innerHTML;
+    btnEl.innerHTML = ok ? '✓' : '✕';
+    setTimeout(()=>{ btnEl.innerHTML = orig; }, 1200);
   }
   if(!ok) alert('Kopyalanamadı, tarayıcı izin vermiyor olabilir.');
 }
