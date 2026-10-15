@@ -2003,6 +2003,7 @@ function buildExCard(ex, di, ei) {
       <div class="meta-pill${comp?' done-pill':''}" id="mp_${di}_${ei}">${done}/${ex.sets}</div>
       <div class="meta-pill">${ex.reps}×${ex.sets}</div>
     </div>
+    <button onclick="event.stopPropagation();copyExerciseInfo(${di},${ei},this)" title="Hareketi kopyala" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;padding:4px 7px;cursor:pointer;flex-shrink:0;line-height:1">📋</button>
     <div class="expand-arr">⌄</div>
   </div>
   <div class="set-area">
@@ -2023,6 +2024,35 @@ function buildExCard(ex, di, ei) {
 }
 
 function toggleEC(id){document.getElementById(id)?.classList.toggle('open');}
+
+// Panoya kopyalama - once modern Clipboard API, calismazsa (http, eski
+// webview vb.) execCommand fallback'i dener.
+async function copyTextToClipboard(text){
+  if(navigator.clipboard && window.isSecureContext){
+    try{ await navigator.clipboard.writeText(text); return true; }catch(e){ console.error('clipboard.writeText error:', e); }
+  }
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px'; ta.style.top='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok=document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){ console.error('execCommand copy error:', e); return false; }
+}
+
+async function copyExerciseInfo(di, ei, btnEl){
+  const ex = activeProgram()[di]?.exercises?.[ei];
+  if(!ex) return;
+  const text = [ex.name, ex.muscle, (ex.sets&&ex.reps)?`${ex.sets}×${ex.reps}`:null].filter(Boolean).join(' — ');
+  const ok = await copyTextToClipboard(text);
+  if(btnEl){
+    const orig = btnEl.textContent;
+    btnEl.textContent = ok ? '✓' : '✕';
+    setTimeout(()=>{ btnEl.textContent = orig; }, 1200);
+  }
+  if(!ok) alert('Kopyalanamadı, tarayıcı izin vermiyor olabilir.');
+}
 
 function qSave(uid,di,ei,si,field,val){
   if(si===-1){setCache['exn_'+uid+'_'+di+'_'+ei]=val;return;}
