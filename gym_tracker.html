@@ -539,12 +539,18 @@ button:active{transform:scale(.97)}
     <div style="padding:18px 16px 0">
       <h2 id="dashGreeting" style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.5px">Merhaba 👋</h2>
       <div id="dashDate" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+      <div id="dashMotivation" style="font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic"></div>
     </div>
     <div id="dashTodayCard" style="margin:14px 16px 0"></div>
-    <div id="dashCalCard" style="margin:12px 16px 0"></div>
-    <div id="dashWeekDots" style="margin:12px 16px 0"></div>
+    <div id="dashNextWorkout" style="margin:10px 16px 0"></div>
+    <div id="dashPRCard" style="margin:10px 16px 0"></div>
     <div id="dashStatsRow" style="margin:12px 16px 0"></div>
-    <div id="dashWaterCard" style="margin:12px 16px 0;padding-bottom:20px"></div>
+    <div id="dashWeightTrend" style="margin:12px 16px 0"></div>
+    <div id="dashWeekDots" style="margin:12px 16px 0"></div>
+    <div id="dashCalCard" style="margin:12px 16px 0"></div>
+    <div id="dashWaterCard" style="margin:12px 16px 0"></div>
+    <div id="dashLastWorkout" style="margin:12px 16px 0"></div>
+    <div id="dashRestSuggestion" style="margin:12px 16px 0;padding-bottom:20px"></div>
   </div>
 
   <div class="screen" id="screen-workout">
@@ -1188,12 +1194,18 @@ const ACTIVITY_ICONS = {
 async function renderDashboard(){
   if(!activeProfile()) return;
   renderDashGreeting();
+  renderDashMotivation();
   renderDashTodayCard();
+  renderDashNextWorkout();
   renderDashWeekDots();
+  renderDashLastWorkout();
+  renderDashRestSuggestion();
   await Promise.all([
     renderDashCalCard(),
     renderDashStatsRow(),
     renderDashWater(),
+    renderDashPRCard(),
+    renderDashWeightTrend(),
   ]);
 }
 
@@ -1203,6 +1215,161 @@ function renderDashGreeting(){
   const dateEl = document.getElementById('dashDate');
   if(greetEl) greetEl.textContent = `Merhaba ${(p?.name||'').split(' ')[0]||''} 👋`;
   if(dateEl) dateEl.textContent = new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'});
+}
+
+// Gun icindeki saate ve bugun/yarinin program turune (antrenman/dinlenme) gore
+// degisen kisa motivasyon mesaji - dinlenme gunu saatten bagimsiz kendi
+// mesajini gosterir, cunku "antrenman vakti yaklasiyor" gibi bir mesaj
+// dinlenme gununde anlamsiz olurdu.
+function renderDashMotivation(){
+  const el = document.getElementById('dashMotivation');
+  if(!el) return;
+  const p = activeProfile();
+  const name = (p?.name||'').split(' ')[0]||'';
+  const todayIdx = new Date().getDay()===0?6:new Date().getDay()-1;
+  const today = activeProgram()[todayIdx] || {type:'rest'};
+  let msg;
+  if(today.type==='rest'){
+    msg = 'Bugün dinlen, kasların büyüyor 😴';
+  } else {
+    const hour = new Date().getHours();
+    if(hour>=6 && hour<12) msg = `Günaydın ${name}! Bugün ${today.name||'antrenman'} günü 💪`;
+    else if(hour>=12 && hour<17) msg = 'Antrenman vakti yaklaşıyor ⚡';
+    else if(hour>=17 && hour<21) msg = 'Bugün antrenman yaptın mı? 🏋️';
+    else {
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+      const tIdx = tomorrow.getDay()===0?6:tomorrow.getDay()-1;
+      const tDay = programForDate(tomorrow)[tIdx] || {type:'rest'};
+      msg = tDay.type==='rest' ? 'Yarın dinlenme günü, iyi dinlen 😴' : `Yarın ${tDay.name||'antrenman'} var, hazır ol 🔥`;
+    }
+  }
+  el.textContent = msg;
+}
+
+// "Sonraki Antrenman" - ABA/BAB rotasyonuna gore YARININ gun indexi icin
+// hangi haftanin (A/B) programi gecerliyse onu okur (programForDate), "bugunun
+// paritesi" degil - cunku hafta Pazar->Pazartesi gecisinde A/B degisebiliyor.
+function renderDashNextWorkout(){
+  const el = document.getElementById('dashNextWorkout');
+  if(!el) return;
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+  const tIdx = tomorrow.getDay()===0?6:tomorrow.getDay()-1;
+  const day = programForDate(tomorrow)[tIdx] || {type:'rest'};
+  if(day.type==='rest'){
+    el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)">
+      <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--text-muted);background:var(--surface3);padding:2px 8px;border-radius:8px;flex-shrink:0">YARIN</span>
+      <span>Yarın dinlenme günü 😴</span>
+    </div>`;
+    return;
+  }
+  const exCount = day.type==='amrap' ? ((day.amrap&&day.amrap.exercises)||[]).length : (day.type==='hiit'||day.type==='cardio') ? 0 : (day.exercises||[]).length;
+  const countTxt = exCount>0 ? ` — ${exCount} egzersiz` : '';
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:12px">
+    <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--acc);background:var(--acc-dim);padding:2px 8px;border-radius:8px;flex-shrink:0">YARIN</span>
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${day.name||''}${countTxt}</span>
+  </div>`;
+}
+
+// "Son Antrenman Özeti" - sessionCache zaten login sirasinda en son 50
+// session_logs kaydiyla (logged_at'a gore azalan) doldurulmus oluyor, o yuzden
+// ekstra bir sorgu gerekmiyor; sessionCache[0] = en guncel kayit.
+function renderDashLastWorkout(){
+  const el = document.getElementById('dashLastWorkout');
+  if(!el) return;
+  if(!sessionCache.length){ el.innerHTML=''; return; }
+  const last = sessionCache[0];
+  const loggedMid = new Date(last.logged_at); loggedMid.setHours(0,0,0,0);
+  const todayMid = new Date(); todayMid.setHours(0,0,0,0);
+  const dayDiff = Math.round((todayMid-loggedMid)/86400000);
+  const whenTxt = dayDiff<=0 ? 'Bugün' : dayDiff===1 ? '1 gün önce' : `${dayDiff} gün önce`;
+  const vol = parseFloat(last.volume)||0;
+  const volTxt = vol>=1000 ? (vol/1000).toFixed(1).replace('.0','')+'k kg' : `${Math.round(vol)} kg`;
+  el.innerHTML = `<div onclick="showScreen('stats',navBtnFor('stats'))" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;cursor:pointer;box-shadow:var(--card-shadow)">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:5px">Son Antrenman</div>
+    <div style="font-size:13px;font-weight:600">${whenTxt} · ${last.day_name||''} · ${last.sets_done||0} set · ${volTxt}</div>
+  </div>`;
+}
+
+// Sadece dinlenme gununde gosterilen aktif dinlenme onerisi.
+function renderDashRestSuggestion(){
+  const el = document.getElementById('dashRestSuggestion');
+  if(!el) return;
+  const todayIdx = new Date().getDay()===0?6:new Date().getDay()-1;
+  const today = activeProgram()[todayIdx] || {type:'rest'};
+  if(today.type!=='rest'){ el.innerHTML=''; return; }
+  el.innerHTML = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;font-size:11px;color:var(--text-muted);line-height:1.5">
+    💡 Bugün 30 dk yürüyüş önerilir — aktif dinlenme kas gelişimini hızlandırır
+  </div>`;
+}
+
+// "PR Bildirimi" - set_history'den (append-only log, bkz. scripts/set-history-table.sql)
+// bu haftanin (Pazartesi 00:00'dan itibaren) ve gecen haftanin max agirliklarini
+// egzersiz adina gore grupluyor; bu hafta gecen haftadan daha agirsa PR sayilir.
+// Gecen hafta hic veri yoksa karsilastirma yapilamaz, o egzersiz PR listesine girmez.
+function mondayOf(d){
+  const x = new Date(d);
+  const idx = x.getDay()===0?6:x.getDay()-1;
+  x.setDate(x.getDate()-idx);
+  x.setHours(0,0,0,0);
+  return x;
+}
+async function renderDashPRCard(){
+  const el = document.getElementById('dashPRCard');
+  if(!el) return;
+  const uid = activeProfile()?.id;
+  if(!uid){ el.innerHTML=''; return; }
+  const thisMonday = mondayOf(new Date());
+  const lastMonday = new Date(thisMonday); lastMonday.setDate(lastMonday.getDate()-7);
+  const {data, error} = await sb.from('set_history').select('exercise_name,weight,logged_at').eq('user_id', uid).gte('logged_at', lastMonday.toISOString());
+  if(error || !data || !data.length){ el.innerHTML=''; return; }
+  const thisWeek = {}, lastWeek = {};
+  data.forEach(r=>{
+    const t = new Date(r.logged_at);
+    const bucket = t>=thisMonday ? thisWeek : lastWeek;
+    const w = parseFloat(r.weight)||0;
+    if(bucket[r.exercise_name]===undefined || w>bucket[r.exercise_name]) bucket[r.exercise_name]=w;
+  });
+  const prs = Object.keys(thisWeek)
+    .filter(name=>lastWeek[name]!==undefined && thisWeek[name]>lastWeek[name])
+    .map(name=>({name, weight:thisWeek[name]}));
+  if(!prs.length){ el.innerHTML=''; return; }
+  const cards = prs.map(pr=>`<div style="flex-shrink:0;background:rgba(247,201,72,.08);border:1px solid rgba(247,201,72,.25);border-radius:var(--r-sm);padding:10px 14px;white-space:nowrap">
+    <span style="font-size:12px;font-weight:600;color:var(--acc4)">🏆 ${pr.name} — ${pr.weight} kg yeni rekor!</span>
+  </div>`).join('');
+  el.innerHTML = `<div style="display:flex;gap:8px;overflow-x:auto">${cards}</div>`;
+}
+
+// "Kilo Trendi" - weight_logs'tan son 7 kaydi kucuk bir SVG cizgi grafikle gosterir.
+async function renderDashWeightTrend(){
+  const el = document.getElementById('dashWeightTrend');
+  if(!el) return;
+  const uid = activeProfile()?.id;
+  if(!uid){ el.innerHTML=''; return; }
+  const {data, error} = await sb.from('weight_logs').select('weight,date').eq('user_id', uid).order('date', {ascending:false}).limit(7);
+  if(error || !data || data.length<2){ el.innerHTML=''; return; }
+  const points = [...data].reverse();
+  const weights = points.map(p=>parseFloat(p.weight));
+  const min = Math.min(...weights), max = Math.max(...weights);
+  const range = max-min || 1;
+  const W = 160, H = 80, pad = 6;
+  const stepX = (W-pad*2)/(weights.length-1);
+  const coords = weights.map((w,i)=>[pad+i*stepX, pad+(H-pad*2)*(1-(w-min)/range)]);
+  const pathD = coords.map((c,i)=>(i===0?'M':'L')+c[0].toFixed(1)+','+c[1].toFixed(1)).join(' ');
+  const dots = coords.map(c=>`<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="2.5" fill="var(--acc)"/>`).join('');
+  const start = weights[0], current = weights[weights.length-1];
+  const delta = Math.round((current-start)*10)/10;
+  const deltaColor = delta>0 ? 'var(--danger)' : delta<0 ? 'var(--success)' : 'var(--text-muted)';
+  const deltaTxt = delta===0 ? '±0 kg' : `${delta>0?'+':''}${delta} kg`;
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;align-items:center;gap:14px;box-shadow:var(--card-shadow)">
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="flex-shrink:0">
+      <path d="${pathD}" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}
+    </svg>
+    <div style="text-align:center;flex:1;min-width:0">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:${deltaColor};line-height:1">${deltaTxt}</div>
+      <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px">Kilo Trendi (7g)</div>
+    </div>
+  </div>`;
 }
 
 function goToTodayWorkout(){
@@ -1276,9 +1443,18 @@ async function renderDashCalCard(){
   const uid = p?.id;
   if(!uid){ el.innerHTML=''; return; }
   const nd = await loadNutrition(uid, todayStr());
-  let alinan = 0;
-  nd.meals?.forEach(m=>m.foods?.forEach(f=>alinan+=parseFloat(f.kcal||0)));
+  let alinan = 0, proteinAlinan = 0;
+  nd.meals?.forEach(m=>m.foods?.forEach(f=>{alinan+=parseFloat(f.kcal||0);proteinAlinan+=parseFloat(f.protein||0);}));
   alinan = Math.round(alinan);
+  proteinAlinan = Math.round(proteinAlinan);
+  const targets = nd.targets||{};
+  const kcalTarget = targets.kcal||0;
+  const proteinTarget = targets.protein||0;
+  const kcalRatio = kcalTarget>0 ? alinan/kcalTarget : 0;
+  // Kalori bari: hedefin altinda yesil, yakininda (± %5-10 arasi) sari, ustunde kirmizi.
+  const kcalBarColor = kcalTarget<=0 ? 'var(--text-muted)' : kcalRatio<=0.9 ? 'var(--success)' : kcalRatio<=1.05 ? 'var(--warning)' : 'var(--danger)';
+  const kcalPct = kcalTarget>0 ? Math.min(kcalRatio*100,100) : 0;
+  const proteinPct = proteinTarget>0 ? Math.min((proteinAlinan/proteinTarget)*100,100) : 0;
   const maint = estimateMaintenanceKcal(p);
   const activities = await loadTodayActivityLogs(uid);
   const extraBurn = activities.reduce((s,a)=>s+parseFloat(a.kcal_burned||0),0);
@@ -1318,6 +1494,14 @@ async function renderDashCalCard(){
       <div><div style="font-size:17px;font-weight:700;color:#ff5c38">${yakilan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Yakılan</div></div>
       <div><div style="font-size:17px;font-weight:700;color:${color}">${net}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Net</div></div>
     </div>
+    ${kcalTarget>0?`<div style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Kalori</span><span>${alinan} / ${kcalTarget}</span></div>
+      <div class="nut-bar"><div class="nut-bar-fill" style="width:${kcalPct}%;background:${kcalBarColor}"></div></div>
+    </div>`:''}
+    ${proteinTarget>0?`<div style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Protein</span><span>${proteinAlinan} / ${proteinTarget}g</span></div>
+      <div class="nut-bar"><div class="nut-bar-fill" style="width:${proteinPct}%;background:var(--danger)"></div></div>
+    </div>`:''}
     ${actList}
   </div>`;
 }
@@ -1972,6 +2156,13 @@ function qSave(uid,di,ei,si,field,val){
   saveSet(uid,di,ei,si,{[field]:val});
 }
 
+// PR bildirimi (dashboard) icin append-only gecmis log'u - bkz. scripts/set-history-table.sql
+async function logSetHistory(uid, exerciseName, weight, reps){
+  try{
+    await sb.from('set_history').insert({user_id:uid, exercise_name:exerciseName, weight:parseFloat(weight), reps: reps?String(reps):null});
+  }catch(e){ console.error('logSetHistory error:', e); }
+}
+
 async function toggleSet(uid,di,ei,si,rs){
   const k=`${uid}_${di}_${ei}_${si}`;
   if(!setCache[k])setCache[k]={};
@@ -1981,7 +2172,12 @@ async function toggleSet(uid,di,ei,si,rs){
   if(sr&&sr.value)fields.reps=sr.value;
   const newDone=!setCache[k].done;
   fields.done=newDone;
-  if(newDone){fields.done_at=new Date().toISOString();if(rs>0)startRest(rs);}
+  if(newDone){
+    fields.done_at=new Date().toISOString();
+    if(rs>0)startRest(rs);
+    const exName=activeProgram()[di]?.exercises?.[ei]?.name;
+    if(exName&&fields.weight)logSetHistory(uid,exName,fields.weight,fields.reps);
+  }
   await saveSet(uid,di,ei,si,fields);
   const row=document.getElementById('sr_'+k),btn=document.getElementById('cb_'+k);
   if(newDone){row?.classList.add('sdone');if(btn){btn.classList.add('chk');btn.textContent='✓';}}
@@ -4325,6 +4521,7 @@ async function deleteOwnAccount(){
   const {error} = await sb.from('profiles').delete().eq('id', uid);
   if(error){ alert('Silme başarısız: '+error.message); return; }
   await sb.from('workout_sets').delete().eq('user_id', uid);
+  await sb.from('set_history').delete().eq('user_id', uid);
   await sb.from('session_logs').delete().eq('user_id', uid);
   await sb.from('nutrition_logs').delete().eq('user_id', uid);
   await sb.from('weight_logs').delete().eq('user_id', uid);
@@ -4354,6 +4551,7 @@ async function deleteProfile(){
   const {error} = await sb.from('profiles').delete().eq('id', uid);
   if(error){ alert('Silme başarısız: '+error.message); return; }
   await sb.from('workout_sets').delete().eq('user_id', uid);
+  await sb.from('set_history').delete().eq('user_id', uid);
   await sb.from('session_logs').delete().eq('user_id', uid);
   await sb.from('nutrition_logs').delete().eq('user_id', uid);
   await sb.from('weight_logs').delete().eq('user_id', uid);
