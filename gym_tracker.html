@@ -204,9 +204,23 @@ button:active{transform:scale(.97)}
 .set-row.sdone{background:rgba(52,211,153,.06);border-left:3px solid var(--success)}
 .set-row.warmup-row{background:rgba(247,201,72,.07)}
 .set-row.warmup-row.sdone{background:rgba(247,201,72,.14);border-left:3px solid var(--warning)}
-.snum{font-family:'Bebas Neue',sans-serif;font-size:14px;color:var(--text-muted);line-height:1;text-align:center}
+.snum{font-family:'Bebas Neue',sans-serif;font-size:14px;color:var(--text-muted);line-height:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
 .sdone .snum{color:var(--success)}
 .warmup-row .snum{color:var(--warning)}
+.rir-badge{font-family:'Inter',sans-serif;display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:13px;padding:0 3px;border-radius:5px;font-size:8px;font-weight:700;line-height:1}
+.rir-badge-0{background:rgba(239,68,68,.18);color:var(--danger)}
+.rir-badge-1{background:rgba(255,146,51,.18);color:#ff9233}
+.rir-badge-2{background:rgba(247,201,72,.18);color:var(--acc4)}
+.rir-badge-3{background:rgba(52,211,153,.18);color:var(--success)}
+.rir-popup{max-height:0;overflow:hidden;transition:max-height .25s ease;background:var(--surface2)}
+.rir-popup.open{max-height:130px}
+.rir-popup-inner{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 16px 6px}
+.rir-opt{border:none;border-radius:8px;padding:8px 4px;font-size:10px;font-weight:700;cursor:pointer;color:#080808;line-height:1.3;min-height:40px}
+.rir-opt.rir-opt-0{background:var(--danger)}
+.rir-opt.rir-opt-1{background:#ff9233}
+.rir-opt.rir-opt-2{background:var(--acc4)}
+.rir-opt.rir-opt-3{background:var(--success)}
+.rir-skip{display:block;width:100%;background:none;border:none;color:var(--text-muted);font-size:10px;text-decoration:underline;cursor:pointer;padding:2px 16px 10px;text-align:center}
 .warmup-hint{padding:0 16px 8px;margin-top:-4px;font-size:10px;color:var(--warning)}
 .effort-hint{padding:0 16px 8px;margin-top:-4px;font-size:10px;color:var(--text-muted)}
 .sinput{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 7px;color:var(--text);font-family:'Inter',sans-serif;font-size:16px;font-weight:600;text-align:center;width:100%;min-height:48px;transition:border-color .2s}
@@ -564,6 +578,7 @@ button:active{transform:scale(.97)}
     <div id="weightChartSection" style="margin:12px 16px 0"></div>
     <div id="nutChartSection" style="margin:10px 16px 0"></div>
     <div class="pr-section"><h3>Kişisel Rekorlar</h3><div id="prList"></div></div>
+    <div class="pr-section" style="margin-top:14px"><h3>Egzersiz Bazlı Ortalama RIR</h3><div id="rirStatsList"></div></div>
   </div>
 
   <div class="screen" id="screen-nutrition">
@@ -917,7 +932,7 @@ async function loadSetsForDay(userId, dayIdx) {
     const doneAt = row.done_at ? new Date(row.done_at) : null;
     // Only show done if viewing current week
     const isDone = row.done === true && doneAt && doneAt >= monday && doneAt < nextMonday;
-    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDone, ts: row.done_at, db_id: row.id};
+    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDone, done_at: row.done_at, rir: row.rir, ts: row.done_at, db_id: row.id};
   });
 }
 
@@ -1034,7 +1049,13 @@ async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
   saveTimer[k] = setTimeout(async () => {
     try {
       const storeDi = storageDayIndex(userId, parseInt(dayIdx));
-      const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...fields};
+      // db_id haric, o anki setCache[k]'in TAMAMI yazilir (sadece bu cagriya
+      // ozel 'fields' degil) - yoksa RIR secimi gibi, checkmark'in kendi
+      // 600ms'lik debounce'u bitmeden gelen hizli ikinci bir saveSet cagrisi
+      // onceki cagrinin (weight/reps/done) alanlarini iptal edip sadece
+      // kendi alanini (rir) yazar, digerleri hic kaydedilmemis olurdu.
+      const {db_id, ...cacheable} = setCache[k];
+      const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...cacheable};
       if(setCache[k].db_id) {
         await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
       } else {
@@ -2071,11 +2092,24 @@ function buildExCard(ex, di, ei) {
     const hintHtml = isWarmup
       ? `<div class="warmup-hint">🔥 Isınma seti — hedef ağırlığının ~%40-50'si ile ısın</div>`
       : (def && def.effort && def.effort!=='warmup' ? `<div class="effort-hint">Hedef efor: %${def.effort}</div>` : '');
+    const rirVal = sd.rir;
+    const hasRir = rirVal!==undefined && rirVal!==null;
+    const rirBucket = hasRir ? (rirVal>=3?3:rirVal) : null;
+    const rirBadgeHtml = hasRir ? `<span class="rir-badge rir-badge-${rirBucket}">${rirVal>=3?'3+':rirVal}</span>` : '';
     setRows += `<div class="set-row${isDone?' sdone':''}${isWarmup?' warmup-row':''}" id="sr_${k}">
-      <div class="snum">${s+1}</div>
+      <div class="snum">${s+1}${rirBadgeHtml}</div>
       <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="${sd.weight||'kg'}" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
       <input class="sinput" type="text" placeholder="${sd.reps||repTarget}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
       <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?"✓":"O"}</button>
+    </div>
+    <div class="rir-popup" id="rirpop_${k}">
+      <div class="rir-popup-inner">
+        <button class="rir-opt rir-opt-0" onclick="pickRIR('${uid}',${di},${ei},${s},0)">0 — Failure</button>
+        <button class="rir-opt rir-opt-1" onclick="pickRIR('${uid}',${di},${ei},${s},1)">1 — 1 kaldı</button>
+        <button class="rir-opt rir-opt-2" onclick="pickRIR('${uid}',${di},${ei},${s},2)">2 — 2 kaldı</button>
+        <button class="rir-opt rir-opt-3" onclick="pickRIR('${uid}',${di},${ei},${s},3)">3+ — Rahat</button>
+      </div>
+      <button class="rir-skip" onclick="closeRIRPopup('${k}')">Atla</button>
     </div>${hintHtml}`;
   }
   const exCount = activeProgram()[di]?.exercises.length||1;
@@ -2180,13 +2214,35 @@ async function toggleSet(uid,di,ei,si,rs){
   }
   await saveSet(uid,di,ei,si,fields);
   const row=document.getElementById('sr_'+k),btn=document.getElementById('cb_'+k);
-  if(newDone){row?.classList.add('sdone');if(btn){btn.classList.add('chk');btn.textContent='✓';}}
-  else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='O';}}
+  if(newDone){row?.classList.add('sdone');if(btn){btn.classList.add('chk');btn.textContent='✓';}openRIRPopup(k);}
+  else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='O';}closeRIRPopup(k);}
   const ex=activeProgram()[di].exercises[ei];let done=0;
   for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)done++;}
   const mp=document.getElementById(`mp_${di}_${ei}`);if(mp){mp.textContent=`${done}/${ex.sets}`;mp.className=`meta-pill${done===ex.sets?' done-pill':''}`;}
   done===ex.sets?document.getElementById(`ec_${di}_${ei}`)?.classList.add('completed'):document.getElementById(`ec_${di}_${ei}`)?.classList.remove('completed');
   renderDayTabs();
+}
+
+function openRIRPopup(k){ document.getElementById('rirpop_'+k)?.classList.add('open'); }
+function closeRIRPopup(k){ document.getElementById('rirpop_'+k)?.classList.remove('open'); }
+
+// Set tamamlandiktan hemen sonra acilan RIR popup'indaki secime tiklaninca
+// cagrilir - saveSet'e sadece {rir} gonderir (asil yazim saveSet'teki
+// setCache[k] merge'i sayesinde onceki weight/reps/done alanlariyla birlikte
+// guvenle kaydedilir, bkz. saveSet icindeki aciklama).
+async function pickRIR(uid,di,ei,si,rir){
+  const k=`${uid}_${di}_${ei}_${si}`;
+  await saveSet(uid,di,ei,si,{rir});
+  const numEl=document.querySelector(`#sr_${k} .snum`);
+  if(numEl){
+    numEl.querySelector('.rir-badge')?.remove();
+    const bucket=rir>=3?3:rir;
+    const span=document.createElement('span');
+    span.className=`rir-badge rir-badge-${bucket}`;
+    span.textContent=rir>=3?'3+':String(rir);
+    numEl.appendChild(span);
+  }
+  closeRIRPopup(k);
 }
 
 
@@ -2811,6 +2867,30 @@ async function renderStats(){
   }));
   const keys=Object.keys(prs);
   document.getElementById('prList').innerHTML=keys.length?keys.map(n=>`<div class="pr-item"><div class="pr-ex">${n}</div><div class="pr-v">${prs[n].w} kg</div><div class="pr-d">${prs[n].d}</div></div>`).join(''):'<div class="empty-state">Henüz ağırlık girilmedi.</div>';
+  // Egzersiz bazli ortalama RIR - ayni setCache uzerinden (bkz. yukaridaki
+  // PR dongusu) hesaplanir; setCache sadece bu oturumda ACILMIS gunlerin
+  // verisini tutar (loadSetsForDay gun bazli cagriliyor), bu yuzden PR
+  // listesiyle ayni bilinen sinirlamayi tasir.
+  const rirStats={};
+  activeProgram().forEach((day,di)=>day.exercises.forEach((ex,ei)=>{
+    for(let s=0;s<ex.sets;s++){
+      const d=setCache[`${p?.id}_${di}_${ei}_${s}`]||{};
+      if(d.rir!==undefined&&d.rir!==null){
+        if(!rirStats[ex.name])rirStats[ex.name]={sum:0,count:0};
+        rirStats[ex.name].sum+=parseFloat(d.rir);
+        rirStats[ex.name].count++;
+      }
+    }
+  }));
+  const rirKeys=Object.keys(rirStats);
+  document.getElementById('rirStatsList').innerHTML=rirKeys.length?rirKeys.map(n=>{
+    const avg=rirStats[n].sum/rirStats[n].count;
+    const avgR=Math.round(avg*10)/10;
+    let hint='ort. RIR',hintColor='var(--text-muted)';
+    if(avg>=3){hint='💪 Ağırlığı artır';hintColor='var(--success)';}
+    else if(avg<=0.5){hint='⚠️ Ağırlığı düşür veya dinlen';hintColor='var(--danger)';}
+    return `<div class="pr-item"><div class="pr-ex">${n}</div><div class="pr-v" style="font-size:15px">${avgR}</div><div class="pr-d" style="color:${hintColor}">${hint}</div></div>`;
+  }).join(''):'<div class="empty-state">Henüz RIR verisi yok.</div>';
 }
 
 // ── NUTRITION ──
