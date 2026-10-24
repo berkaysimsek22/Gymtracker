@@ -1305,9 +1305,10 @@ function renderDashLastWorkout(){
   const whenTxt = dayDiff<=0 ? 'Bugün' : dayDiff===1 ? '1 gün önce' : `${dayDiff} gün önce`;
   const vol = parseFloat(last.volume)||0;
   const volTxt = vol>=1000 ? (vol/1000).toFixed(1).replace('.0','')+'k kg' : `${Math.round(vol)} kg`;
+  const durTxt = last.duration_sec ? ` · ⏱ ${fmtDuration(last.duration_sec)}` : '';
   el.innerHTML = `<div onclick="showScreen('stats',navBtnFor('stats'))" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;cursor:pointer;box-shadow:var(--card-shadow)">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:5px">Son Antrenman</div>
-    <div style="font-size:13px;font-weight:600">${whenTxt} · ${last.day_name||''} · ${last.sets_done||0} set · ${volTxt}</div>
+    <div style="font-size:13px;font-weight:600">${whenTxt} · ${last.day_name||''} · ${last.sets_done||0} set · ${volTxt}${durTxt}</div>
   </div>`;
 }
 
@@ -2023,6 +2024,7 @@ async function renderDayContent(di) {
     </div>
     <div class="day-head-right">
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
+      <button class="btn btn-outline btn-sm" id="woTimerPill" onclick="toggleWorkoutTimer('${uid}',${di})" title="Antrenman süresi — manuel başlat/durdur, ilk set işaretlenince de otomatik başlar">⏱ Başlat</button>
       <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">💪</button>
       ${canEdit()&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
@@ -2068,6 +2070,7 @@ async function renderDayContent(di) {
   el.innerHTML = html;
   const exList = document.getElementById('exList');
   day.exercises.forEach((ex,ei) => exList.appendChild(buildExCard(ex,di,ei)));
+  setupWorkoutTimerDisplay(uid, di);
 }
 
 function canEdit() { return isAdmin() || currentProfile?.id === activeProfile()?.id; }
@@ -2211,6 +2214,9 @@ async function toggleSet(uid,di,ei,si,rs){
     if(rs>0)startRest(rs);
     const exName=activeProgram()[di]?.exercises?.[ei]?.name;
     if(exName&&fields.weight)logSetHistory(uid,exName,fields.weight,fields.reps);
+    // Manuel baslatilmamissa, gunun ilk set isaretlemesinde antrenman
+    // zamanlayicisini otomatik baslat.
+    if(!loadWorkoutTimer(uid,di)) startWorkoutTimer(uid,di);
   }
   await saveSet(uid,di,ei,si,fields);
   const row=document.getElementById('sr_'+k),btn=document.getElementById('cb_'+k);
@@ -2432,6 +2438,98 @@ async function clearDaySets(di){
 }
 
 
+// ── ANTRENMAN SÜRE ÖLÇER ──
+// Baslangic/bitis iki yoldan tetiklenebilir: manuel Başlat/Durdur butonu, ya
+// da ilk set isaretlenince otomatik baslama + "Günü Tamamla"da otomatik
+// bitirme. localStorage'da tutuluyor ki sayfa yenilense/uygulama arka plana
+// alinsa bile sayac kaybolmasin (antrenmanlar 30-90dk surebiliyor).
+let workoutTimerInterval = null;
+
+function woTimerKey(uid, di){ return `wotimer_${uid}_${di}`; }
+
+function loadWorkoutTimer(uid, di){
+  try{
+    const raw = localStorage.getItem(woTimerKey(uid, di));
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function saveWorkoutTimerState(uid, di, state){
+  try{
+    if(state) localStorage.setItem(woTimerKey(uid, di), JSON.stringify(state));
+    else localStorage.removeItem(woTimerKey(uid, di));
+  }catch(e){}
+}
+
+function fmtDuration(sec){
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function renderWorkoutTimerPill(uid, di){
+  const pill = document.getElementById('woTimerPill');
+  if(!pill) return;
+  const t = loadWorkoutTimer(uid, di);
+  if(t && t.running){
+    pill.textContent = `⏱ ${fmtDuration((Date.now()-t.start)/1000)}`;
+    pill.style.color = 'var(--acc)';
+    pill.style.borderColor = 'var(--acc-border)';
+  } else if(t && t.frozenSec!=null){
+    pill.textContent = `⏱ ${fmtDuration(t.frozenSec)}`;
+    pill.style.color = 'var(--success)';
+    pill.style.borderColor = 'var(--border)';
+  } else {
+    pill.textContent = '⏱ Başlat';
+    pill.style.color = '';
+    pill.style.borderColor = '';
+  }
+}
+
+// renderDayContent her cagrildiginda (gun degistirilince de) onceki interval'i
+// temizleyip o anki gunun pill'ine gore gerekirse yenisini kurar.
+function setupWorkoutTimerDisplay(uid, di){
+  clearInterval(workoutTimerInterval);
+  workoutTimerInterval = null;
+  renderWorkoutTimerPill(uid, di);
+  const t = loadWorkoutTimer(uid, di);
+  if(t && t.running) workoutTimerInterval = setInterval(()=>renderWorkoutTimerPill(uid, di), 1000);
+}
+
+function startWorkoutTimer(uid, di){
+  saveWorkoutTimerState(uid, di, {start: Date.now(), running: true, frozenSec: null});
+  setupWorkoutTimerDisplay(uid, di);
+}
+
+function stopWorkoutTimer(uid, di){
+  const t = loadWorkoutTimer(uid, di);
+  if(t && t.running){
+    saveWorkoutTimerState(uid, di, {start: null, running: false, frozenSec: (Date.now()-t.start)/1000});
+  }
+  setupWorkoutTimerDisplay(uid, di);
+}
+
+function toggleWorkoutTimer(uid, di){
+  const t = loadWorkoutTimer(uid, di);
+  if(t && t.running) stopWorkoutTimer(uid, di);
+  else startWorkoutTimer(uid, di);
+}
+
+// finishDay tarafindan cagrilir: o anki toplam sureyi (saniye) dondurup
+// zamanlayiciyi temizler - cagrildiktan sonra o gun icin sayac sifirlanmis olur.
+function finalizeWorkoutTimer(uid, di){
+  const t = loadWorkoutTimer(uid, di);
+  clearInterval(workoutTimerInterval);
+  workoutTimerInterval = null;
+  let durationSec = null;
+  if(t){
+    if(t.running && t.start) durationSec = Math.round((Date.now()-t.start)/1000);
+    else if(t.frozenSec!=null) durationSec = Math.round(t.frozenSec);
+  }
+  saveWorkoutTimerState(uid, di, null);
+  return durationSec;
+}
+
 // Program dizisindeki "di" indeksinin (prog[di]) BU HAFTA icindeki gercek
 // takvim tarihini dondurur - renderWeekGrid'in hucre tarihi hesabiyla ayni
 // mantik (pi -> haftanin gunu -> tarih), saat 12:00'ye sabitlenmis (gun
@@ -2485,12 +2583,16 @@ function confirmFinishDay(di){
 async function finishDay(di,sets,vol){
   document.getElementById('finishModal')?.remove();
   const prog=activeProgram()[di],uid=activeProfile()?.id;
+  // Zamanlayici calisiyorsa (otomatik ya da manuel baslatilmis) o ana kadar
+  // gecen sureyi al, manuel durdurulmussa donmus degeri kullan, hic
+  // baslatilmadiysa null - ya da bu cagri zamanlayiciyi her durumda temizler.
+  const durationSec = finalizeWorkoutTimer(uid, di);
   // logged_at'i bu gunun (di) GERCEK TAKVIM TARIHINE sabitliyoruz - eskiden
   // bos birakilinca Supabase'in varsayilani (insert anindaki "simdi") kullaniliyordu,
   // bu da butona basilan an baska bir gunun icerigini goruntuluyorsan (ör. curDay
   // Pazartesi'de kalmisken Sali gunu basmak) tamamlanmayi YANLIS takvim gunune
   // (Sali) yaziyordu.
-  const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,logged_at:dateForDayIndex(di).toISOString()}).select().single();
+  const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,logged_at:dateForDayIndex(di).toISOString()}).select().single();
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
   document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
@@ -2500,7 +2602,8 @@ async function finishDay(di,sets,vol){
   const toast=document.createElement('div');
   toast.id='finishToast';
   toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#161616;border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;display:flex;align-items:center;gap:12px;z-index:500;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5)';
-  toast.innerHTML=`<span style="font-size:13px">💪 <strong>${prog.name}</strong> tamamlandı!</span>
+  const durTxt = durationSec!=null ? ` · ⏱ ${fmtDuration(durationSec)}` : '';
+  toast.innerHTML=`<span style="font-size:13px">💪 <strong>${prog.name}</strong> tamamlandı!${durTxt}</span>
     <button onclick="undoFinish('${data.id}')" style="background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.2);color:#ff5c38;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">Geri Al</button>`;
   document.body.appendChild(toast);
   setTimeout(()=>document.getElementById('finishToast')?.remove(),6000);
