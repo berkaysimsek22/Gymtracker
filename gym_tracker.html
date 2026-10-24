@@ -2694,11 +2694,45 @@ function tickH(h){
 }
 
 // ── AMRAP / CHALLENGE (Cindy, Fran vb.) ──
+// Round/ekstra-tekrar/geri-sayim ilerlemesi localStorage'a yazilir (sayfa
+// yenilense bile kaybolmasin) ve antrenman BITINCE (sure dolunca otomatik,
+// ya da "Antrenmani Tamamla" ile manuel) session_logs'a kaydedilip normal
+// antrenman gunleriyle AYNI tamamlanma/hafta-grid/istatistik altyapisini
+// kullanir - isDayDoneThisWeek/confirmUnfinishDay/undoFinish zaten gun adi +
+// tarih eslesmesiyle calistigi icin oldugu gibi yeniden kullanilabiliyor.
+function amrapStateKey(uid, di){ return `amrapstate_${uid}_${di}`; }
+function loadAmrapState(uid, di){
+  try{ const raw = localStorage.getItem(amrapStateKey(uid, di)); return raw ? JSON.parse(raw) : null; }
+  catch(e){ return null; }
+}
+function saveAmrapState(uid, di, state){
+  try{ if(state) localStorage.setItem(amrapStateKey(uid, di), JSON.stringify(state)); else localStorage.removeItem(amrapStateKey(uid, di)); }
+  catch(e){}
+}
+// completeRound/undoRound/adjustExtra/tickAmrap hicbir zaman di parametresi
+// almadan cagriliyordu (tek seferde ekranda sadece bir AMRAP gunu goruntulenir
+// varsayimiyla) - ayni varsayimla, o anki gorunen gun olan curDay'e yaziyoruz.
+function persistAmrapCurrent(){
+  const uid=activeProfile()?.id;
+  if(uid==null) return;
+  saveAmrapState(uid, curDay, {rounds:amrapRounds, extra:amrapExtra, secsRemaining:amrapSecs, running:amrapRunning});
+}
+
+function amrapTotalRepsPerRound(day){
+  return ((day.amrap&&day.amrap.exercises)||[]).reduce((s,ex)=>s+(parseInt(ex.reps)||0),0);
+}
+
 function renderAmrapDay(el,day,di){
+  const uid=activeProfile()?.id;
   const a=day.amrap||{timeCapSec:1200,exercises:[]};
   const cap=a.timeCapSec||1200;
-  if(!amrapRunning) amrapSecs=cap;
-  const m0=Math.floor(amrapSecs/60),s0=amrapSecs%60;
+  if(!amrapRunning){
+    const saved=loadAmrapState(uid,di);
+    amrapRounds=saved?.rounds||0;
+    amrapExtra=saved?.extra||0;
+    amrapSecs=(saved&&saved.secsRemaining!=null)?saved.secsRemaining:cap;
+  }
+  const m0=Math.floor(Math.max(0,amrapSecs)/60),s0=Math.max(0,amrapSecs)%60;
   const exRows=(a.exercises||[]).map((ex,ei)=>`
     <div class="amrap-ex-row">
       ${editMode&&canEdit()?`
@@ -2707,9 +2741,14 @@ function renderAmrapDay(el,day,di){
         <button class="del-btn" onclick="delAmrapEx(${di},${ei})">✕</button>
       `:`<div class="n">${ex.name}</div><div class="r">${ex.reps}</div>`}
     </div>`).join('');
+  const isDone=isDayDoneThisWeek(day.name,di);
   el.innerHTML=`<div class="day-head-row">
     <input class="day-head-title" value="${day.name}" ${canEdit()&&editMode?'':'readonly'} onchange="activeProgram()[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
     ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+    ${isDone?
+      '<button class="finish-day-btn" onclick="confirmUnfinishDay('+di+')" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399" title="Tamamlanmayı kaldır">✓ Tamamlandı</button>':
+      '<button class="finish-day-btn" onclick="confirmFinishAmrap('+di+')">🏁 Antrenmanı Tamamla</button>'
+    }
   </div>
   <div class="amrap-card">
     <div class="amrap-head"><h3>🏆 ${day.name}</h3><span style="font-size:10px;color:var(--muted)">${day.day} · AMRAP</span></div>
@@ -2750,13 +2789,14 @@ function toggleAmrap(di){
     if(amrapSecs<=0)amrapSecs=cap;
     amrapRunning=true;
     const btn=document.getElementById('amrapBtn');if(btn)btn.textContent='⏸ DURAKLAT';
-    amrapIv=setInterval(tickAmrap,1000);
+    amrapIv=setInterval(()=>tickAmrap(di),1000);
   } else {
     amrapRunning=false;clearInterval(amrapIv);
     const btn=document.getElementById('amrapBtn');if(btn)btn.textContent='▶ DEVAM ET';
   }
+  persistAmrapCurrent();
 }
-function tickAmrap(){
+function tickAmrap(di){
   const cd=document.getElementById('amrapCd');
   if(!cd){clearInterval(amrapIv);amrapRunning=false;return;}
   amrapSecs--;
@@ -2766,30 +2806,100 @@ function tickAmrap(){
     amrapRunning=false;clearInterval(amrapIv);
     cd.style.color='var(--acc2)';
     const btn=document.getElementById('amrapBtn');if(btn)btn.textContent='✓ SÜRE BİTTİ';
+    finishAmrapDay(di);
+    return;
   }
+  persistAmrapCurrent();
 }
 function resetAmrap(di){
   clearInterval(amrapIv);amrapRunning=false;amrapRounds=0;amrapExtra=0;
   const day=activeProgram()[di];
   amrapSecs=(day.amrap&&day.amrap.timeCapSec)||1200;
+  const uid=activeProfile()?.id;
+  if(uid!=null) saveAmrapState(uid, di, null);
   renderDayContent(di);
 }
 function completeRound(){
   amrapRounds++;amrapExtra=0;
   updateAmrapScoreUI();
+  persistAmrapCurrent();
 }
 function undoRound(){
   if(amrapRounds>0)amrapRounds--;
   updateAmrapScoreUI();
+  persistAmrapCurrent();
 }
 function adjustExtra(delta){
   amrapExtra=Math.max(0,amrapExtra+delta);
   updateAmrapScoreUI();
+  persistAmrapCurrent();
 }
 function updateAmrapScoreUI(){
   const r=document.getElementById('amrapRoundsDisp'),e=document.getElementById('amrapExtraDisp');
   if(r)r.textContent=amrapRounds;
   if(e)e.textContent=amrapExtra;
+}
+
+// Manuel "Antrenmanı Tamamla" - sure dolmadan erken bitirmek icin onay modali.
+function confirmFinishAmrap(di){
+  const day=activeProgram()[di];
+  if(!day) return;
+  if(amrapRunning){ amrapRunning=false; clearInterval(amrapIv); persistAmrapCurrent(); }
+  const totalReps=amrapRounds*amrapTotalRepsPerRound(day)+amrapExtra;
+  document.getElementById('finishModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='finishModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
+  modal.innerHTML=`<div style="background:var(--surface);border:1px solid var(--acc-border);border-radius:16px;padding:24px;max-width:340px;width:100%;text-align:center">
+    <div style="font-size:36px;margin-bottom:12px">🏆</div>
+    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${day.name}</h3>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">${amrapRounds} round + ${amrapExtra} tekrar · toplam ${totalReps} tekrar</p>
+    <p style="font-size:11px;color:var(--acc);margin-bottom:20px">Bu antrenmanı tamamlamak istediğine emin misin?</p>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('finishModal').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border-strong);background:none;color:var(--text-muted);cursor:pointer;font-size:12px">İptal</button>
+      <button onclick="document.getElementById('finishModal').remove();finishAmrapDay(${di})" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--acc);color:#080808;cursor:pointer;font-size:12px;font-weight:700">Evet, Tamamla!</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+// Antrenmani otomatik (sure dolunca, tickAmrap'tan) ya da manuel
+// (confirmFinishAmrap'tan) bitirir: session_logs'a kaydeder (sets_done=round
+// sayisi, volume=toplam tekrar sayisi - normal gunlerdeki "kg hacim" anlamina
+// gelmiyor ama ayni sutunlar yeniden kullaniliyor), onceki en iyi sonuçla
+// karsilastirip analizini gosterir, ilerleme kaydini temizler.
+async function finishAmrapDay(di){
+  const day=activeProgram()[di], uid=activeProfile()?.id;
+  if(!day||!uid) return;
+  const a=day.amrap||{timeCapSec:1200,exercises:[]};
+  const cap=a.timeCapSec||1200;
+  const elapsedSec=Math.max(0, cap-Math.max(0,amrapSecs));
+  const totalReps=amrapRounds*amrapTotalRepsPerRound(day)+amrapExtra;
+  const prevBest=sessionCache.filter(s=>s.day_name===day.name).reduce((best,s)=>Math.max(best, s.sets_done||0), 0);
+  const {data,error}=await sb.from('session_logs').insert({
+    user_id:uid, day_name:day.name, sets_done:amrapRounds, volume:totalReps,
+    duration_sec:elapsedSec, logged_at:dateForDayIndex(di).toISOString()
+  }).select().single();
+  if(error){ alert('Kaydedilemedi: '+error.message); return; }
+  saveAmrapState(uid, di, null);
+  await loadSessionLogs(uid);
+  document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
+  renderWeekGrid();
+  await renderDayContent(di);
+  showAmrapAnalysis(day.name, amrapRounds, amrapExtra, totalReps, elapsedSec, prevBest, data.id);
+}
+
+function showAmrapAnalysis(dayName, rounds, extra, totalReps, elapsedSec, prevBest, logId){
+  document.getElementById('finishToast')?.remove();
+  const cmp = prevBest<=0 ? '' : rounds>prevBest ? ` · 🎉 Yeni rekor! (önceki: ${prevBest} round)` : rounds===prevBest ? ' · önceki rekorla eşit' : ` · önceki rekor: ${prevBest} round`;
+  const toast=document.createElement('div');
+  toast.id='finishToast';
+  toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--acc-border);border-radius:12px;padding:12px 20px;display:flex;flex-direction:column;align-items:center;gap:4px;z-index:500;max-width:90vw;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+  toast.innerHTML=`<span style="font-size:13px">🏆 <strong>${dayName}</strong> tamamlandı!</span>
+    <span style="font-size:11px;color:var(--text-muted)">${rounds} round + ${extra} tekrar · toplam ${totalReps} tekrar · ⏱ ${fmtDuration(elapsedSec)}${cmp}</span>
+    <button onclick="undoFinish('${logId}')" style="margin-top:4px;background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.2);color:#ff5c38;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">Geri Al</button>`;
+  document.body.appendChild(toast);
+  setTimeout(()=>document.getElementById('finishToast')?.remove(),8000);
 }
 function addAmrapEx(di){
   const name=document.getElementById('amrap-ex-name')?.value.trim();
