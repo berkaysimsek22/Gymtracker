@@ -84,18 +84,17 @@ button:active{transform:scale(.97)}
 .auth-err.show{display:block}
 .auth-info{font-size:11px;color:var(--text-muted);text-align:center;margin-top:12px;line-height:1.5}
 
-/* HEADER - sade: sol avatar, sag streak + cikis (bkz. "HEADER" PR notu) */
-.app-header{padding:14px 16px 0;padding-top:max(14px,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;gap:8px}
-.header-left{display:flex;align-items:center}
-.header-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.badge{font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--text-muted)}
-.streak{background:var(--acc-dim);border-color:var(--acc-border);color:var(--acc)}
-.user-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+/* Global header kaldirildi (avatar/streak/cikis) - cikis artik sadece Profil
+   ekraninda; streak bilgisi zaten Ana Sayfa'nin stats row'unda var. Notch/
+   Dynamic Island guvenli alani artik #mainApp'in kendisine uygulaniyor,
+   cunku admin olmayan kullanicilarda ekranin en tepesindeki eleman artik
+   admin-banner degil (o admin-only), dogrudan her ekranin kendi icerigi. */
+#mainApp{padding-top:max(0px,env(safe-area-inset-top))}
 .logout-btn{font-size:10px;color:var(--danger);background:none;border:1px solid var(--border);border-radius:20px;cursor:pointer;padding:5px 12px}
 
-/* ADMIN BANNER */
-.admin-banner{margin:10px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:8px;max-width:100%}
-.admin-user-search{width:100%;background:var(--surface2);border:1px solid rgba(247,201,72,.25);border-radius:20px;padding:7px 14px;color:var(--acc4);font-size:12px}
+/* ADMIN BANNER - sadece admin gorur, kompakt */
+.admin-banner{margin:8px 16px 0;background:rgba(247,201,72,.06);border:1px solid rgba(247,201,72,.2);border-radius:var(--r-sm);padding:6px 10px;display:flex;align-items:center;gap:8px;max-width:100%}
+.admin-user-search{width:100%;background:var(--surface2);border:1px solid rgba(247,201,72,.25);border-radius:16px;padding:5px 12px;color:var(--acc4);font-size:11px}
 .admin-user-search::placeholder{color:rgba(247,201,72,.55)}
 .admin-user-search:focus{border-color:rgba(247,201,72,.5)}
 
@@ -116,7 +115,6 @@ button:active{transform:scale(.97)}
 
 /* PROFILE */
 .profile-card{margin:12px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;gap:12px;align-items:center;box-shadow:var(--card-shadow)}
-.p-av-big{width:56px;height:56px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0}
 .goal-tag{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-size:10px;padding:3px 8px;border-radius:10px}
 .p-stats{margin-left:auto;display:flex;gap:10px}
 .pstat .val{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;color:var(--acc)}
@@ -524,22 +522,6 @@ button:active{transform:scale(.97)}
 
 <!-- MAIN APP -->
 <div id="mainApp" style="display:none">
-  <div class="app-header">
-    <div class="header-left">
-      <div class="user-avatar" id="userAvatar" style="background:var(--acc-dim);color:var(--acc)"><svg viewBox="0 0 40 40" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-  <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
-  <rect x="6" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
-  <rect x="29" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
-  <rect x="3" y="15" width="4" height="10" rx="2" fill="currentColor"/>
-  <rect x="33" y="15" width="4" height="10" rx="2" fill="currentColor"/>
-</svg></div>
-    </div>
-    <div class="header-right">
-      <div class="badge streak" id="streakBadge">🔥 0 antrenman</div>
-      <button class="logout-btn" onclick="logout()">çıkış</button>
-    </div>
-  </div>
-
   <!-- ADMIN BANNER -->
   <div class="admin-banner" id="adminBanner" style="display:none">
     <div style="position:relative;flex:1;min-width:0">
@@ -630,9 +612,12 @@ button:active{transform:scale(.97)}
 
   <!-- PROFILE SCREEN -->
   <div class="screen" id="screen-profile">
-    <div style="padding:18px 16px 0;display:flex;align-items:center;justify-content:space-between">
+    <div style="padding:18px 16px 0;display:flex;align-items:center;justify-content:space-between;gap:8px">
       <h2 style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px">Profil</h2>
-      <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
+        <button class="logout-btn" onclick="logout()">çıkış</button>
+      </div>
     </div>
     <div class="prof-section" style="margin:12px 16px 0">
       <h3>Görünüm</h3>
@@ -1109,10 +1094,6 @@ function showMainApp() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
 
-  // User avatar
-  const p = currentProfile;
-  document.getElementById('userAvatar').textContent = (p?.name||'?')[0].toUpperCase();
-
   // Admin setup
   if(isAdmin()) {
     document.getElementById('adminBanner').style.display = 'flex';
@@ -1217,7 +1198,6 @@ async function renderAll() {
   renderProfile(p);
   renderDayTabs();
   await renderDayContent(curDay);
-  document.getElementById('streakBadge').textContent = `🔥 ${sessionCache.length} antrenman`;
 }
 
 // ── ANA SAYFA (DASHBOARD) ──
@@ -1762,17 +1742,12 @@ async function renderProfile(p) {
   // sekmesindeki gunluk kalori/makro hedefleriyle karistirilmasin diye "Amac" deniyor.
   // Amac secilmemisse hic etiket gosterilmiyor (eskiden "Amaç belirlenmedi" yaziyordu).
   const goalLabel = GOALS.find(g=>g.id===goalId)?.label || p.goal || null;
-  document.getElementById('profileCard').innerHTML = `
-    <div class="p-av-big" style="background:${bg};color:${color}"><svg viewBox="0 0 40 40" width="28" height="28" xmlns="http://www.w3.org/2000/svg">
-  <rect x="9" y="18" width="22" height="4" rx="2" fill="currentColor"/>
-  <rect x="6" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
-  <rect x="29" y="13" width="5" height="14" rx="2.5" fill="currentColor"/>
-  <rect x="3" y="15" width="4" height="10" rx="2" fill="currentColor"/>
-  <rect x="33" y="15" width="4" height="10" rx="2" fill="currentColor"/>
-</svg></div>
-    <div style="flex:1;min-width:0">
-      ${goalLabel?`<div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${goalLabel}</div>`:''}
-    </div>`;
+  const profileCardEl = document.getElementById('profileCard');
+  // Amac yoksa bu kartin gosterecek bir seyi kalmiyor (eskiden icon tek
+  // basina, hicbir seye bagli olmadan oradaydi) - kart tamamen gizleniyor.
+  profileCardEl.innerHTML = goalLabel
+    ? `<div class="goal-tag" style="color:${color};background:${bg};border:1px solid ${color}33">🎯 ${goalLabel}</div>`
+    : '';
 }
 
 // Dashboard'daki tek satirlik ozet ("77.2 kg → 80 kg hedef · Ort. 1.079 kcal/gün")
@@ -2616,7 +2591,6 @@ async function finishDay(di,sets,vol){
   const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,logged_at:dateForDayIndex(di).toISOString()}).select().single();
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
-  document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
   renderWeekGrid();
   await renderDayContent(di);
   // Show success with undo
@@ -2634,7 +2608,6 @@ async function undoFinish(logId){
   document.getElementById('finishToast')?.remove();
   await sb.from('session_logs').delete().eq('id',logId);
   await loadSessionLogs(activeProfile()?.id);
-  document.getElementById('streakBadge').textContent=`🔥 ${sessionCache.length} antrenman`;
   const t=document.createElement('div');
   t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;padding:12px 20px;z-index:500;font-size:12px;color:var(--text-muted)';
   t.textContent='↩ Antrenman kaydı geri alındı';
@@ -2657,7 +2630,6 @@ async function confirmUnfinishDay(di){
   const {error} = await sb.from('session_logs').delete().eq('id', target.id);
   if(error){ alert('Kaldırılamadı: '+error.message); return; }
   await loadSessionLogs(uid);
-  document.getElementById('streakBadge').textContent=`🔥 ${sessionCache.length} antrenman`;
   renderWeekGrid();
   await renderDayContent(di);
 }
@@ -2888,7 +2860,6 @@ async function finishAmrapDay(di){
   if(error){ alert('Kaydedilemedi: '+error.message); return; }
   saveAmrapState(uid, di, null);
   await loadSessionLogs(uid);
-  document.getElementById('streakBadge').textContent='🔥 '+sessionCache.length+' antrenman';
   renderWeekGrid();
   await renderDayContent(di);
   showAmrapAnalysis(day.name, amrapRounds, amrapExtra, totalReps, elapsedSec, prevBest, data.id);
