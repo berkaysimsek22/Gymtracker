@@ -85,7 +85,7 @@ button:active{transform:scale(.97)}
 .auth-info{font-size:11px;color:var(--text-muted);text-align:center;margin-top:12px;line-height:1.5}
 
 /* HEADER - sade: sol avatar, sag streak + cikis (bkz. "HEADER" PR notu) */
-.app-header{padding:14px 16px 0;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.app-header{padding:14px 16px 0;padding-top:max(14px,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;gap:8px}
 .header-left{display:flex;align-items:center}
 .header-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .badge{font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid var(--border);color:var(--text-muted)}
@@ -455,11 +455,6 @@ button:active{transform:scale(.97)}
 /* SCREENS */
 .screen{display:none;-webkit-overflow-scrolling:touch;padding-bottom:90px}
 .screen.active{display:block}
-
-/* iPhone notch/dynamic island */
-@supports (padding-top: env(safe-area-inset-top)) {
-  .main-header { padding-top: max(12px, env(safe-area-inset-top)); }
-}
 </style>
 </head>
 <body>
@@ -710,6 +705,11 @@ let setCache = {}; // key -> set data
 let nutCache = {}; // userId_date -> nutrition data
 let sessionCache = []; // session logs for current view
 let curDay = 0;
+// Kullanici Antrenman ekraninda elle bir gun sectiginde (selDW/selDay) o
+// gunu hatirliyoruz ki uygulamadan cikip girince ayni gunde devam etsin
+// (bkz. showMainApp - bugune otomatik sifirlanan diger curDay atamalari
+// kasitli, orn. "bugune git" butonu ya da yeni split uygulanmasi).
+function persistCurDay(){ try{ localStorage.setItem('gt_curDay', String(curDay)); }catch(e){} }
 let editMode = false;
 let restIv = null, restSecs = 0;
 let hiitIv = null, hiitRunning = false, hiitPhase = 'work', hiitRound = 1, hiitSecs = 0;
@@ -1119,9 +1119,13 @@ function showMainApp() {
     renderAdminTabs();
   }
 
-  // Set curDay to today's program index
+  // curDay: kullanicinin en son kendi elceyle sectigi gun varsa (selDW/selDay
+  // - bkz. persistCurDay) onu geri yukle, yoksa bugunun gun index'ine dus.
   const todayJS = new Date().getDay(); // 0=Sun,1=Mon...6=Sat
-  curDay = todayJS === 0 ? 6 : todayJS - 1; // Convert to Mon=0...Sun=6
+  const todayIdx = todayJS === 0 ? 6 : todayJS - 1; // Convert to Mon=0...Sun=6
+  let savedDay = null;
+  try{ const raw = localStorage.getItem('gt_curDay'); if(raw!==null) savedDay = parseInt(raw); }catch(e){}
+  curDay = (savedDay!==null && savedDay>=0 && savedDay<=6) ? savedDay : todayIdx;
 
   renderAll();
   renderDashboard();
@@ -1742,6 +1746,7 @@ function renderWeekGrid() {
 }
 function selDW(i){
   curDay=i;
+  persistCurDay();
   showScreen('workout',navBtnFor('workout'));
   renderWeekGrid();
   renderDayContent(curDay);
@@ -2009,7 +2014,7 @@ async function avgKcalLast7Days(userId){
 }
 
 function renderDayTabs(){} // removed
-async function selDay(i){curDay=i;editMode=false;renderDayTabs();await renderDayContent(i);}
+async function selDay(i){curDay=i;persistCurDay();editMode=false;renderDayTabs();await renderDayContent(i);}
 
 async function renderDayContent(di) {
   const prog = activeProgram(), day = prog[di], el = document.getElementById('dayContent');
