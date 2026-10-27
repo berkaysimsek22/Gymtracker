@@ -558,6 +558,12 @@ button:active{transform:scale(.97)}
   </div>
 
   <div class="screen" id="screen-workout">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0">
+      <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
+      <div id="weekLabelWO" style="font-size:10px;color:var(--muted)">Bu Hafta</div>
+      <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
+    </div>
+    <div class="week-grid" id="weekGridWO"></div>
     <div id="profileCard" style="margin:12px 16px 0"></div>
     <div class="day-content" id="dayContent"></div>
   </div>
@@ -1049,45 +1055,75 @@ async function saveProgram(userId) {
   await sb.from('programs').upsert({user_id: userId, program_data: payload, updated_at: new Date().toISOString()}, {onConflict: 'user_id'});
 }
 
+// setCache[k]'i Supabase'e YAZAN asil islem - debounce timer'in icinden de,
+// flushPendingSetSaves'in hemen-simdi yolundan da cagrilabilsin diye ayri
+// bir fonksiyon (bkz. flushPendingSetSaves).
+async function performSetSave(userId, dayIdx, exIdx, setIdx, k) {
+  try {
+    const storeDi = storageDayIndex(userId, parseInt(dayIdx));
+    // db_id haric, o anki setCache[k]'in TAMAMI yazilir (sadece bu cagriya
+    // ozel 'fields' degil) - yoksa RIR secimi gibi, checkmark'in kendi
+    // 600ms'lik debounce'u bitmeden gelen hizli ikinci bir saveSet cagrisi
+    // onceki cagrinin (weight/reps/done) alanlarini iptal edip sadece
+    // kendi alanini (rir) yazar, digerleri hic kaydedilmemis olurdu.
+    const {db_id, ...cacheable} = setCache[k];
+    const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...cacheable};
+    if(setCache[k].db_id) {
+      await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
+    } else {
+      // Try to find existing row first
+      const {data: existing} = await sb.from('workout_sets')
+        .select('id').eq('user_id', userId)
+        .eq('day_index', storeDi)
+        .eq('exercise_index', parseInt(exIdx))
+        .eq('set_index', parseInt(setIdx))
+        .single();
+      if(existing) {
+        setCache[k].db_id = existing.id;
+        await sb.from('workout_sets').update(row).eq('id', existing.id);
+      } else {
+        const {data} = await sb.from('workout_sets').insert(row).select().single();
+        if(data) setCache[k].db_id = data.id;
+      }
+    }
+  } catch(e) {
+    console.error('saveSet error:', e);
+  }
+}
+
+// Hangi set'in kaydi 600ms'lik debounce penceresinde bekliyor - gun
+// tamamlanirken/sayfadan ayrilirken bunlari hemen yazdirmak icin.
+let pendingSetSaves = {}; // k -> {userId, dayIdx, exIdx, setIdx}
+
 async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
   if(!userId) return; // Guard against null user
   const k = userId+'_'+dayIdx+'_'+exIdx+'_'+setIdx;
   if(!setCache[k]) setCache[k] = {};
   Object.assign(setCache[k], fields);
   clearTimeout(saveTimer[k]);
+  pendingSetSaves[k] = {userId, dayIdx, exIdx, setIdx};
   saveTimer[k] = setTimeout(async () => {
-    try {
-      const storeDi = storageDayIndex(userId, parseInt(dayIdx));
-      // db_id haric, o anki setCache[k]'in TAMAMI yazilir (sadece bu cagriya
-      // ozel 'fields' degil) - yoksa RIR secimi gibi, checkmark'in kendi
-      // 600ms'lik debounce'u bitmeden gelen hizli ikinci bir saveSet cagrisi
-      // onceki cagrinin (weight/reps/done) alanlarini iptal edip sadece
-      // kendi alanini (rir) yazar, digerleri hic kaydedilmemis olurdu.
-      const {db_id, ...cacheable} = setCache[k];
-      const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...cacheable};
-      if(setCache[k].db_id) {
-        await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
-      } else {
-        // Try to find existing row first
-        const {data: existing} = await sb.from('workout_sets')
-          .select('id').eq('user_id', userId)
-          .eq('day_index', storeDi)
-          .eq('exercise_index', parseInt(exIdx))
-          .eq('set_index', parseInt(setIdx))
-          .single();
-        if(existing) {
-          setCache[k].db_id = existing.id;
-          await sb.from('workout_sets').update(row).eq('id', existing.id);
-        } else {
-          const {data} = await sb.from('workout_sets').insert(row).select().single();
-          if(data) setCache[k].db_id = data.id;
-        }
-      }
-    } catch(e) {
-      console.error('saveSet error:', e);
-    }
+    delete pendingSetSaves[k];
+    await performSetSave(userId, dayIdx, exIdx, setIdx, k);
   }, 600);
 }
+
+// Semih'in basina gelen senaryo: gunu tamamlarken hata alinca sayfa
+// yenilenmis ve 600ms'lik debounce penceresinde bekleyen set kayitlari hic
+// Supabase'e ulasmadan kaybolmustu. Artik gunu tamamlamadan ONCE, ve sayfa
+// kapatilirken/yenilenirken de, bekleyen TUM set kayitlari hemen (debounce
+// beklenmeden) yazdiriliyor.
+async function flushPendingSetSaves() {
+  const keys = Object.keys(pendingSetSaves);
+  if(!keys.length) return;
+  await Promise.all(keys.map(k => {
+    const {userId, dayIdx, exIdx, setIdx} = pendingSetSaves[k];
+    clearTimeout(saveTimer[k]);
+    delete pendingSetSaves[k];
+    return performSetSave(userId, dayIdx, exIdx, setIdx, k);
+  }));
+}
+window.addEventListener('beforeunload', () => { flushPendingSetSaves(); });
 
 function showMainApp() {
   document.getElementById('loadingScreen').style.display = 'none';
@@ -1686,10 +1722,13 @@ function renderWeekGrid() {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   const fmtDate = d => d.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()];
-  const lbl = document.getElementById('weekLabel');
-  if(lbl) lbl.textContent = weekOffset===0 ? 'Bu Hafta' : weekOffset===-1 ? 'Geçen Hafta' : fmtDate(weekStart)+' – '+fmtDate(weekEnd);
+  const lblTxt = weekOffset===0 ? 'Bu Hafta' : weekOffset===-1 ? 'Geçen Hafta' : fmtDate(weekStart)+' – '+fmtDate(weekEnd);
+  // Hafta grid'i hem Ana Sayfa'da hem Antrenman ekraninda ayni anda var
+  // (iki ayri DOM kopyasi, ayni ID'ler HTML'de tekrarlanamayacagi icin
+  // "WO" sonekli ikinci bir set kullaniliyor) - ikisi de burada guncelleniyor.
+  ['weekLabel','weekLabelWO'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=lblTxt; });
 
-  document.getElementById('weekGrid').innerHTML = days.map((d,i) => {
+  const gridHtml = days.map((d,i) => {
     const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
     // Bu hucrenin gercek takvim tarihi (hafta ofsetiyle) - tamamlanma
     // kontrolu artik bu tarihe gore yapiliyor, isim eslesmesine gore degil.
@@ -1723,6 +1762,7 @@ function renderWeekGrid() {
       <div style="font-size:8px;color:${isDone?'#34d399':'var(--muted)'};margin-top:1px;opacity:0.8">${dateStr}</div>
     </div>`;
   }).join('');
+  ['weekGrid','weekGridWO'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=gridHtml; });
 }
 function selDW(i){
   curDay=i;
@@ -2578,6 +2618,10 @@ function confirmFinishDay(di){
 
 async function finishDay(di,sets,vol){
   document.getElementById('finishModal')?.remove();
+  // Gunu tamamlama kaydindan ONCE, debounce'ta bekleyen set yazimlarini
+  // hemen bitiriyoruz - yoksa bu islem sirasinda bir hata olup sayfa
+  // yenilenirse, henuz Supabase'e ulasmamis son birkac set kaybolabilirdi.
+  await flushPendingSetSaves();
   const prog=activeProgram()[di],uid=activeProfile()?.id;
   // Zamanlayici calisiyorsa (otomatik ya da manuel baslatilmis) o ana kadar
   // gecen sureyi al, manuel durdurulmussa donmus degeri kullan, hic
