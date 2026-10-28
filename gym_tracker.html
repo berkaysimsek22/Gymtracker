@@ -2579,6 +2579,21 @@ function dateForDayIndex(di){
   return d;
 }
 
+// session_logs'a gun/AMRAP tamamlama kaydi yazar. duration_sec kolonu henuz
+// Supabase'de yoksa (scripts/session-logs-duration-column.sql calistirilmamissa)
+// Supabase "schema cache"de bulamadigi icin TUM insert'i reddediyor - bu da
+// gunu tamamlamayi tamamen kilitliyordu. Artik boyle bir hata yakalanirsa
+// duration_sec'siz tekrar deneniyor; sure kaydedilmeden ama gun tamamlanmis olur.
+async function insertSessionLog(row){
+  let res = await sb.from('session_logs').insert(row).select().single();
+  if(res.error && /duration_sec/i.test(res.error.message||'')){
+    console.warn('session_logs.duration_sec kolonu yok (scripts/session-logs-duration-column.sql calistirilmamis) - sure kaydedilmeden devam ediliyor.');
+    const {duration_sec, ...withoutDuration} = row;
+    res = await sb.from('session_logs').insert(withoutDuration).select().single();
+  }
+  return res;
+}
+
 // "di" gunu, o gunun GERCEK TAKVIM TARIHINDE tamamlanmis mi? (sadece isim +
 // bu hafta degil - eskiden ayni isimli (ör. "Gün B") baska bir gun bu hafta
 // loglandiysa, ilgisiz bir gun de yanlislikla "tamamlandi" gosteriyordu.)
@@ -2632,7 +2647,7 @@ async function finishDay(di,sets,vol){
   // bu da butona basilan an baska bir gunun icerigini goruntuluyorsan (ör. curDay
   // Pazartesi'de kalmisken Sali gunu basmak) tamamlanmayi YANLIS takvim gunune
   // (Sali) yaziyordu.
-  const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,logged_at:dateForDayIndex(di).toISOString()}).select().single();
+  const {data,error}=await insertSessionLog({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,logged_at:dateForDayIndex(di).toISOString()});
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
   renderWeekGrid();
@@ -2897,10 +2912,10 @@ async function finishAmrapDay(di){
   const elapsedSec=Math.max(0, cap-Math.max(0,amrapSecs));
   const totalReps=amrapRounds*amrapTotalRepsPerRound(day)+amrapExtra;
   const prevBest=sessionCache.filter(s=>s.day_name===day.name).reduce((best,s)=>Math.max(best, s.sets_done||0), 0);
-  const {data,error}=await sb.from('session_logs').insert({
+  const {data,error}=await insertSessionLog({
     user_id:uid, day_name:day.name, sets_done:amrapRounds, volume:totalReps,
     duration_sec:elapsedSec, logged_at:dateForDayIndex(di).toISOString()
-  }).select().single();
+  });
   if(error){ alert('Kaydedilemedi: '+error.message); return; }
   saveAmrapState(uid, di, null);
   await loadSessionLogs(uid);
