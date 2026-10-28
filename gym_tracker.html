@@ -911,9 +911,17 @@ async function loadExerciseGifCache(){
   (data||[]).forEach(row=>{
     if(row.gif_url) exerciseGifCache.set(normalizeExName(row.name), row.gif_url);
   });
-  // Cache arka planda, sayfa ilk acildiktan SONRA dolar - o an Antrenman
-  // ekranindaysa GIF'ler gorunsun diye bir kere yeniden ciz.
-  if(document.getElementById('dayContent')) renderDayContent(curDay);
+  // Cache arka planda, sayfa ilk acildiktan SONRA (zayif internette birkac
+  // saniye surebilir) dolar - o an GERCEKTEN Antrenman ekranindaysa GIF'ler
+  // gorunsun diye bir kere yeniden ciz. ÖNEMLİ: bu arada kullanici tam o
+  // sirada set isaretliyor olabilir (debounce'ta bekleyen yazimlar var) -
+  // once bunlari flush etmeden yeniden cizersek, loadSetsForDay henuz
+  // Supabase'e ulasmamis degisiklikleri ESKI veriyle EZERDİ (kullanicinin
+  // az once isaretledigi setler "yapilmadi" gibi gorunurdu).
+  if(document.getElementById('screen-workout')?.classList.contains('active')){
+    await flushPendingSetSaves();
+    renderDayContent(curDay);
+  }
 }
 function findExerciseGif(name){
   if(!exerciseGifCache || !name) return null;
@@ -1058,7 +1066,13 @@ async function saveProgram(userId) {
 // setCache[k]'i Supabase'e YAZAN asil islem - debounce timer'in icinden de,
 // flushPendingSetSaves'in hemen-simdi yolundan da cagrilabilsin diye ayri
 // bir fonksiyon (bkz. flushPendingSetSaves).
-async function performSetSave(userId, dayIdx, exIdx, setIdx, k) {
+// Basarili/basarisiz oldugunu dondurur (true/false) - ustteki eski versiyon
+// hatayi sessizce yutuyordu, zayif internette (ör. spor salonunda 1 cekili
+// sinyal) yazim gercekten basarisiz olsa bile cagiran taraf bunu hic
+// bilemiyordu. Simdi gecici bir hata varsa 2 kez daha (artan bekleme ile)
+// deneniyor, hala basarisizsa false donuyor ki finishDay gunu YANLIŞLIKLA
+// "tamamlandi" olarak isaretlemesin.
+async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
   try {
     const storeDi = storageDayIndex(userId, parseInt(dayIdx));
     // db_id haric, o anki setCache[k]'in TAMAMI yazilir (sadece bu cagriya
@@ -1068,10 +1082,12 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k) {
     // kendi alanini (rir) yazar, digerleri hic kaydedilmemis olurdu.
     const {db_id, ...cacheable} = setCache[k];
     const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...cacheable};
+    let writeError = null;
     if(setCache[k].db_id) {
-      await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id);
+      ({error: writeError} = await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id));
     } else {
-      // Try to find existing row first
+      // Try to find existing row first - burada hata olmasi normal (0 satir
+      // eslesmesi .single()'i hata dondurur), bu yuzden kasten yok sayiliyor.
       const {data: existing} = await sb.from('workout_sets')
         .select('id').eq('user_id', userId)
         .eq('day_index', storeDi)
@@ -1080,14 +1096,22 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k) {
         .single();
       if(existing) {
         setCache[k].db_id = existing.id;
-        await sb.from('workout_sets').update(row).eq('id', existing.id);
+        ({error: writeError} = await sb.from('workout_sets').update(row).eq('id', existing.id));
       } else {
-        const {data} = await sb.from('workout_sets').insert(row).select().single();
+        const {data, error} = await sb.from('workout_sets').insert(row).select().single();
+        writeError = error;
         if(data) setCache[k].db_id = data.id;
       }
     }
+    if(writeError) throw writeError;
+    return true;
   } catch(e) {
-    console.error('saveSet error:', e);
+    console.error(`saveSet error (deneme ${attempt}):`, e);
+    if(attempt < 3){
+      await new Promise(r=>setTimeout(r, 400*attempt));
+      return performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt+1);
+    }
+    return false;
   }
 }
 
@@ -1113,15 +1137,19 @@ async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
 // Supabase'e ulasmadan kaybolmustu. Artik gunu tamamlamadan ONCE, ve sayfa
 // kapatilirken/yenilenirken de, bekleyen TUM set kayitlari hemen (debounce
 // beklenmeden) yazdiriliyor.
+// Hepsi basariyla kaydedildiyse true, en az biri (yeniden denemelere ragmen)
+// basarisiz olduysa false dondurur - cagiran taraf (ör. finishDay) bunu
+// kontrol edip false ise gunu tamamlamayi durdurmali.
 async function flushPendingSetSaves() {
   const keys = Object.keys(pendingSetSaves);
-  if(!keys.length) return;
-  await Promise.all(keys.map(k => {
+  if(!keys.length) return true;
+  const results = await Promise.all(keys.map(k => {
     const {userId, dayIdx, exIdx, setIdx} = pendingSetSaves[k];
     clearTimeout(saveTimer[k]);
     delete pendingSetSaves[k];
     return performSetSave(userId, dayIdx, exIdx, setIdx, k);
   }));
+  return results.every(ok => ok);
 }
 window.addEventListener('beforeunload', () => { flushPendingSetSaves(); });
 
@@ -2579,6 +2607,21 @@ function dateForDayIndex(di){
   return d;
 }
 
+// session_logs'a gun/AMRAP tamamlama kaydi yazar. duration_sec kolonu henuz
+// Supabase'de yoksa (scripts/session-logs-duration-column.sql calistirilmamissa)
+// Supabase "schema cache"de bulamadigi icin TUM insert'i reddediyor - bu da
+// gunu tamamlamayi tamamen kilitliyordu. Artik boyle bir hata yakalanirsa
+// duration_sec'siz tekrar deneniyor; sure kaydedilmeden ama gun tamamlanmis olur.
+async function insertSessionLog(row){
+  let res = await sb.from('session_logs').insert(row).select().single();
+  if(res.error && /duration_sec/i.test(res.error.message||'')){
+    console.warn('session_logs.duration_sec kolonu yok (scripts/session-logs-duration-column.sql calistirilmamis) - sure kaydedilmeden devam ediliyor.');
+    const {duration_sec, ...withoutDuration} = row;
+    res = await sb.from('session_logs').insert(withoutDuration).select().single();
+  }
+  return res;
+}
+
 // "di" gunu, o gunun GERCEK TAKVIM TARIHINDE tamamlanmis mi? (sadece isim +
 // bu hafta degil - eskiden ayni isimli (ör. "Gün B") baska bir gun bu hafta
 // loglandiysa, ilgisiz bir gun de yanlislikla "tamamlandi" gosteriyordu.)
@@ -2621,7 +2664,13 @@ async function finishDay(di,sets,vol){
   // Gunu tamamlama kaydindan ONCE, debounce'ta bekleyen set yazimlarini
   // hemen bitiriyoruz - yoksa bu islem sirasinda bir hata olup sayfa
   // yenilenirse, henuz Supabase'e ulasmamis son birkac set kaybolabilirdi.
-  await flushPendingSetSaves();
+  // flush basarisiz olursa (ör. zayif internet) gunu ASLA "tamamlandi"
+  // olarak isaretlemiyoruz - yoksa veri sessizce kaybolmus gibi gorunur.
+  const flushOk = await flushPendingSetSaves();
+  if(!flushOk){
+    alert('⚠️ Bazı setler internet bağlantısı sorunu yüzünden kaydedilemedi. Günü tamamlamadan önce bağlantını kontrol edip tekrar dene - "Günü Tamamla" butonuna tekrar basman yeterli.');
+    return;
+  }
   const prog=activeProgram()[di],uid=activeProfile()?.id;
   // Zamanlayici calisiyorsa (otomatik ya da manuel baslatilmis) o ana kadar
   // gecen sureyi al, manuel durdurulmussa donmus degeri kullan, hic
@@ -2632,7 +2681,7 @@ async function finishDay(di,sets,vol){
   // bu da butona basilan an baska bir gunun icerigini goruntuluyorsan (ör. curDay
   // Pazartesi'de kalmisken Sali gunu basmak) tamamlanmayi YANLIS takvim gunune
   // (Sali) yaziyordu.
-  const {data,error}=await sb.from('session_logs').insert({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,logged_at:dateForDayIndex(di).toISOString()}).select().single();
+  const {data,error}=await insertSessionLog({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,logged_at:dateForDayIndex(di).toISOString()});
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
   renderWeekGrid();
@@ -2897,10 +2946,10 @@ async function finishAmrapDay(di){
   const elapsedSec=Math.max(0, cap-Math.max(0,amrapSecs));
   const totalReps=amrapRounds*amrapTotalRepsPerRound(day)+amrapExtra;
   const prevBest=sessionCache.filter(s=>s.day_name===day.name).reduce((best,s)=>Math.max(best, s.sets_done||0), 0);
-  const {data,error}=await sb.from('session_logs').insert({
+  const {data,error}=await insertSessionLog({
     user_id:uid, day_name:day.name, sets_done:amrapRounds, volume:totalReps,
     duration_sec:elapsedSec, logged_at:dateForDayIndex(di).toISOString()
-  }).select().single();
+  });
   if(error){ alert('Kaydedilemedi: '+error.message); return; }
   saveAmrapState(uid, di, null);
   await loadSessionLogs(uid);
