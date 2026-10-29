@@ -422,6 +422,9 @@ button:active{transform:scale(.97)}
 .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--acc);display:inline-block;margin-left:4px;animation:pulse 1.5s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
+/* AYLIK HEDEF KUTLAMASI (12/12 konfeti) */
+@keyframes confettiFall{to{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(8,8,8,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 16px env(safe-area-inset-bottom, 16px);gap:4px;z-index:100}
 .nav-btn{flex:1;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px;border-radius:var(--r-sm);cursor:pointer;border:none;background:none;color:var(--text-muted);font-size:9px;font-family:'Inter',sans-serif;text-transform:uppercase;letter-spacing:.4px;transition:color .2s;position:relative}
@@ -574,6 +577,7 @@ button:active{transform:scale(.97)}
     <div id="weightChartSection" style="margin:12px 16px 0"></div>
     <div id="nutChartSection" style="margin:10px 16px 0"></div>
     <div class="pr-section"><h3>Kişisel Rekorlar</h3><div id="prList"></div></div>
+    <div class="pr-section" style="margin-top:14px"><h3>Favori PR</h3><div id="favoritePrCard"></div></div>
     <div class="pr-section" style="margin-top:14px"><h3>Egzersiz Bazlı Ortalama RIR</h3><div id="rirStatsList"></div></div>
   </div>
 
@@ -1647,19 +1651,61 @@ async function deleteActivityLog(id){
   renderDashCalCard();
 }
 
-function computeWorkoutStreak(){
-  if(!sessionCache.length) return 0;
-  const doneDates = new Set(sessionCache.map(s=>localDateStr(new Date(s.logged_at))));
-  let streak = 0;
-  let d = new Date();
-  // Bugun henuz tamamlanmadiysa dunden saymaya basla - bugun henuz bitmedigi
-  // icin seri "kirilmis" sayilmaz.
-  if(!doneDates.has(localDateStr(d))) d.setDate(d.getDate()-1);
-  while(doneDates.has(localDateStr(d))){
-    streak++;
-    d.setDate(d.getDate()-1);
+// ── AYLIK HEDEF ("BU AY" kartı — Ana Sayfa + İstatistik) ──
+const MONTHLY_GOAL = 12;
+function computeMonthlyWorkoutCount(){
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  return sessionCache.filter(s=>{
+    const d = new Date(s.logged_at);
+    return d.getFullYear()===y && d.getMonth()===m;
+  }).length;
+}
+function monthlyGoalColor(count){
+  if(count>=MONTHLY_GOAL) return 'var(--success)';
+  if(count>=10) return 'var(--warning)';
+  return 'var(--acc)';
+}
+function monthlyGoalSubtitle(count){
+  if(count>=MONTHLY_GOAL) return 'Tamamlandı! 🎉';
+  if(count>=10) return 'Az kaldı! 🔥';
+  return 'antrenman';
+}
+// 12/12'ye ulasilinca kutlama (konfeti + toast) sadece bu ay icin BIR KERE
+// gosterilsin diye localStorage'da isaretleniyor - yoksa kart her render
+// oldugunda (ana sayfaya her girişte) tekrar tekrar patlardi.
+function maybeCelebrateMonthlyGoal(uid, count){
+  if(count < MONTHLY_GOAL || !uid) return;
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const key = `gt_monthCelebrated_${uid}_${monthKey}`;
+  try{
+    if(localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
+  }catch(e){ return; }
+  showConfetti();
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--success);border-radius:12px;padding:14px 24px;z-index:9999;font-size:14px;font-weight:700;color:var(--success);box-shadow:0 8px 32px rgba(0,0,0,.5);text-align:center;white-space:nowrap';
+  t.textContent='Ayı tamamladın! 💪';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+function showConfetti(){
+  const colors=['#c8f53c','#ff5c38','#38b6ff','#f7c948','#34d399'];
+  const container=document.createElement('div');
+  container.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9998;overflow:hidden';
+  for(let i=0;i<60;i++){
+    const piece=document.createElement('div');
+    const color=colors[Math.floor(Math.random()*colors.length)];
+    const left=Math.random()*100;
+    const delay=Math.random()*0.4;
+    const duration=2.2+Math.random()*1.2;
+    const size=6+Math.random()*6;
+    piece.style.cssText=`position:absolute;top:-20px;left:${left}vw;width:${size}px;height:${size*0.4}px;background:${color};opacity:.9;border-radius:2px;transform:rotate(${Math.random()*360}deg);animation:confettiFall ${duration}s ease-in ${delay}s forwards`;
+    container.appendChild(piece);
   }
-  return streak;
+  document.body.appendChild(container);
+  setTimeout(()=>container.remove(),3800);
 }
 
 async function renderDashStatsRow(){
@@ -1672,12 +1718,15 @@ async function renderDashStatsRow(){
     const {data} = await sb.from('weight_logs').select('weight,date').eq('user_id', uid).order('date', {ascending:false}).limit(1);
     if(data && data.length) lastWeight = data[0].weight;
   }
-  const streak = computeWorkoutStreak();
+  const monthCount = computeMonthlyWorkoutCount();
+  const monthColor = monthlyGoalColor(monthCount);
+  const monthSub = monthlyGoalSubtitle(monthCount);
+  maybeCelebrateMonthlyGoal(uid, monthCount);
   el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
-      <div style="font-size:22px">🔥</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px">${streak}</div>
-      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Gün Seri</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Bu Ay</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px;color:${monthColor}">${monthCount} / ${MONTHLY_GOAL}</div>
+      <div style="font-size:9px;color:${monthColor};margin-top:1px">${monthSub}</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
       <div style="font-size:22px">🏋️</div>
@@ -3144,16 +3193,62 @@ async function renderNutChart(p){
     +'</div>';
 }
 
+function parseRepsNum(reps){
+  if(reps===null||reps===undefined) return 0;
+  const n = parseInt(String(reps).split(/[-,]/)[0]);
+  return isNaN(n) ? 0 : n;
+}
+
+// "Favori PR" - set_history'den (append-only agirlik gecmisi, bkz.
+// scripts/set-history-table.sql) egzersiz basina EN ESKI ve EN YENI hacim
+// (agirlik x tekrar) degerini karsilastirip en cok hacim artisi olan
+// hareketi secer. workout_sets'ten YAPILAMAZ, cunku o tablo her hafta ayni
+// slotun uzerine yazdigi icin gecmis agirligi saklamiyor (bkz. PR Bildirimi
+// bloğu icin ayni sebeple eklenen set_history).
+async function renderFavoritePr(uid){
+  const el = document.getElementById('favoritePrCard');
+  if(!el) return;
+  if(!uid){ el.innerHTML='<div class="empty-state">Henüz yeterli veri yok.</div>'; return; }
+  const {data, error} = await sb.from('set_history').select('exercise_name,weight,reps,logged_at').eq('user_id', uid).order('logged_at', {ascending:true});
+  if(error || !data || !data.length){ el.innerHTML='<div class="empty-state">Henüz yeterli veri yok.</div>'; return; }
+  const byEx = {};
+  data.forEach(r=>{ (byEx[r.exercise_name] ||= []).push(r); });
+  let best = null;
+  Object.keys(byEx).forEach(name=>{
+    const rows = byEx[name];
+    if(rows.length < 2) return; // tek veri noktasiyla "artis" hesaplanamaz
+    const first = rows[0], last = rows[rows.length-1];
+    const firstVol = parseFloat(first.weight)*parseRepsNum(first.reps);
+    const lastVol = parseFloat(last.weight)*parseRepsNum(last.reps);
+    const increase = lastVol - firstVol;
+    if(increase>0 && (!best || increase>best.increase)){
+      best = {name, firstWeight:first.weight, lastWeight:last.weight, increase};
+    }
+  });
+  el.innerHTML = best
+    ? `<div class="pr-item">
+        <div class="pr-ex">${best.name}</div>
+        <div class="pr-v" style="font-size:14px">${best.firstWeight} kg → ${best.lastWeight} kg</div>
+        <div class="pr-d" style="color:var(--acc4)">🏆 En İyi Gelişim</div>
+      </div>`
+    : '<div class="empty-state">Henüz yeterli veri yok.</div>';
+}
+
 async function renderStats(){
   const p=activeProfile();
   if(!p) return;
+  const uid=p?.id;
   const tv=sessionCache.reduce((s,l)=>s+(l.volume||0),0);
   const ts=sessionCache.reduce((s,l)=>s+(l.sets_done||0),0);
   const color=p?.color||'#d4f53c';
+  const monthCount=computeMonthlyWorkoutCount();
+  const monthColor=monthlyGoalColor(monthCount);
+  const monthSub=monthlyGoalSubtitle(monthCount);
+  maybeCelebrateMonthlyGoal(uid, monthCount);
   document.getElementById('statsGrid').innerHTML=`
     <div class="stat-card"><div class="sc-lbl">Toplam Antrenman</div><div class="sc-val" style="color:${color}">${sessionCache.length}</div><div class="sc-sub">seans</div></div>
     <div class="stat-card"><div class="sc-lbl">Toplam Set</div><div class="sc-val" style="color:${color}">${ts}</div><div class="sc-sub">tamamlandı</div></div>
-    <div class="stat-card"><div class="sc-lbl">Toplam Hacim</div><div class="sc-val" style="color:${color}">${(tv/1000).toFixed(1)}k</div><div class="sc-sub">kg kaldırıldı</div></div>
+    <div class="stat-card"><div class="sc-lbl">Bu Ay</div><div class="sc-val" style="color:${monthColor}">${monthCount} / ${MONTHLY_GOAL}</div><div class="sc-sub" style="color:${monthColor}">${monthSub}</div></div>
     <div class="stat-card"><div class="sc-lbl">Ort. Hacim</div><div class="sc-val" style="color:${color}">${sessionCache.length?Math.round(tv/sessionCache.length):0}</div><div class="sc-sub">kg/seans</div></div>`;
   // Load weight logs and draw chart
   await renderWeightChart(p);
@@ -3165,6 +3260,7 @@ async function renderStats(){
   }));
   const keys=Object.keys(prs);
   document.getElementById('prList').innerHTML=keys.length?keys.map(n=>`<div class="pr-item"><div class="pr-ex">${n}</div><div class="pr-v">${prs[n].w} kg</div><div class="pr-d">${prs[n].d}</div></div>`).join(''):'<div class="empty-state">Henüz ağırlık girilmedi.</div>';
+  await renderFavoritePr(uid);
   // Egzersiz bazli ortalama RIR - ayni setCache uzerinden (bkz. yukaridaki
   // PR dongusu) hesaplanir; setCache sadece bu oturumda ACILMIS gunlerin
   // verisini tutar (loadSetsForDay gun bazli cagriliyor), bu yuzden PR
