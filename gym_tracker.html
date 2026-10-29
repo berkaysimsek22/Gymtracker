@@ -1790,6 +1790,24 @@ async function renderDashStatsRow(){
   const monthColor = monthlyGoalColor(monthCount);
   const monthSub = monthlyGoalSubtitle(monthCount);
   maybeCelebrateMonthlyGoal(uid, monthCount);
+
+  // Ort. protein (son 7 gun) + hedefe gore renk. Profilde ayri bir "protein
+  // hedefi" alani yok - Beslenme sekmesindeki gunluk hedef (bugune ait,
+  // calcMacros ile otomatik ya da elle girilen) "profildeki hedef" yerine
+  // kullanildi, cunku kullanicinin asil takip ettigi deger bu.
+  let avgProtein = null, proteinTarget = 0;
+  if(uid){
+    avgProtein = await avgProteinLast7Days(uid);
+    const nd = await loadNutrition(uid, todayStr());
+    proteinTarget = nd.targets?.protein || 0;
+  }
+  let proteinColor = 'var(--text)';
+  if(avgProtein!==null && proteinTarget>0){
+    const ratio = avgProtein/proteinTarget;
+    proteinColor = ratio>=1 ? 'var(--success)' : ratio>=0.8 ? 'var(--warning)' : 'var(--danger)';
+  }
+  const proteinDisp = avgProtein!==null ? `${avgProtein}g` : '—';
+
   el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
       <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Bu Ay</div>
@@ -1797,9 +1815,9 @@ async function renderDashStatsRow(){
       <div style="font-size:9px;color:${monthColor};margin-top:1px">${monthSub}</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
-      <div style="font-size:22px">🏋️</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px">${sessionCache.length}</div>
-      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Toplam</div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ort. Protein</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px;color:${proteinColor}">${proteinDisp}</div>
+      <div style="font-size:9px;color:var(--muted);margin-top:1px">son 7 gün</div>
     </div>
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
       <div style="font-size:22px">⚖️</div>
@@ -2169,6 +2187,20 @@ async function avgKcalLast7Days(userId){
     let dayKcal=0;
     (row.data?.meals||[]).forEach(m=>(m.foods||[]).forEach(f=>dayKcal+=parseFloat(f.kcal||0)));
     if(dayKcal>0){ total+=dayKcal; days++; }
+  });
+  return days ? Math.round(total/days) : null;
+}
+
+async function avgProteinLast7Days(userId){
+  const end = new Date(); const start = new Date(); start.setDate(end.getDate()-6);
+  const {data, error} = await sb.from('nutrition_logs').select('data')
+    .eq('user_id', userId).gte('date', localDateStr(start)).lte('date', localDateStr(end));
+  if(error){ console.error('avgProteinLast7Days error:', error); return null; }
+  let total=0, days=0;
+  (data||[]).forEach(row=>{
+    let dayProtein=0;
+    (row.data?.meals||[]).forEach(m=>(m.foods||[]).forEach(f=>dayProtein+=parseFloat(f.protein||0)));
+    if(dayProtein>0){ total+=dayProtein; days++; }
   });
   return days ? Math.round(total/days) : null;
 }
