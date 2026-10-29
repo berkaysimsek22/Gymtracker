@@ -104,6 +104,14 @@ button:active{transform:scale(.97)}
 .person-btn.active{background:var(--acc);color:#080808;border-color:var(--acc)}
 .p-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
 
+/* QUOTE BANNER (Ana Sayfa, haftalık grid'in üstünde) */
+.quote-banner{padding:16px 24px 8px;text-align:center}
+.quote-text{font-size:13px;font-style:italic;color:var(--text);line-height:1.5;transition:opacity .4s ease;min-height:2.8em;display:flex;align-items:center;justify-content:center}
+.quote-author{font-size:10px;color:var(--text-muted);margin-top:6px;transition:opacity .4s ease}
+.quote-dots{display:flex;justify-content:center;gap:4px;margin-top:10px}
+.quote-dot{width:4px;height:4px;border-radius:50%;background:var(--border-strong);transition:background .3s}
+.quote-dot.active{background:var(--acc)}
+
 /* WEEK GRID */
 .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:8px 12px 0}
 .wday{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 4px;text-align:center;cursor:pointer;transition:all .2s;opacity:.6}
@@ -537,6 +545,11 @@ button:active{transform:scale(.97)}
   <div class="person-bar" id="personBar" style="display:none"></div>
 
   <div class="screen active" id="screen-dashboard">
+    <div class="quote-banner">
+      <div class="quote-text" id="quoteText"></div>
+      <div class="quote-author" id="quoteAuthor"></div>
+      <div class="quote-dots" id="quoteDots"></div>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0">
       <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
       <div id="weekLabel" style="font-size:10px;color:var(--muted)">Bu Hafta</div>
@@ -1179,6 +1192,7 @@ function showMainApp() {
   renderAll();
   renderDashboard();
   restoreLastScreen();
+  startQuoteRotation();
 }
 
 function renderAdminTabs() {
@@ -1266,6 +1280,60 @@ async function renderAll() {
   renderProfile(p);
   renderDayTabs();
   await renderDayContent(curDay);
+}
+
+// ── ANA SAYFA ÜST BANNER: DÖNEN MOTIVASYON SÖZÜ ──
+const MOTIVATION_QUOTES = [
+  {text:"The last three or four reps is what makes the muscle grow.", author:"Arnold Schwarzenegger"},
+  {text:"Everybody wants to be a bodybuilder, but nobody wants to lift no heavy-ass weights.", author:"Ronnie Coleman"},
+  {text:"No pain, no gain. Shut up and train.", author:"Ronnie Coleman"},
+  {text:"Don't count the days, make the days count.", author:"Muhammad Ali"},
+  {text:"Champions aren't made in gyms.", author:"Muhammad Ali"},
+  {text:"We must all suffer from one of two pains: discipline or regret.", author:"Jim Rohn"},
+  {text:"If it doesn't challenge you, it doesn't change you.", author:"Fred DeVito"},
+  {text:"Success is usually the culmination of controlling failure.", author:"Sylvester Stallone"},
+  {text:"You have to think it before you can do it.", author:"Arnold Schwarzenegger"},
+  {text:"It never gets easier, you just get better.", author:"Unknown"},
+  {text:"The pain you feel today will be the strength you feel tomorrow.", author:"Unknown"},
+  {text:"Dream big, work hard, stay humble.", author:"David Goggins"},
+  {text:"Strength does not come from the body. It comes from the will of the soul.", author:"Gandhi"},
+  {text:"Once the mind is made up, the body follows.", author:"Arnold Schwarzenegger"},
+  {text:"You think I'm cute now? You should see me after leg day.", author:"Unknown"},
+];
+let quoteIdx = 0;
+let quoteInterval = null;
+
+function renderQuoteBanner(){
+  const textEl = document.getElementById('quoteText');
+  const authorEl = document.getElementById('quoteAuthor');
+  const dotsEl = document.getElementById('quoteDots');
+  if(!textEl || !authorEl || !dotsEl) return;
+  if(!dotsEl.children.length){
+    dotsEl.innerHTML = MOTIVATION_QUOTES.map((_,i)=>`<div class="quote-dot"></div>`).join('');
+  }
+  textEl.style.opacity = 0;
+  authorEl.style.opacity = 0;
+  setTimeout(()=>{
+    const q = MOTIVATION_QUOTES[quoteIdx];
+    textEl.textContent = `"${q.text}"`;
+    authorEl.textContent = `— ${q.author}`;
+    Array.from(dotsEl.children).forEach((d,i)=>d.classList.toggle('active', i===quoteIdx));
+    textEl.style.opacity = 1;
+    authorEl.style.opacity = 1;
+  }, 300);
+}
+
+// Uygulama acilinca rastgele bir sozden basla, 5 saniyede bir fade ile
+// siradakine gec - sekme degisiminde sifirlanmasin diye bir kere, uygulama
+// acilirken cagriliyor (showMainApp), ekran gorunmese de arka planda devam eder.
+function startQuoteRotation(){
+  quoteIdx = Math.floor(Math.random()*MOTIVATION_QUOTES.length);
+  renderQuoteBanner();
+  clearInterval(quoteInterval);
+  quoteInterval = setInterval(()=>{
+    quoteIdx = (quoteIdx+1) % MOTIVATION_QUOTES.length;
+    renderQuoteBanner();
+  }, 5000);
 }
 
 // ── ANA SAYFA (DASHBOARD) ──
