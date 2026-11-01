@@ -969,6 +969,12 @@ async function loadSetsForDay(userId, dayIdx) {
   const staleIds = [];
   (data||[]).forEach(row => {
     const k = userId+'_'+dayIdx+'_'+row.exercise_index+'_'+row.set_index;
+    // Bu set icin henuz Supabase'e yazilmamis/yazilmakta olan taze bir
+    // kullanici degisikligi varsa (debounce'ta bekliyor ya da az once
+    // saveSetImmediate ile gonderildi), bu satiri ESKI sunucu verisiyle
+    // EZME - yoksa az once isaretlenmis bir set, henuz sunucuya ulasmamis
+    // eski (stale) veriyle okununca kalici olarak sifirlanabilir.
+    if(pendingSetSaves[k]) return;
     // done is only true if done_at is within THIS week (Mon 00:00 to next Mon 00:00)
     const doneAt = row.done_at ? new Date(row.done_at) : null;
     const isCurrentWeek = !!(doneAt && doneAt >= monday && doneAt < nextMonday);
@@ -1154,6 +1160,22 @@ async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
     delete pendingSetSaves[k];
     await performSetSave(userId, dayIdx, exIdx, setIdx, k);
   }, 600);
+}
+
+// toggleSet (checkmark) bunu kullanir - weight/reps yazimindan farkli olarak
+// "tamamlandi" durumu nadir/tek seferlik bir eylem, debounce'tan fayda
+// gormuyor ama zarar gorebiliyordu: kullanici isaretleyip HEMEN sayfayi
+// yenilerse (ör. "Günü Tamamla"da hata alip tekrar denemek icin), 600ms
+// dolmadan yazim hic Supabase'e ulasmadan kayboluyordu. Bu yuzden done/
+// done_at burada debounce'u atlayip DOGRUDAN, beklenerek yaziliyor.
+async function saveSetImmediate(userId, dayIdx, exIdx, setIdx, fields){
+  if(!userId) return false;
+  const k = userId+'_'+dayIdx+'_'+exIdx+'_'+setIdx;
+  if(!setCache[k]) setCache[k] = {};
+  Object.assign(setCache[k], fields);
+  clearTimeout(saveTimer[k]);
+  delete pendingSetSaves[k];
+  return performSetSave(userId, dayIdx, exIdx, setIdx, k);
 }
 
 // Semih'in basina gelen senaryo: gunu tamamlarken hata alinca sayfa
@@ -2448,7 +2470,11 @@ async function toggleSet(uid,di,ei,si,rs){
     // zamanlayicisini otomatik baslat.
     if(!loadWorkoutTimer(uid,di)) startWorkoutTimer(uid,di);
   }
-  await saveSet(uid,di,ei,si,fields);
+  // Once setCache'i guncelleyip arayuzu ANINDA guncelliyoruz (kullanici
+  // beklemesin), sonra done/done_at'i Supabase'e debounce'suz yaziyoruz -
+  // bkz. saveSetImmediate: checkbox'in "kaydedildi" gibi gorunup 600ms
+  // dolmadan sayfa kapanirsa hic kaydedilmemis olmasi riskine karsi.
+  Object.assign(setCache[k], fields);
   const row=document.getElementById('sr_'+k),btn=document.getElementById('cb_'+k);
   if(newDone){row?.classList.add('sdone');if(btn){btn.classList.add('chk');btn.textContent='✓';}openRIRPopup(k);}
   else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='O';}closeRIRPopup(k);}
@@ -2457,6 +2483,7 @@ async function toggleSet(uid,di,ei,si,rs){
   const mp=document.getElementById(`mp_${di}_${ei}`);if(mp){mp.textContent=`${done}/${ex.sets}`;mp.className=`meta-pill${done===ex.sets?' done-pill':''}`;}
   done===ex.sets?document.getElementById(`ec_${di}_${ei}`)?.classList.add('completed'):document.getElementById(`ec_${di}_${ei}`)?.classList.remove('completed');
   renderDayTabs();
+  await saveSetImmediate(uid,di,ei,si,fields);
 }
 
 function openRIRPopup(k){ document.getElementById('rirpop_'+k)?.classList.add('open'); }
