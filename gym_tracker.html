@@ -961,15 +961,26 @@ async function loadSetsForDay(userId, dayIdx) {
   monday.setHours(0,0,0,0);
   const nextMonday = new Date(monday);
   nextMonday.setDate(monday.getDate() + 7);
-  
+
+  // done=true ama done_at gecen haftaya aitse (yeni haftaya gecilmis),
+  // sadece EKRANDA degil Supabase'de de kalici olarak sifirlaniyor - yoksa
+  // workout_sets'i dogrudan okuyan baska bir yer (raporlar, ileride eklenecek
+  // bir ozellik) hala "tamamlandi" gorebilirdi. weight/reps dokunulmuyor.
+  const staleIds = [];
   (data||[]).forEach(row => {
     const k = userId+'_'+dayIdx+'_'+row.exercise_index+'_'+row.set_index;
     // done is only true if done_at is within THIS week (Mon 00:00 to next Mon 00:00)
     const doneAt = row.done_at ? new Date(row.done_at) : null;
+    const isCurrentWeek = !!(doneAt && doneAt >= monday && doneAt < nextMonday);
     // Only show done if viewing current week
-    const isDone = row.done === true && doneAt && doneAt >= monday && doneAt < nextMonday;
+    const isDone = row.done === true && isCurrentWeek;
+    if(row.done === true && doneAt && !isCurrentWeek) staleIds.push(row.id);
     setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDone, done_at: row.done_at, rir: row.rir, ts: row.done_at, db_id: row.id};
   });
+  if(staleIds.length){
+    sb.from('workout_sets').update({done:false, done_at:null}).in('id', staleIds)
+      .then(({error})=>{ if(error) console.error('stale set reset error:', error); });
+  }
 }
 
 async function loadNutrition(userId, date) {
