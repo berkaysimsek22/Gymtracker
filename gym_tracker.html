@@ -1148,6 +1148,11 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
 // Hangi set'in kaydi 600ms'lik debounce penceresinde bekliyor - gun
 // tamamlanirken/sayfadan ayrilirken bunlari hemen yazdirmak icin.
 let pendingSetSaves = {}; // k -> {userId, dayIdx, exIdx, setIdx}
+// saveSetImmediate ile baslatilmis ama HENUZ Supabase'den yanit gelmemis
+// yazimlar - bunlar pendingSetSaves'te YER ALMAZ (debounce'u atladiklari
+// icin), bu yuzden flushPendingSetSaves'in bunlari da bekleyebilmesi icin
+// ayri takip ediliyor (bkz. flushPendingSetSaves).
+let inFlightSetSaves = {}; // k -> Promise<boolean>
 
 async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
   if(!userId) return; // Guard against null user
@@ -1175,7 +1180,14 @@ async function saveSetImmediate(userId, dayIdx, exIdx, setIdx, fields){
   Object.assign(setCache[k], fields);
   clearTimeout(saveTimer[k]);
   delete pendingSetSaves[k];
-  return performSetSave(userId, dayIdx, exIdx, setIdx, k);
+  // Yazimi inFlightSetSaves'e kaydediyoruz ki kullanici bu await'in
+  // DONMESINI beklemeden (ör. son checkbox'a basip hemen "Gunu Tamamla"ya
+  // tiklarsa) flushPendingSetSaves bu yazimin bitmesini bekleyebilsin.
+  const p = performSetSave(userId, dayIdx, exIdx, setIdx, k);
+  inFlightSetSaves[k] = p;
+  const ok = await p;
+  if(inFlightSetSaves[k] === p) delete inFlightSetSaves[k];
+  return ok;
 }
 
 // Semih'in basina gelen senaryo: gunu tamamlarken hata alinca sayfa
@@ -1188,14 +1200,20 @@ async function saveSetImmediate(userId, dayIdx, exIdx, setIdx, fields){
 // kontrol edip false ise gunu tamamlamayi durdurmali.
 async function flushPendingSetSaves() {
   const keys = Object.keys(pendingSetSaves);
-  if(!keys.length) return true;
-  const results = await Promise.all(keys.map(k => {
+  const pendingResults = keys.length ? await Promise.all(keys.map(k => {
     const {userId, dayIdx, exIdx, setIdx} = pendingSetSaves[k];
     clearTimeout(saveTimer[k]);
     delete pendingSetSaves[k];
     return performSetSave(userId, dayIdx, exIdx, setIdx, k);
-  }));
-  return results.every(ok => ok);
+  })) : [];
+  // saveSetImmediate ile baslatilmis ama henuz Supabase'den yanit gelmemis
+  // yazimlar da olabilir (ör. kullanici son checkbox'a basip hemen "Gunu
+  // Tamamla"ya tikladiysa) - bunlari beklemezsek finishDay'in hemen
+  // ardindan yaptigi yeniden-okuma bu yazimlari kacirip o setleri
+  // "tamamlanmamis" gosterebilir, weight/reps kalirken sadece done geri
+  // duser (Semih'in son bildirdigi senaryo tam olarak bu).
+  const inFlightResults = await Promise.all(Object.values(inFlightSetSaves));
+  return [...pendingResults, ...inFlightResults].every(ok => ok);
 }
 window.addEventListener('beforeunload', () => { flushPendingSetSaves(); });
 
