@@ -610,6 +610,7 @@ button:active{transform:scale(.97)}
       <div class="nt-head"><h3>Günlük Hedefler</h3><button class="btn btn-outline btn-sm" onclick="calcMacros()">🧮 Otomatik Hesapla</button></div>
       <div class="target-row" id="targetRow"></div>
     </div>
+    <div id="suppTrackCard" style="margin:10px 16px 14px"></div>
     <div class="meals-section">
       <div class="ms-head"><h3>Öğünler</h3>
         <div style="display:flex;gap:6px">
@@ -657,6 +658,7 @@ button:active{transform:scale(.97)}
     <div id="adminReportCard" style="margin:10px 16px 0"></div>
     <div id="autoProgCard" style="margin:10px 16px 0"></div>
     <div id="deleteProfileCard" style="margin:10px 16px 0"></div>
+    <div id="suppCard" style="margin:10px 16px 0"></div>
     <div id="selfDeleteAccountCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
   </div>
 
@@ -1341,10 +1343,12 @@ async function renderPtReport(){
   const WD = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
   const list = allProfiles.length ? allProfiles : [currentProfile];
   const cards = await Promise.all(list.map(async p=>{
-    const [{data: sessions}, {data: nutRows}] = await Promise.all([
+    const [{data: sessions}, {data: nutRows}, supps] = await Promise.all([
       sb.from('session_logs').select('day_name,sets_done,volume,logged_at').eq('user_id',p.id).gte('logged_at', monday.toISOString()).lt('logged_at', nextMonday.toISOString()),
       sb.from('nutrition_logs').select('date,data').eq('user_id',p.id).in('date', dayStrs),
+      loadSupplements(p.id),
     ]);
+    const suppLogs = supps.length ? await loadWeekSupplementLogs(p.id, dayStrs) : [];
     const sess = sessions||[];
     const workoutCount = sess.length;
     const totalSets = sess.reduce((s,r)=>s+(r.sets_done||0),0);
@@ -1372,6 +1376,11 @@ async function renderPtReport(){
     const tagsHtml = uniqTags.map(t=>`<span style="font-size:9px;padding:3px 8px;border-radius:8px;background:rgba(52,211,153,.12);color:#34d399;border:1px solid rgba(52,211,153,.25)">${t}</span>`).join('');
     const noWorkoutWarn = workoutCount===0 ? '<div style="font-size:11px;color:#ff5c38;margin-top:6px">⚠️ Bu hafta antrenman yapılmadı</div>' : '';
     const nutWarn = loggedDays===0 ? '<div style="font-size:11px;color:#ff5c38;margin-top:4px">⚠️ beslenme kaydı yok</div>' : `<div style="font-size:10px;color:var(--muted);margin-top:4px">${loggedDays}/7 gün kaydedildi</div>`;
+    const suppPillsHtml = supps.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${supps.map(s=>{
+      const takenDays = suppLogs.filter(l=>l.supplement_id===s.id && l.taken).length;
+      const color = takenDays>=6?'#34d399':takenDays>=4?'#f7c948':'#ff5c38';
+      return `<span style="font-size:9px;padding:3px 8px;border-radius:8px;background:${color};color:#0c0c0c;font-weight:600">${s.name}: ${takenDays}/7</span>`;
+    }).join('')}</div>` : '';
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <div style="width:34px;height:34px;border-radius:50%;background:rgba(212,245,60,.15);color:var(--acc);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${avatarLetter}</div>
@@ -1391,6 +1400,7 @@ async function renderPtReport(){
         <div><div style="font-size:14px;font-weight:700;color:${kcalColor}">${avgKcal}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase">Ort. Kalori</div></div>
         <div><div style="font-size:14px;font-weight:700;color:var(--text)">${totalSets}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase">Set · ${Math.round(totalVol)}kg</div></div>
       </div>
+      ${suppPillsHtml}
       ${nutWarn}
     </div>`;
   }));
@@ -3782,6 +3792,209 @@ async function selectNutDate(dateKey){
   renderNutrition();
 }
 
+// ── TAKVİYE TAKİBİ ──
+// supabase tablolari (Supabase SQL Editor'de scripts/supplements-tables.sql
+// calistirilmali):
+// create table public.supplements (
+//   id uuid, user_id uuid, name text, dose text,
+//   timing text (morning/pre/post/night), order_index int, created_at timestamptz
+// );
+// create table public.supplement_logs (
+//   id uuid, user_id uuid, date date, supplement_id uuid,
+//   taken boolean, created_at timestamptz
+// );
+const SUPPLEMENT_SUGGESTIONS = ['Kreatin','Whey Protein','Kazein Protein','Omega-3','Vitamin D','Magnezyum',
+  'Çinko (Zink)','BCAA','Pre-Workout','L-Carnitine','CLA','Collagen','Multivitamin','ZMA','Kafein',
+  'Beta-Alanin','Glutamin','Creatine HCL','Vitamin C','Vitamin B12','Demir','Melatonin'];
+const SUPP_GOAL_SUGGESTIONS = {
+  bulk: ['Kreatin','Whey Protein','Kazein Protein','Pre-Workout','ZMA'],
+  cut: ['Whey Protein','L-Carnitine','CLA','Vitamin D','Kafein'],
+  maintain: ['Kreatin','Omega-3','Magnezyum','Multivitamin','Vitamin D'],
+};
+const SUPP_TIMINGS = [
+  {id:'morning', label:'Sabah', color:'var(--acc4)'},
+  {id:'pre', label:'Ant. Öncesi', color:'var(--acc2)'},
+  {id:'post', label:'Ant. Sonrası', color:'var(--acc3)'},
+  {id:'night', label:'Gece', color:'#9b59b6'},
+];
+const SUPP_TIMING_ORDER = SUPP_TIMINGS.map(t=>t.id);
+let supplementCache = {}; // userId -> list
+let supplementLogCache = {}; // userId_date -> logs
+
+async function loadSupplements(userId){
+  if(!userId) return [];
+  const {data, error} = await sb.from('supplements').select('*').eq('user_id', userId).order('order_index', {ascending:true});
+  if(error){ console.warn('loadSupplements error (scripts/supplements-tables.sql çalıştırılmamış olabilir):', error); return supplementCache[userId]||[]; }
+  supplementCache[userId] = data||[];
+  return supplementCache[userId];
+}
+async function loadSupplementLogs(userId, dateStr){
+  const k = userId+'_'+dateStr;
+  if(!userId) return [];
+  const {data, error} = await sb.from('supplement_logs').select('*').eq('user_id', userId).eq('date', dateStr);
+  if(error){ console.warn('loadSupplementLogs error:', error); return supplementLogCache[k]||[]; }
+  supplementLogCache[k] = data||[];
+  return supplementLogCache[k];
+}
+async function loadWeekSupplementLogs(userId, dayStrs){
+  const {data, error} = await sb.from('supplement_logs').select('supplement_id,date,taken').eq('user_id', userId).in('date', dayStrs);
+  if(error){ console.warn('loadWeekSupplementLogs error:', error); return []; }
+  return data||[];
+}
+async function saveSupplementLog(suppId, dateStr, taken){
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  const k = uid+'_'+dateStr;
+  if(!supplementLogCache[k]) await loadSupplementLogs(uid, dateStr);
+  const logs = supplementLogCache[k] || (supplementLogCache[k]=[]);
+  const existing = logs.find(l=>l.supplement_id===suppId);
+  if(existing){
+    await sb.from('supplement_logs').update({taken}).eq('id', existing.id);
+    existing.taken = taken;
+  } else {
+    const {data, error} = await sb.from('supplement_logs').insert({user_id:uid, date:dateStr, supplement_id:suppId, taken}).select().single();
+    if(!error && data) logs.push(data);
+  }
+}
+async function addSupplement(name, dose, timing){
+  const uid = activeProfile()?.id;
+  if(!uid || !name) return;
+  const list = supplementCache[uid] || await loadSupplements(uid);
+  const {error} = await sb.from('supplements').insert({user_id:uid, name, dose:dose||null, timing, order_index:list.length});
+  if(error){ alert('Eklenemedi: '+error.message); return; }
+  await loadSupplements(uid);
+  renderSuppCard(activeProfile());
+}
+async function deleteSupplement(id){
+  if(!confirm('Bu takviye silinsin mi?')) return;
+  const uid = activeProfile()?.id;
+  const {error} = await sb.from('supplements').delete().eq('id', id);
+  if(error){ alert('Silinemedi: '+error.message); return; }
+  await loadSupplements(uid);
+  renderSuppCard(activeProfile());
+}
+
+// Profil ekranindaki "+" ile acilan satir-ici ekleme formu.
+let suppFormOpen = false;
+let suppFormTiming = 'morning';
+function toggleSuppForm(){
+  suppFormOpen = !suppFormOpen;
+  renderSuppCard(activeProfile());
+}
+function setSuppFormTiming(id){ suppFormTiming=id; renderSuppCard(activeProfile()); }
+function filterSuppSuggestions(q){
+  const dd = document.getElementById('suppSuggDropdown');
+  if(!dd) return;
+  const query = (q||'').toLowerCase().trim();
+  let items;
+  if(!query){
+    const dir = goalDirection(activeProfile());
+    items = SUPP_GOAL_SUGGESTIONS[dir] || SUPP_GOAL_SUGGESTIONS.maintain;
+  } else {
+    items = SUPPLEMENT_SUGGESTIONS.filter(s=>s.toLowerCase().includes(query));
+  }
+  if(!items.length){ dd.style.display='none'; return; }
+  dd.style.display='block';
+  dd.innerHTML = items.map(s=>`<div onclick="pickSuppSuggestion('${s.replace(/'/g,"\\'")}')" style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid rgba(255,255,255,.05)" onmouseover="this.style.background='rgba(212,245,60,.08)'" onmouseout="this.style.background='none'">${s}</div>`).join('');
+}
+function hideSuppSuggestions(){ const dd=document.getElementById('suppSuggDropdown'); if(dd) dd.style.display='none'; }
+function pickSuppSuggestion(name){
+  const inp = document.getElementById('suppNameInp');
+  if(inp) inp.value = name;
+  hideSuppSuggestions();
+}
+async function submitSuppForm(){
+  const name = document.getElementById('suppNameInp')?.value?.trim();
+  const dose = document.getElementById('suppDoseInp')?.value?.trim();
+  if(!name){ alert('Takviye adı gir.'); return; }
+  await addSupplement(name, dose, suppFormTiming);
+  suppFormTiming = 'morning';
+}
+function renderSuppForm(p){
+  return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+    <div style="position:relative;margin-bottom:8px">
+      <input id="suppNameInp" type="text" placeholder="Takviye adı..." autocomplete="off"
+        style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 10px;color:var(--text);font-size:12px;outline:none"
+        oninput="filterSuppSuggestions(this.value)" onfocus="filterSuppSuggestions(this.value)" onblur="setTimeout(hideSuppSuggestions,200)">
+      <div id="suppSuggDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-height:180px;overflow-y:auto;z-index:100;margin-top:4px"></div>
+    </div>
+    <input id="suppDoseInp" type="text" placeholder='Dozaj (ör. "5g", "1 kapsül")' style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 10px;color:var(--text);font-size:12px;outline:none;margin-bottom:8px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      ${SUPP_TIMINGS.map(t=>`<button onclick="setSuppFormTiming('${t.id}')" style="flex:1;min-width:70px;padding:7px 4px;border-radius:8px;border:1px solid ${suppFormTiming===t.id?t.color:'var(--border)'};background:${suppFormTiming===t.id?t.color:'none'};color:${suppFormTiming===t.id?'#0c0c0c':'var(--text-muted)'};font-size:10px;cursor:pointer;font-weight:${suppFormTiming===t.id?'700':'400'}">${t.label}</button>`).join('')}
+    </div>
+    <button onclick="submitSuppForm()" class="btn btn-acc btn-sm" style="width:100%">Kaydet</button>
+  </div>`;
+}
+function renderSuppCard(p){
+  const el = document.getElementById('suppCard');
+  if(!el || !p) return;
+  const list = supplementCache[p.id];
+  if(list===undefined){
+    el.innerHTML = '<div class="prof-section"><h3>💊 Takviyelerim</h3><div class="empty-state">Yükleniyor...</div></div>';
+    loadSupplements(p.id).then(()=>renderSuppCard(activeProfile()));
+    return;
+  }
+  const sorted = [...list].sort((a,b)=>SUPP_TIMING_ORDER.indexOf(a.timing)-SUPP_TIMING_ORDER.indexOf(b.timing));
+  const rows = sorted.length ? sorted.map(s=>{
+    const t = SUPP_TIMINGS.find(x=>x.id===s.timing) || SUPP_TIMINGS[0];
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name}</div>
+        ${s.dose?`<div style="font-size:10px;color:var(--muted)">${s.dose}</div>`:''}
+      </div>
+      <span style="font-size:9px;padding:3px 8px;border-radius:8px;background:${t.color};color:#0c0c0c;font-weight:600;white-space:nowrap">${t.label}</span>
+      <button onclick="deleteSupplement('${s.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✕</button>
+    </div>`;
+  }).join('') : '<div class="empty-state">Henüz takviye eklenmedi.</div>';
+  el.innerHTML = `<div class="prof-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${suppFormOpen?'12px':'4px'};padding-bottom:10px;border-bottom:1px solid var(--border)">
+      <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin:0;padding:0;border:none">💊 Takviyelerim</h3>
+      <button onclick="toggleSuppForm()" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);color:var(--acc);border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;flex-shrink:0">${suppFormOpen?'✕':'+'}</button>
+    </div>
+    ${suppFormOpen?renderSuppForm(p):''}
+    ${rows}
+  </div>`;
+}
+
+// Beslenme ekranindaki gunluk takip karti (meals listesinden once gosterilir).
+async function renderSuppTrackCard(uid){
+  const el = document.getElementById('suppTrackCard');
+  if(!el || !uid) return;
+  const list = await loadSupplements(uid);
+  if(!list.length){
+    el.innerHTML = `<div class="prof-section"><h3 style="margin-bottom:6px">💊 Günlük Takviyeler</h3><div class="empty-state" style="padding:4px 0">Profil ekranından takviyelerini ekle → <span onclick="showScreen('profile',navBtnFor('profile'))" style="color:var(--acc);cursor:pointer;text-decoration:underline">Profil</span></div></div>`;
+    return;
+  }
+  const dateStr = curNutDate;
+  const logs = await loadSupplementLogs(uid, dateStr);
+  const sorted = [...list].sort((a,b)=>SUPP_TIMING_ORDER.indexOf(a.timing)-SUPP_TIMING_ORDER.indexOf(b.timing));
+  const takenCount = sorted.filter(s=>logs.find(l=>l.supplement_id===s.id)?.taken).length;
+  const rows = sorted.map(s=>{
+    const taken = !!logs.find(l=>l.supplement_id===s.id)?.taken;
+    const t = SUPP_TIMINGS.find(x=>x.id===s.timing) || SUPP_TIMINGS[0];
+    return `<div onclick="toggleSuppTaken('${s.id}','${dateStr}',${taken})" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.06);cursor:pointer">
+      <div style="width:22px;height:22px;border-radius:6px;border:2px solid ${taken?'#34d399':'var(--border-strong)'};background:${taken?'#34d399':'none'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;color:#0c0c0c">${taken?'✓':''}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;${taken?'color:var(--muted);text-decoration:line-through':''}">${s.name}${s.dose?` <span style="color:var(--muted);font-weight:400">· ${s.dose}</span>`:''}</div>
+      </div>
+      <span style="font-size:9px;padding:3px 8px;border-radius:8px;background:${t.color};color:#0c0c0c;font-weight:600;white-space:nowrap">${t.label}</span>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="prof-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+      <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin:0;padding:0;border:none">💊 Günlük Takviyeler</h3>
+      <span style="font-size:11px;font-weight:700;color:${sorted.length&&takenCount===sorted.length?'#34d399':'var(--muted)'}">${takenCount}/${sorted.length} tamamlandı</span>
+    </div>
+    ${rows}
+  </div>`;
+}
+async function toggleSuppTaken(suppId, dateStr, currentlyTaken){
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  await saveSupplementLog(suppId, dateStr, !currentlyTaken);
+  renderSuppTrackCard(uid);
+}
+
 async function renderNutrition(){
   const p=activeProfile();const uid=p?.id;if(!uid)return;
   computeHeaderStats(p).then(renderNutSummaryPill);
@@ -3806,6 +4019,7 @@ async function renderNutrition(){
     <div class="target-box"><label>Yağ</label><input value="${t.fat}" type="number" onchange="updateTarget('fat',this.value)"><div class="tu">gram</div></div>`;
   renderMeals(nd);
   const noteEl=document.getElementById('dailyNoteInp');if(noteEl)noteEl.value=nd.note||'';
+  renderSuppTrackCard(uid);
 }
 
 async function updateTarget(field,val){
@@ -5783,6 +5997,7 @@ function renderProfileScreen(){
   renderAdminReportCard();
   renderAutoProgCard(p);
   renderDeleteProfileCard(p);
+  renderSuppCard(p);
   renderSelfDeleteCard(p);
 }
 
