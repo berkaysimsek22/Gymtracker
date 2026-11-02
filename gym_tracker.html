@@ -4287,9 +4287,11 @@ function renderWoWeekTable(){
   const altToggle = _woSplitMeta?.altSchedule ? `<button class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="toggleWoAltPreview()">🔁 ${_woShowAlt?'Hafta A\'yı Gör':'Hafta B\'yi Gör'} <span style="color:var(--muted);font-weight:400">(şu an: Hafta ${_woShowAlt?'B':'A'})</span></button>` : '';
   const header = _woSplitMeta ? `<h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>${altToggle}` : '';
   const applyBtn = _woSplitMeta && canEdit() ? `<button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="applyPopularSplit('${_woSplitMeta.id}')">🚀 Bu Split'i Uygula</button>` : '';
+  const analyzeBtn = `<button class="btn btn-outline btn-sm" style="width:100%;margin-top:12px" onclick="showProgramMuscleAnalysis()">📊 Analizi Gör</button>`;
   el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>
     ${header}
     <div class="wo-week-table">${rows}</div>
+    ${analyzeBtn}
     ${applyBtn}`;
 }
 
@@ -4358,6 +4360,238 @@ function getExercisesForRegion(tags){
     seen.add(e.name);
     return true;
   });
+}
+
+// ── PROGRAM KAS GRUBU ANALIZI ("📊 Analizi Gör") ──
+// EXERCISE_DB'deki 'muscles' etiketlerinden FARKLI, kullanicinin istedigi
+// 15 anatomik gruba gore ozel bir siniflandirma - program egzersizleri
+// (hem WORKOUTS kutuphanesindeki hazir splitler hem kullanicinin kendi
+// programi) sadece serbest metin 'muscle' alanina sahip, bu yuzden
+// egzersiz ADI + 'muscle' metni birlikte anahtar-kelime ile taranarak
+// bu gruplara esleniyor.
+const ANALYSIS_MUSCLE_GROUPS = [
+  {id:'pectoral', label:'Pectoral'},
+  {id:'lat', label:'Latissimus Dorsi'},
+  {id:'rhomboid', label:'Rhomboids'},
+  {id:'traps', label:'Trapezius'},
+  {id:'front_delt', label:'Ön Deltoid'},
+  {id:'side_delt', label:'Yan Deltoid'},
+  {id:'rear_delt', label:'Arka Deltoid'},
+  {id:'biceps', label:'Biceps'},
+  {id:'triceps', label:'Triceps'},
+  {id:'brachialis', label:'Brachialis'},
+  {id:'quad', label:'Quadriceps'},
+  {id:'hamstring', label:'Hamstring'},
+  {id:'glute', label:'Glute'},
+  {id:'calves', label:'Calf'},
+  {id:'abs', label:'Abs'},
+];
+
+function classifyExerciseMuscles(ex){
+  const name=(ex.name||'').toLowerCase();
+  const muscle=(ex.muscle||'').toLowerCase();
+  const out=new Set();
+  const nameHas=(...w)=>w.some(x=>name.includes(x));
+  const muscleHas=(...w)=>w.some(x=>muscle.includes(x));
+
+  // Spesifik anahtar kelimeler (ingilizce/turkce terimler, ExerciseDB ve
+  // EXERCISE_DB'deki 'muscle' metinlerinde zaten dogrudan geciyor).
+  if(muscleHas('pectoral','göğüs','gogus','chest','pec')) out.add('pectoral');
+  if(muscleHas('latissimus')) out.add('lat');
+  if(muscleHas('rhomboid')) out.add('rhomboid');
+  if(muscleHas('trapez','trap')) out.add('traps');
+  if(muscleHas('ön delt','on delt','anterior delt','front delt')) out.add('front_delt');
+  if(muscleHas('yan delt','lateral delt','side delt')) out.add('side_delt');
+  if(muscleHas('arka delt','rear delt','posterior delt')) out.add('rear_delt');
+  if(muscleHas('brachialis')) out.add('brachialis');
+  if(muscleHas('biceps','bicep')) out.add('biceps');
+  if(muscleHas('triceps','tricep')) out.add('triceps');
+  if(muscleHas('quadriceps','quad')) out.add('quad');
+  if(muscleHas('hamstring')) out.add('hamstring');
+  if(muscleHas('glute')) out.add('glute');
+  if(muscleHas('calf','calves','gastrocnemius','soleus','baldır','baldir')) out.add('calves');
+  if(muscleHas('abs','core','abdominis','karın','karin')) out.add('abs');
+
+  // "Sırt/Omuz/Kol/Bacak" gibi GENEL terimler icin (ozellikle WORKOUTS
+  // kutuphanesindeki hazir programlarin cogu bunlari kullaniyor) egzersiz
+  // ADINDAN alt kas grubunu TAHMIN ediyoruz - kesin degil ama makul.
+  if(muscleHas('sırt','sirt','back')){
+    if(nameHas('pull-up','pullup','chin-up','chinup','pulldown')) out.add('lat');
+    else if(nameHas('deadlift')){ out.add('lat'); out.add('hamstring'); }
+    else if(nameHas('row')) out.add('rhomboid');
+    else out.add('lat');
+  }
+  if(muscleHas('omuz','shoulder')){
+    if(nameHas('lateral raise')) out.add('side_delt');
+    else if(nameHas('face pull','rear delt','reverse')) out.add('rear_delt');
+    else if(nameHas('front raise')) out.add('front_delt');
+    else if(nameHas('shrug')) out.add('traps');
+    else out.add('front_delt');
+  }
+  if(muscleHas('kol','arm','ön kol','on kol','forearm') && !muscleHas('ön delt','on delt')){
+    if(nameHas('hammer curl')){ out.add('biceps'); out.add('brachialis'); }
+    else if(nameHas('reverse curl','wrist')) out.add('brachialis');
+    else if(nameHas('curl')) out.add('biceps');
+    else if(nameHas('pushdown','extension','close grip','dip','skull','jm press')) out.add('triceps');
+  }
+  if(muscleHas('bacak','leg')){
+    if(nameHas('squat','leg press','lunge')){ out.add('quad'); out.add('glute'); }
+    if(nameHas('extension') && !nameHas('triceps','overhead')) out.add('quad');
+    if(nameHas('curl','deadlift','romanian','rdl')) out.add('hamstring');
+    if(nameHas('calf')) out.add('calves');
+  }
+  if(nameHas('hammer curl')) out.add('brachialis');
+
+  return [...out];
+}
+
+function muscleVolumeColor(sets){
+  if(!sets) return '#3a3a3a';
+  if(sets<=5) return '#eab308';
+  if(sets<=12) return '#f97316';
+  if(sets<=20) return '#22c55e';
+  return '#ef4444';
+}
+function muscleVolumeLabel(sets){
+  if(!sets) return 'Çalışmıyor';
+  if(sets<=5) return 'Az';
+  if(sets<=12) return 'Orta';
+  if(sets<=20) return 'Yoğun';
+  return 'Çok Yoğun';
+}
+
+// schedule: 7 gunluk program dizisi. dayIdx=null -> haftalik (tum gunlerin
+// toplami), dayIdx=0..6 -> sadece o gun. Her grup icin {sets, exercises:
+// {adı: set_sayisi}} dondurur.
+function computeMuscleSets(schedule, dayIdx){
+  const result = {};
+  ANALYSIS_MUSCLE_GROUPS.forEach(g=>{ result[g.id] = {sets:0, exercises:{}}; });
+  const days = dayIdx===null ? (schedule||[]) : [schedule?.[dayIdx]].filter(Boolean);
+  days.forEach(day=>{
+    if(!day || day.type==='rest' || !day.exercises) return;
+    day.exercises.forEach(ex=>{
+      const groups = classifyExerciseMuscles(ex);
+      const sets = parseInt(ex.sets)||0;
+      groups.forEach(gid=>{
+        if(!result[gid]) return;
+        result[gid].sets += sets;
+        result[gid].exercises[ex.name] = (result[gid].exercises[ex.name]||0) + sets;
+      });
+    });
+  });
+  return result;
+}
+
+let _pmaMode='weekly', _pmaDayIdx=0, _pmaSelected=null;
+
+function showProgramMuscleAnalysis(){
+  if(!_woSchedule || !_woSchedule.length) return;
+  const todayIdx = new Date().getDay()===0?6:new Date().getDay()-1;
+  _pmaDayIdx = (_woSchedule[todayIdx] && _woSchedule[todayIdx].type!=='rest') ? todayIdx : _woSchedule.findIndex(d=>d.type!=='rest');
+  if(_pmaDayIdx<0) _pmaDayIdx=0;
+  _pmaMode='weekly';
+  _pmaSelected=null;
+  renderProgramMuscleAnalysis();
+}
+function setPmaMode(mode){ _pmaMode=mode; renderProgramMuscleAnalysis(); }
+function setPmaDay(i){ _pmaDayIdx=parseInt(i); renderProgramMuscleAnalysis(); }
+function selectPmaMuscle(id){ _pmaSelected = (_pmaSelected===id) ? null : id; renderProgramMuscleAnalysis(); }
+
+function renderProgramMuscleAnalysis(){
+  document.getElementById('pmaModal')?.remove();
+  const volumes = computeMuscleSets(_woSchedule, _pmaMode==='daily' ? _pmaDayIdx : null);
+  const attrsFor = (id) => {
+    const v = volumes[id] || {sets:0};
+    const isSel = _pmaSelected===id;
+    return `fill="${muscleVolumeColor(v.sets)}" stroke="${isSel?'#d4f53c':'#000'}" stroke-width="${isSel?2.5:1}" style="cursor:pointer" onclick="selectPmaMuscle('${id}')"`;
+  };
+  const front = `<svg viewBox="0 0 120 260" width="130" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="60" cy="22" rx="16" ry="18" fill="#2a2a2a" stroke="#444" stroke-width="1"/>
+    <rect x="54" y="36" width="12" height="10" rx="4" fill="#2a2a2a" stroke="#444" stroke-width="1"/>
+    <rect x="30" y="44" width="60" height="50" rx="6" ${attrsFor('pectoral')}/>
+    <rect x="38" y="94" width="44" height="40" rx="4" ${attrsFor('abs')}/>
+    <line x1="60" y1="94" x2="60" y2="134" stroke="#0008" stroke-width="1.5" pointer-events="none"/>
+    <line x1="38" y1="107" x2="82" y2="107" stroke="#0008" stroke-width="1.5" pointer-events="none"/>
+    <line x1="38" y1="120" x2="82" y2="120" stroke="#0008" stroke-width="1.5" pointer-events="none"/>
+    <ellipse cx="23" cy="52" rx="10" ry="13" ${attrsFor('front_delt')}/>
+    <ellipse cx="97" cy="52" rx="10" ry="13" ${attrsFor('front_delt')}/>
+    <ellipse cx="14" cy="58" rx="7" ry="9" ${attrsFor('side_delt')}/>
+    <ellipse cx="106" cy="58" rx="7" ry="9" ${attrsFor('side_delt')}/>
+    <rect x="9" y="68" width="12" height="28" rx="5" ${attrsFor('biceps')}/>
+    <rect x="99" y="68" width="12" height="28" rx="5" ${attrsFor('biceps')}/>
+    <rect x="3" y="70" width="5" height="22" rx="2" ${attrsFor('brachialis')}/>
+    <rect x="112" y="70" width="5" height="22" rx="2" ${attrsFor('brachialis')}/>
+    <rect x="6" y="96" width="12" height="24" rx="4" fill="#1e1e1e" stroke="#333" stroke-width="1"/>
+    <rect x="102" y="96" width="12" height="24" rx="4" fill="#1e1e1e" stroke="#333" stroke-width="1"/>
+    <rect x="32" y="136" width="24" height="52" rx="8" ${attrsFor('quad')}/>
+    <rect x="64" y="136" width="24" height="52" rx="8" ${attrsFor('quad')}/>
+    <rect x="33" y="200" width="20" height="38" rx="6" ${attrsFor('calves')}/>
+    <rect x="67" y="200" width="20" height="38" rx="6" ${attrsFor('calves')}/>
+  </svg>`;
+  const back = `<svg viewBox="0 0 120 260" width="130" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="60" cy="22" rx="16" ry="18" fill="#2a2a2a" stroke="#444" stroke-width="1"/>
+    <path d="M38,44 L82,44 L76,60 L44,60 Z" ${attrsFor('traps')}/>
+    <rect x="44" y="60" width="32" height="34" rx="3" ${attrsFor('rhomboid')}/>
+    <path d="M30,54 Q15,80 22,110 L30,94 Z" ${attrsFor('lat')}/>
+    <path d="M90,54 Q105,80 98,110 L90,94 Z" ${attrsFor('lat')}/>
+    <rect x="38" y="94" width="44" height="30" rx="4" fill="#1a1a1a" stroke="#333" stroke-width="1" pointer-events="none"/>
+    <ellipse cx="23" cy="52" rx="10" ry="13" ${attrsFor('rear_delt')}/>
+    <ellipse cx="97" cy="52" rx="10" ry="13" ${attrsFor('rear_delt')}/>
+    <rect x="8" y="68" width="14" height="28" rx="6" ${attrsFor('triceps')}/>
+    <rect x="98" y="68" width="14" height="28" rx="6" ${attrsFor('triceps')}/>
+    <rect x="6" y="96" width="12" height="24" rx="4" fill="#1e1e1e" stroke="#333" stroke-width="1"/>
+    <rect x="102" y="96" width="12" height="24" rx="4" fill="#1e1e1e" stroke="#333" stroke-width="1"/>
+    <ellipse cx="44" cy="138" rx="18" ry="16" ${attrsFor('glute')}/>
+    <ellipse cx="76" cy="138" rx="18" ry="16" ${attrsFor('glute')}/>
+    <rect x="32" y="150" width="24" height="46" rx="8" ${attrsFor('hamstring')}/>
+    <rect x="64" y="150" width="24" height="46" rx="8" ${attrsFor('hamstring')}/>
+    <rect x="33" y="200" width="20" height="38" rx="6" ${attrsFor('calves')}/>
+    <rect x="67" y="200" width="20" height="38" rx="6" ${attrsFor('calves')}/>
+  </svg>`;
+  const dayOptions = (_woSchedule||[]).map((d,i)=>`<option value="${i}" ${i===_pmaDayIdx?'selected':''} ${d.type==='rest'?'disabled':''}>${d.day?d.day+' · ':''}${d.name}${d.type==='rest'?' (Dinlenme)':''}</option>`).join('');
+  const dayPicker = _pmaMode==='daily' ? `<select onchange="setPmaDay(this.value)" style="width:100%;margin-bottom:12px;padding:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:12px">${dayOptions}</select>` : '';
+  let detailHtml = '';
+  if(_pmaSelected){
+    const g = ANALYSIS_MUSCLE_GROUPS.find(x=>x.id===_pmaSelected);
+    const v = volumes[_pmaSelected] || {sets:0, exercises:{}};
+    const exEntries = Object.entries(v.exercises);
+    const exList = exEntries.length ? exEntries.map(([n,s])=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)"><span>${n}</span><span style="color:var(--text-muted)">${s} set</span></div>`).join('') : '<div class="empty-state" style="padding:8px 0">Bu kas grubunu çalıştıran hareket yok.</div>';
+    detailHtml = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700;font-size:13px">${g.label}</div>
+        <div style="font-size:12px;font-weight:700;color:${muscleVolumeColor(v.sets)}">${v.sets} set${_pmaMode==='weekly'?'/hafta':''} · ${muscleVolumeLabel(v.sets)}</div>
+      </div>
+      ${exList}
+    </div>`;
+  }
+  const legend = `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px;font-size:9px;color:var(--text-muted)">
+    <span><span style="color:#3a3a3a">■</span> Yok</span>
+    <span><span style="color:#eab308">■</span> Az (1-5)</span>
+    <span><span style="color:#f97316">■</span> Orta (6-12)</span>
+    <span><span style="color:#22c55e">■</span> Yoğun (13-20)</span>
+    <span><span style="color:#ef4444">■</span> Çok Yoğun (20+)</span>
+  </div>`;
+  const modal=document.createElement('div');
+  modal.id='pmaModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:600;padding:16px;overflow-y:auto';
+  modal.innerHTML = `<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:22px;max-width:420px;width:100%;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.5px">📊 Kas Grubu Analizi</h3>
+      <button onclick="document.getElementById('pmaModal').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="btn btn-sm ${_pmaMode==='weekly'?'btn-acc':'btn-outline'}" style="flex:1" onclick="setPmaMode('weekly')">Haftalık</button>
+      <button class="btn btn-sm ${_pmaMode==='daily'?'btn-acc':'btn-outline'}" style="flex:1" onclick="setPmaMode('daily')">Günlük</button>
+    </div>
+    ${dayPicker}
+    <div style="display:flex;gap:14px;justify-content:center">
+      <div style="text-align:center"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Ön</div>${front}</div>
+      <div style="text-align:center"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Arka</div>${back}</div>
+    </div>
+    ${legend}
+    ${detailHtml}
+  </div>`;
+  document.body.appendChild(modal);
 }
 
 function renderWoMuscle(el, activeRegion){
