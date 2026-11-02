@@ -523,6 +523,7 @@ button:active{transform:scale(.97)}
   <div class="rt-lbl">⏱ Dinlenme</div>
   <div class="rt-time" id="rtDisp">2:00</div>
   <div class="rt-btns">
+    <button class="rt-btn" id="rtPauseBtn" onclick="toggleRestPause()">⏸</button>
     <button class="rt-btn" onclick="addRest(30)">+30s</button>
     <button class="rt-btn" onclick="stopRest()">✕</button>
   </div>
@@ -715,7 +716,7 @@ let curDay = 0;
 // kasitli, orn. "bugune git" butonu ya da yeni split uygulanmasi).
 function persistCurDay(){ try{ localStorage.setItem('gt_curDay', String(curDay)); }catch(e){} }
 let editMode = false;
-let restIv = null, restSecs = 0;
+let restIv = null, restSecs = 0, restPaused = false;
 let hiitIv = null, hiitRunning = false, hiitPhase = 'work', hiitRound = 1, hiitSecs = 0;
 let amrapIv = null, amrapRunning = false, amrapSecs = 1200, amrapRounds = 0, amrapExtra = 0;
 let curNutDate = todayStr();
@@ -969,12 +970,13 @@ async function loadSetsForDay(userId, dayIdx) {
   const staleIds = [];
   (data||[]).forEach(row => {
     const k = userId+'_'+dayIdx+'_'+row.exercise_index+'_'+row.set_index;
-    // Bu set icin henuz Supabase'e yazilmamis/yazilmakta olan taze bir
-    // kullanici degisikligi varsa (debounce'ta bekliyor ya da az once
-    // saveSetImmediate ile gonderildi), bu satiri ESKI sunucu verisiyle
-    // EZME - yoksa az once isaretlenmis bir set, henuz sunucuya ulasmamis
-    // eski (stale) veriyle okununca kalici olarak sifirlanabilir.
-    if(pendingSetSaves[k]) return;
+    // Bu set icin henuz Supabase'e yazilmamis (debounce'ta bekliyor) YA DA
+    // saveSetImmediate ile baslatilip HALA DEVAM EDEN (yanit gelmemis) bir
+    // yazim varsa, bu satiri ESKI sunucu verisiyle EZME - yoksa az once
+    // isaretlenmis bir set, henuz sunucuya ulasmamis eski (stale) veriyle
+    // okununca kalici olarak sifirlanabilir (in-flight yazimlar sadece
+    // inFlightSetSaves'te tutulur, pendingSetSaves'te degil).
+    if(pendingSetSaves[k] || inFlightSetSaves[k]) return;
     // done is only true if done_at is within THIS week (Mon 00:00 to next Mon 00:00)
     const doneAt = row.done_at ? new Date(row.done_at) : null;
     const isCurrentWeek = !!(doneAt && doneAt >= monday && doneAt < nextMonday);
@@ -1216,6 +1218,16 @@ async function flushPendingSetSaves() {
   return [...pendingResults, ...inFlightResults].every(ok => ok);
 }
 window.addEventListener('beforeunload', () => { flushPendingSetSaves(); });
+// iOS Safari/PWA'da uygulama arka plana alinip (telefon kilitlenir, baska
+// uygulamaya gecilir) sonra iOS tarafindan bellek icin SONLANDIRILIRSA (ya
+// da uzun sure arka planda kalip sayfa yeniden yuklenirse), 'beforeunload'
+// GUVENILIR SEKILDE TETIKLENMEZ - bu durumda henuz Supabase'e ulasmamis
+// (debounce'ta bekleyen ya da hala devam eden) set yazimlari sessizce
+// kaybolur. 'visibilitychange'(hidden) ve 'pagehide' arka plana gecisi
+// 'beforeunload'dan cok daha guvenilir yakaladigi icin, ikisinde de aynı
+// flush tetikleniyor.
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flushPendingSetSaves(); });
+window.addEventListener('pagehide', () => { flushPendingSetSaves(); });
 
 function showMainApp() {
   document.getElementById('loadingScreen').style.display = 'none';
@@ -1500,9 +1512,12 @@ function renderDashLastWorkout(){
   const vol = parseFloat(last.volume)||0;
   const volTxt = vol>=1000 ? (vol/1000).toFixed(1).replace('.0','')+'k kg' : `${Math.round(vol)} kg`;
   const durTxt = last.duration_sec ? ` · ⏱ ${fmtDuration(last.duration_sec)}` : '';
+  const skippedCount = Array.isArray(last.skipped_sets) ? last.skipped_sets.length : 0;
+  const skippedTxt = skippedCount ? `<div style="font-size:10px;color:var(--warning);margin-top:4px">⚠️ ${skippedCount} set ağırlık/tekrar girilmeden atlandı</div>` : '';
   el.innerHTML = `<div onclick="showScreen('stats',navBtnFor('stats'))" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;cursor:pointer;box-shadow:var(--card-shadow)">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:5px">Son Antrenman</div>
     <div style="font-size:13px;font-weight:600">${whenTxt} · ${last.day_name||''} · ${last.sets_done||0} set · ${volTxt}${durTxt}</div>
+    ${skippedTxt}
   </div>`;
 }
 
@@ -2830,6 +2845,11 @@ async function insertSessionLog(row){
     const {duration_sec, ...withoutDuration} = row;
     res = await sb.from('session_logs').insert(withoutDuration).select().single();
   }
+  if(res.error && /skipped_sets/i.test(res.error.message||'')){
+    console.warn('session_logs.skipped_sets kolonu yok (scripts/session-logs-skipped-sets-column.sql calistirilmamis) - atlanan set bilgisi kaydedilmeden devam ediliyor.');
+    const {skipped_sets, ...withoutSkipped} = row;
+    res = await sb.from('session_logs').insert(withoutSkipped).select().single();
+  }
   return res;
 }
 
@@ -2845,12 +2865,25 @@ function confirmFinishDay(di){
   const prog=activeProgram()[di];
   const uid=activeProfile()?.id;
   let sets=0,vol=0;
+  // "Atlandı": kullanici seti isaretlemis (done) ama agirlik VEYA tekrar
+  // hic girmemis - bu setler hacme dahil edilmiyor, gunu tamamlamadan once
+  // ayrica uyariliyor (bkz. asagidaki confirm).
+  const skipped=[];
   prog.exercises.forEach((ex,ei)=>{
     for(let s=0;s<ex.sets;s++){
       const d=setCache[`${uid}_${di}_${ei}_${s}`]||{};
-      if(d.done){sets++;vol+=parseFloat(d.weight||0)*parseInt(d.reps?.split(/[-,]/)[0]||ex.reps.split(/[-,]/)[0]||10);}
+      if(!d.done) continue;
+      sets++;
+      if(!d.weight || !d.reps){ skipped.push({exercise:ex.name, set:s+1}); continue; }
+      vol+=parseFloat(d.weight||0)*parseInt(d.reps?.split(/[-,]/)[0]||ex.reps.split(/[-,]/)[0]||10);
     }
   });
+  if(skipped.length){
+    const byEx={};
+    skipped.forEach(sk=>{byEx[sk.exercise]=(byEx[sk.exercise]||0)+1;});
+    const summary=Object.entries(byEx).map(([name,c])=>`${name} (${c} set)`).join(', ');
+    if(!confirm(`${summary} atlandı (ağırlık/tekrar girilmedi), yine de tamamlamak istiyor musun?`)) return;
+  }
   // Show confirm modal
   const existing=document.getElementById('finishModal');
   if(existing)existing.remove();
@@ -2864,13 +2897,13 @@ function confirmFinishDay(di){
     <p style="font-size:11px;color:#d4f53c;margin-bottom:20px">Bu günü tamamlamak istediğine emin misin?</p>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('finishModal').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border-strong);background:none;color:var(--text-muted);cursor:pointer;font-size:12px">İptal</button>
-      <button onclick="finishDay(${di},${sets},${Math.round(vol)})" style="flex:1;padding:10px;border-radius:8px;border:none;background:#d4f53c;color:#0c0c0c;cursor:pointer;font-size:12px;font-weight:700">Evet, Tamamla!</button>
+      <button onclick="finishDay(${di},${sets},${Math.round(vol)},${JSON.stringify(skipped).replace(/"/g,'&quot;')})" style="flex:1;padding:10px;border-radius:8px;border:none;background:#d4f53c;color:#0c0c0c;cursor:pointer;font-size:12px;font-weight:700">Evet, Tamamla!</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
 }
 
-async function finishDay(di,sets,vol){
+async function finishDay(di,sets,vol,skippedSets){
   document.getElementById('finishModal')?.remove();
   // Gunu tamamlama kaydindan ONCE, debounce'ta bekleyen set yazimlarini
   // hemen bitiriyoruz - yoksa bu islem sirasinda bir hata olup sayfa
@@ -2892,7 +2925,7 @@ async function finishDay(di,sets,vol){
   // bu da butona basilan an baska bir gunun icerigini goruntuluyorsan (ör. curDay
   // Pazartesi'de kalmisken Sali gunu basmak) tamamlanmayi YANLIS takvim gunune
   // (Sali) yaziyordu.
-  const {data,error}=await insertSessionLog({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,logged_at:dateForDayIndex(di).toISOString()});
+  const {data,error}=await insertSessionLog({user_id:uid,day_name:prog.name,sets_done:sets,volume:vol,duration_sec:durationSec,skipped_sets:(skippedSets&&skippedSets.length)?skippedSets:null,logged_at:dateForDayIndex(di).toISOString()});
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
   renderWeekGrid();
@@ -3206,9 +3239,24 @@ function updateAmrapCap(di,mins){
   renderDayContent(di);
 }
 
-function startRest(s){stopRest();restSecs=s;document.getElementById('restTimer').classList.add('show');updRT();restIv=setInterval(()=>{restSecs--;if(restSecs<=0){stopRest();return;}updRT();},1000);}
-function updRT(){const m=Math.floor(restSecs/60),s=restSecs%60;document.getElementById('rtDisp').textContent=`${m}:${s.toString().padStart(2,'0')}`;}
-function stopRest(){clearInterval(restIv);document.getElementById('restTimer').classList.remove('show');}
+function startRest(s){stopRest();restSecs=s;restPaused=false;document.getElementById('restTimer').classList.add('show');updRT();restIv=setInterval(()=>{restSecs--;if(restSecs<=0){stopRest();return;}updRT();},1000);}
+function updRT(){
+  const m=Math.floor(restSecs/60),s=restSecs%60;
+  document.getElementById('rtDisp').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  const btn=document.getElementById('rtPauseBtn');
+  if(btn){btn.textContent=restPaused?'▶':'⏸';btn.title=restPaused?'Devam et':'Durdur';}
+}
+function stopRest(){clearInterval(restIv);restIv=null;restPaused=false;document.getElementById('restTimer').classList.remove('show');}
+// Durdur/Devam: zamanlayiciyi SIFIRLAMADAN sadece interval'i durdurup
+// kaldigi saniyeden devam ettirir - "X" (kapat) butonundan farkli olarak
+// zamanlayiciyi tamamen iptal etmez.
+function toggleRestPause(){
+  if(!document.getElementById('restTimer').classList.contains('show')) return;
+  restPaused = !restPaused;
+  if(restPaused){ clearInterval(restIv); restIv=null; }
+  else { restIv=setInterval(()=>{restSecs--;if(restSecs<=0){stopRest();return;}updRT();},1000); }
+  updRT();
+}
 function addRest(s){restSecs+=s;updRT();}
 
 async function renderWeightChart(p){
@@ -3402,6 +3450,7 @@ async function renderStats(){
   const uid=p?.id;
   const tv=sessionCache.reduce((s,l)=>s+(l.volume||0),0);
   const ts=sessionCache.reduce((s,l)=>s+(l.sets_done||0),0);
+  const tSkipped=sessionCache.reduce((s,l)=>s+(Array.isArray(l.skipped_sets)?l.skipped_sets.length:0),0);
   const color=p?.color||'#d4f53c';
   const monthCount=computeMonthlyWorkoutCount();
   const monthColor=monthlyGoalColor(monthCount);
@@ -3411,7 +3460,8 @@ async function renderStats(){
     <div class="stat-card"><div class="sc-lbl">Toplam Antrenman</div><div class="sc-val" style="color:${color}">${sessionCache.length}</div><div class="sc-sub">seans</div></div>
     <div class="stat-card"><div class="sc-lbl">Toplam Set</div><div class="sc-val" style="color:${color}">${ts}</div><div class="sc-sub">tamamlandı</div></div>
     <div class="stat-card"><div class="sc-lbl">Bu Ay</div><div class="sc-val" style="color:${monthColor}">${monthCount} / ${MONTHLY_GOAL}</div><div class="sc-sub" style="color:${monthColor}">${monthSub}</div></div>
-    <div class="stat-card"><div class="sc-lbl">Ort. Hacim</div><div class="sc-val" style="color:${color}">${sessionCache.length?Math.round(tv/sessionCache.length):0}</div><div class="sc-sub">kg/seans</div></div>`;
+    <div class="stat-card"><div class="sc-lbl">Ort. Hacim</div><div class="sc-val" style="color:${color}">${sessionCache.length?Math.round(tv/sessionCache.length):0}</div><div class="sc-sub">kg/seans</div></div>
+    ${tSkipped?`<div class="stat-card"><div class="sc-lbl">Atlanan Set</div><div class="sc-val" style="color:var(--warning)">${tSkipped}</div><div class="sc-sub">ağırlık/tekrar girilmedi</div></div>`:''}`;
   // Load weight logs and draw chart
   await renderWeightChart(p);
   await renderNutChart(p);
