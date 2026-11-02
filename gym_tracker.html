@@ -1418,7 +1418,90 @@ const ACTIVITY_METS = {
 };
 const ACTIVITY_ICONS = {
   'Koşu':'🏃', 'Bisiklet':'🚴', 'Yürüyüş':'🚶', 'Yüzme':'🏊', 'HIIT':'🔥', 'Ağırlık Antrenmanı':'🏋️',
+  'workout_auto':'🏋️', 'workout_auto_edited':'🏋️',
 };
+const ACTIVITY_LABELS = {
+  'workout_auto':'Antrenman (otomatik)', 'workout_auto_edited':'Antrenman (düzenlendi)',
+};
+
+// ── OTOMATIK ANTRENMAN KALORI HESABI ──
+// Egzersiz ADINA gore 4 MET kategorisinden birini secer. "Günü Tamamla"
+// gerektirmez - gunun HERHANGI bir anindaki done=true setler sayilir ki
+// antrenman devam ederken de "Yakılan" anlik guncellensin.
+function exerciseMetCategory(name){
+  const n=(name||'').toLowerCase();
+  if(n.includes('calf')||n.includes('face pull')) return 3.5; // kucuk kas
+  if(n.includes('deadlift')||n.includes('squat')||n.includes('hip thrust')||n.includes('press')) return 6.0; // compound
+  if(n.includes('pull-up')||n.includes('pullup')||n.includes('chin-up')||n.includes('chinup')||n.includes('row')||n.includes('pulldown')) return 5.0; // pull
+  return 4.0; // izolasyon (curl, lateral raise, fly, extension vb.) - varsayilan
+}
+// Her tamamlanmis set icin: sure = 2.5 dakika (set+dinlenme), kalori = MET x
+// kilo(kg) x sure(saat). Sadece BUGUN (done_at) isaretlenmis setler sayilir.
+async function computeAutoWorkoutKcal(uid){
+  const p = activeProfile();
+  const w = p?.weight || 70;
+  const today = todayStr();
+  const {data} = await sb.from('workout_sets').select('*').eq('user_id', uid).eq('done', true);
+  let kcal=0, sets=0;
+  (data||[]).forEach(row=>{
+    if(!row.done_at || localDateStr(new Date(row.done_at))!==today) return;
+    const ex = activeProgram()[row.day_index%7]?.exercises?.[row.exercise_index];
+    const met = exerciseMetCategory(ex?.name);
+    kcal += met * w * (2.5/60);
+    sets++;
+  });
+  return {kcal: Math.round(kcal), sets, durationMin: Math.round(sets*2.5)};
+}
+// Bugunun otomatik antrenman kaydini activity_logs ile senkronize eder.
+// Kullanici kalem ikonuyla ELLE duzenlediyse (activity_type 'workout_auto_edited'
+// olur) bir daha UZERINE YAZILMAZ - kendi girdigi deger kalici kalir, silip
+// tekrar set isaretlemedikce (bkz. asagi) otomatik hesaba donmez.
+async function syncAutoWorkoutKcal(uid){
+  const {kcal, sets, durationMin} = await computeAutoWorkoutKcal(uid);
+  const {data: existing} = await sb.from('activity_logs').select('*').eq('user_id', uid).eq('date', todayStr()).in('activity_type', ['workout_auto','workout_auto_edited']);
+  const editedRow = (existing||[]).find(a=>a.activity_type==='workout_auto_edited');
+  if(editedRow) return;
+  const autoRow = (existing||[]).find(a=>a.activity_type==='workout_auto');
+  if(!sets){
+    if(autoRow) await sb.from('activity_logs').delete().eq('id', autoRow.id);
+    return;
+  }
+  if(autoRow){
+    if(Math.round(parseFloat(autoRow.kcal_burned))===kcal && Math.round(parseFloat(autoRow.duration_min))===durationMin) return;
+    await sb.from('activity_logs').delete().eq('id', autoRow.id);
+  }
+  await sb.from('activity_logs').insert({user_id:uid, date:todayStr(), activity_type:'workout_auto', duration_min:durationMin, kcal_burned:kcal});
+}
+async function editAutoWorkoutKcal(id, currentKcal){
+  const v = prompt('Antrenman kalorisini düzenle (kcal):', Math.round(currentKcal));
+  if(v===null) return;
+  const kcal = parseFloat(v);
+  if(!kcal || kcal<0){ alert('Geçerli bir kalori değeri gir.'); return; }
+  const {data: row} = await sb.from('activity_logs').select('*').eq('id', id).single();
+  if(!row) return;
+  await sb.from('activity_logs').delete().eq('id', id);
+  await sb.from('activity_logs').insert({user_id:row.user_id, date:row.date, activity_type:'workout_auto_edited', duration_min:row.duration_min, kcal_burned:kcal});
+  renderDashCalCard();
+}
+
+// Bulk/Cut/Maintain yonu: profildeki mainGoal etiketleri (kilo ver/kas
+// kazan/vb.) bulk/cut/maintain'e net esleşmedigi icin, computeGoalCalorieTarget
+// ile AYNI sinyal (hedef kilo - mevcut kilo) kullanilir - zaten hedef kalori de
+// bu farktan hesaplaniyor, ikisi tutarli olsun diye.
+function goalDirection(p){
+  if(!p?.weight || !p?.target_weight) return 'maintain';
+  const diff = p.target_weight - p.weight;
+  if(Math.abs(diff) < 0.5) return 'maintain';
+  return diff > 0 ? 'bulk' : 'cut';
+}
+function kcalTargetColor(p, alinan, target){
+  if(!target) return 'var(--muted)';
+  const dir = goalDirection(p);
+  if(dir==='bulk') return alinan>=target ? '#34d399' : '#ff5c38';
+  if(dir==='cut') return alinan<=target ? '#34d399' : '#ff5c38';
+  const diff = Math.abs(alinan-target);
+  return diff<=200 ? '#34d399' : diff<=400 ? '#f7c948' : '#ff5c38';
+}
 
 async function renderDashboard(){
   const p = activeProfile();
@@ -1675,6 +1758,7 @@ async function renderDashCalCard(){
   const p = activeProfile();
   const uid = p?.id;
   if(!uid){ el.innerHTML=''; return; }
+  await syncAutoWorkoutKcal(uid);
   const nd = await loadNutrition(uid, todayStr());
   let alinan = 0, proteinAlinan = 0;
   nd.meals?.forEach(m=>m.foods?.forEach(f=>{alinan+=parseFloat(f.kcal||0);proteinAlinan+=parseFloat(f.protein||0);}));
@@ -1683,34 +1767,46 @@ async function renderDashCalCard(){
   const targets = nd.targets||{};
   const kcalTarget = targets.kcal||0;
   const proteinTarget = targets.protein||0;
-  const kcalRatio = kcalTarget>0 ? alinan/kcalTarget : 0;
-  // Kalori bari: hedefin altinda yesil, yakininda (± %5-10 arasi) sari, ustunde kirmizi.
-  const kcalBarColor = kcalTarget<=0 ? 'var(--text-muted)' : kcalRatio<=0.9 ? 'var(--success)' : kcalRatio<=1.05 ? 'var(--warning)' : 'var(--danger)';
-  const kcalPct = kcalTarget>0 ? Math.min(kcalRatio*100,100) : 0;
-  const proteinPct = proteinTarget>0 ? Math.min((proteinAlinan/proteinTarget)*100,100) : 0;
+  const proteinRatio = proteinTarget>0 ? proteinAlinan/proteinTarget : 0;
+  // Protein bari HEDEFTEN BAGIMSIZ hep ayni mantikla renklenir: %80 ustu
+  // yesil, %60-80 sari, alti kirmizi.
+  const proteinBarColor = proteinTarget<=0 ? 'var(--text-muted)' : proteinRatio>=0.8 ? '#34d399' : proteinRatio>=0.6 ? '#f7c948' : '#ff5c38';
+  const proteinPct = proteinTarget>0 ? Math.min(proteinRatio*100,100) : 0;
   const maint = estimateMaintenanceKcal(p);
   const activities = await loadTodayActivityLogs(uid);
   const extraBurn = activities.reduce((s,a)=>s+parseFloat(a.kcal_burned||0),0);
   const yakilan = Math.round((maint||0) + extraBurn);
   const net = alinan - yakilan;
+  // Hedef kalori SADECE TDEE'den hesaplanir (bkz. computeGoalCalorieTarget) -
+  // aktivite eklenince DEGISMEZ, "Yakılan" sadece bilgi amaclidir.
   const target = computeGoalCalorieTarget(p);
-  // Renk, ALINAN'in gunluk hedef kaloriye (profildeki ayni hedef) ne kadar
-  // yakin oldugunu gosterir - "Net" (Alinan-Yakilan) merkezdeki buyuk sayi,
-  // ama renklendirme kullanicinin asil takip ettigi "ne kadar yedim" sorusuna
-  // gore yapiliyor.
-  let color = 'var(--muted)';
-  if(target){
-    const diff = Math.abs(alinan - target);
-    color = diff<=100 ? '#34d399' : diff<=200 ? '#f7c948' : '#ff5c38';
-  }
-  const actList = activities.length ? '<div style="margin-top:12px">' + activities.map(a=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)">
-      <div style="font-size:12px">${ACTIVITY_ICONS[a.activity_type]||'🏃'} ${a.activity_type} · ${a.duration_min} dk</div>
+  // Renk: Bulk'ta alinan hedefe ulasti/gecti mi, Cut'ta hedefin altinda mi
+  // kaldi, Maintain'de ±200 kcal bandinda mi - bkz. kcalTargetColor/goalDirection.
+  const color = kcalTargetColor(p, alinan, target);
+  const kcalPct = kcalTarget>0 ? Math.min((alinan/kcalTarget)*100,100) : 0;
+  // "Yakılan" altindaki kisa dokum: otomatik antrenman + manuel aktiviteler
+  // (her biri kendi ikonuyla, ör. "🏋️ 320 kcal + 🚶 150 kcal").
+  const workoutActs = activities.filter(a=>a.activity_type==='workout_auto'||a.activity_type==='workout_auto_edited');
+  const otherActs = activities.filter(a=>a.activity_type!=='workout_auto'&&a.activity_type!=='workout_auto_edited');
+  const breakdownParts = [];
+  const workoutKcalSum = workoutActs.reduce((s,a)=>s+parseFloat(a.kcal_burned||0),0);
+  if(workoutKcalSum>0) breakdownParts.push(`🏋️ ${Math.round(workoutKcalSum)} kcal`);
+  const byOtherType = {};
+  otherActs.forEach(a=>{ byOtherType[a.activity_type]=(byOtherType[a.activity_type]||0)+parseFloat(a.kcal_burned||0); });
+  Object.entries(byOtherType).forEach(([type,k])=>breakdownParts.push(`${ACTIVITY_ICONS[type]||'🏃'} ${Math.round(k)} kcal`));
+  const breakdownHtml = breakdownParts.length ? `<div style="font-size:9px;color:var(--text-muted);margin-top:2px">${breakdownParts.join(' + ')}</div>` : '';
+  const actList = activities.length ? '<div style="margin-top:12px">' + activities.map(a=>{
+    const isAuto = a.activity_type==='workout_auto'||a.activity_type==='workout_auto_edited';
+    const label = ACTIVITY_LABELS[a.activity_type] || a.activity_type;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="font-size:12px">${ACTIVITY_ICONS[a.activity_type]||'🏃'} ${label} · ${a.duration_min} dk</div>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="font-size:12px;color:#ff5c38">-${Math.round(a.kcal_burned)} kcal</div>
+        ${isAuto?`<button onclick="editAutoWorkoutKcal('${a.id}',${parseFloat(a.kcal_burned)})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✏️</button>`:''}
         <button onclick="deleteActivityLog('${a.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✕</button>
       </div>
-    </div>`).join('') + '</div>' : '';
+    </div>`;
+  }).join('') + '</div>' : '';
   const maintNote = maint===null ? '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px">Yaş/boy/kilo eksik, BMR tam hesaplanamadı</div>' : '';
   el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -1724,16 +1820,16 @@ async function renderDashCalCard(){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
       <div><div style="font-size:17px;font-weight:700;color:#34d399">${alinan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Alınan</div></div>
-      <div><div style="font-size:17px;font-weight:700;color:#ff5c38">${yakilan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Yakılan</div></div>
+      <div><div style="font-size:17px;font-weight:700;color:#ff5c38">${yakilan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Yakılan</div>${breakdownHtml}</div>
       <div><div style="font-size:17px;font-weight:700;color:${color}">${net}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Net</div></div>
     </div>
     ${kcalTarget>0?`<div style="margin-top:14px">
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Kalori</span><span>${alinan} / ${kcalTarget}</span></div>
-      <div class="nut-bar"><div class="nut-bar-fill" style="width:${kcalPct}%;background:${kcalBarColor}"></div></div>
+      <div class="nut-bar"><div class="nut-bar-fill" style="width:${kcalPct}%;background:${color}"></div></div>
     </div>`:''}
     ${proteinTarget>0?`<div style="margin-top:10px">
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Protein</span><span>${proteinAlinan} / ${proteinTarget}g</span></div>
-      <div class="nut-bar"><div class="nut-bar-fill" style="width:${proteinPct}%;background:var(--danger)"></div></div>
+      <div class="nut-bar"><div class="nut-bar-fill" style="width:${proteinPct}%;background:${proteinBarColor}"></div></div>
     </div>`:''}
     ${actList}
   </div>`;
