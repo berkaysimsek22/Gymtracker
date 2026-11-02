@@ -2495,13 +2495,20 @@ async function avgProteinLast7Days(userId){
 function renderDayTabs(){} // removed
 async function selDay(i){curDay=i;persistCurDay();editMode=false;renderDayTabs();await renderDayContent(i);}
 
-async function renderDayContent(di) {
+// skipFetch=true: workout_sets'i sunucudan YENIDEN OKUMADAN, mevcut
+// setCache'ten ciziyor. finishDay basarili flush'tan HEMEN SONRA bunu
+// kullanir - cunku o an setCache zaten dogru/guncel (flushPendingSetSaves
+// basariyla tamamlandi), sunucudan tekrar okumak sadece gereksiz bir
+// replikasyon/gecikme riski ekliyordu (az once kaydedilen setlerin bir
+// anlik "eski" veriyle geri donup yesil isaretlerin kaybolmasina neden
+// olan tekrarlanan sikayetlerin kaynagi buydu).
+async function renderDayContent(di, skipFetch) {
   const prog = activeProgram(), day = prog[di], el = document.getElementById('dayContent');
   const uid = activeProfile()?.id;
   if(!uid) return;
 
   // Load sets for this day
-  await loadSetsForDay(uid, di);
+  if(!skipFetch) await loadSetsForDay(uid, di);
 
   if(day.type==='rest') {
     el.innerHTML = `<div class="rest-card"><div class="emoji">😴</div><h3>Dinlenme Günü</h3><p>Kasların büyür, dinlenirsin.<br>Protein alımına dikkat et 💪</p>
@@ -3144,7 +3151,7 @@ async function finishDay(di,sets,vol,skippedSets){
   if(error){alert('Hata: '+error.message);return;}
   await loadSessionLogs(uid);
   renderWeekGrid();
-  await renderDayContent(di);
+  await renderDayContent(di, true);
   // Show success with undo
   const toast=document.createElement('div');
   toast.id='finishToast';
