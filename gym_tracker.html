@@ -1139,22 +1139,24 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
     if(setCache[k].db_id) {
       ({error: writeError} = await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id));
     } else {
-      // Try to find existing row first - burada hata olmasi normal (0 satir
-      // eslesmesi .single()'i hata dondurur), bu yuzden kasten yok sayiliyor.
-      const {data: existing} = await sb.from('workout_sets')
-        .select('id').eq('user_id', userId)
-        .eq('day_index', storeDi)
-        .eq('exercise_index', parseInt(exIdx))
-        .eq('set_index', parseInt(setIdx))
-        .single();
-      if(existing) {
-        setCache[k].db_id = existing.id;
-        ({error: writeError} = await sb.from('workout_sets').update(row).eq('id', existing.id));
-      } else {
-        const {data, error} = await sb.from('workout_sets').insert(row).select().single();
-        writeError = error;
-        if(data) setCache[k].db_id = data.id;
+      // scripts/workout-sets-dedupe-and-unique-constraint.sql calistirildiysa
+      // (user_id,day_index,exercise_index,set_index) UNIQUE - upsert bu slotu
+      // ATOMIK olarak ekler/gunceller (ayri bir "once var mi" sorgusuna/race'e
+      // gerek kalmiyor, cok-sekme/cok-cihaz yarislarina karsi da korur).
+      let res = await sb.from('workout_sets').upsert(row, {onConflict: 'user_id,day_index,exercise_index,set_index'}).select().single();
+      if(res.error && /no unique|exclusion constraint|on conflict/i.test(res.error.message||'')){
+        // Migration henuz calistirilmamis - eski (once var mi diye sor, sonra
+        // ekle/guncelle) yonteme dus, boylece migration calistirilmadan da
+        // uygulama (eski, yarisa acik ama calisir) davranisiyla devam eder.
+        const {data: existing} = await sb.from('workout_sets').select('id')
+          .eq('user_id', userId).eq('day_index', storeDi)
+          .eq('exercise_index', parseInt(exIdx)).eq('set_index', parseInt(setIdx)).single();
+        res = existing
+          ? await sb.from('workout_sets').update(row).eq('id', existing.id).select().single()
+          : await sb.from('workout_sets').insert(row).select().single();
       }
+      writeError = res.error;
+      if(res.data) setCache[k].db_id = res.data.id;
     }
     if(writeError) throw writeError;
     return true;
@@ -1171,11 +1173,32 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
 // Hangi set'in kaydi 600ms'lik debounce penceresinde bekliyor - gun
 // tamamlanirken/sayfadan ayrilirken bunlari hemen yazdirmak icin.
 let pendingSetSaves = {}; // k -> {userId, dayIdx, exIdx, setIdx}
-// saveSetImmediate ile baslatilmis ama HENUZ Supabase'den yanit gelmemis
-// yazimlar - bunlar pendingSetSaves'te YER ALMAZ (debounce'u atladiklari
-// icin), bu yuzden flushPendingSetSaves'in bunlari da bekleyebilmesi icin
-// ayri takip ediliyor (bkz. flushPendingSetSaves).
+// Ayni k (set) icin HALA DEVAM EDEN (yanit gelmemis) yazim - hem
+// saveSetImmediate'in anlik yazimlarini hem de queuedPerformSetSave'in
+// sira kuyruğunu takip eder (bkz. asagisi).
 let inFlightSetSaves = {}; // k -> Promise<boolean>
+
+// performSetSave AYNI k icin iki yazim birden calisirsa (ör. agirlik
+// alanindaki 600ms'lik debounce ile checkmark'in ayni ana denk gelen anlik
+// yazimi) sorunlu: ikisi de henuz db_id bilmedigi icin (bu haftanin ilk kez
+// kaydedilen bir seti oldugunda) "mevcut satir var mi" diye AYNI ANDA
+// sorup ikisi de "yok" gorup AYRI AYRI INSERT edebiliyordu - ayni slot icin
+// IKI satir olusuyor, sonraki bir sayfa yenilemesinde hangisi "son"
+// donerse o gosteriliyor, diger (dogru/guncel) satir kaybolmus gibi
+// gorunuyordu. Bu sarmalayici, ayni k icin yazimlari HER ZAMAN sirayla
+// (bir onceki tamamen bitmeden yenisi baslamadan) calistirarak bu yarisi
+// kokunden kapatiyor.
+async function queuedPerformSetSave(userId, dayIdx, exIdx, setIdx, k){
+  const prior = inFlightSetSaves[k];
+  const run = (async () => {
+    if(prior) await prior;
+    return performSetSave(userId, dayIdx, exIdx, setIdx, k);
+  })();
+  inFlightSetSaves[k] = run;
+  const ok = await run;
+  if(inFlightSetSaves[k] === run) delete inFlightSetSaves[k];
+  return ok;
+}
 
 async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
   if(!userId) return; // Guard against null user
@@ -1186,7 +1209,7 @@ async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
   pendingSetSaves[k] = {userId, dayIdx, exIdx, setIdx};
   saveTimer[k] = setTimeout(async () => {
     delete pendingSetSaves[k];
-    await performSetSave(userId, dayIdx, exIdx, setIdx, k);
+    await queuedPerformSetSave(userId, dayIdx, exIdx, setIdx, k);
   }, 600);
 }
 
@@ -1203,14 +1226,7 @@ async function saveSetImmediate(userId, dayIdx, exIdx, setIdx, fields){
   Object.assign(setCache[k], fields);
   clearTimeout(saveTimer[k]);
   delete pendingSetSaves[k];
-  // Yazimi inFlightSetSaves'e kaydediyoruz ki kullanici bu await'in
-  // DONMESINI beklemeden (ör. son checkbox'a basip hemen "Gunu Tamamla"ya
-  // tiklarsa) flushPendingSetSaves bu yazimin bitmesini bekleyebilsin.
-  const p = performSetSave(userId, dayIdx, exIdx, setIdx, k);
-  inFlightSetSaves[k] = p;
-  const ok = await p;
-  if(inFlightSetSaves[k] === p) delete inFlightSetSaves[k];
-  return ok;
+  return queuedPerformSetSave(userId, dayIdx, exIdx, setIdx, k);
 }
 
 // Semih'in basina gelen senaryo: gunu tamamlarken hata alinca sayfa
@@ -1222,21 +1238,18 @@ async function saveSetImmediate(userId, dayIdx, exIdx, setIdx, fields){
 // basarisiz olduysa false dondurur - cagiran taraf (ör. finishDay) bunu
 // kontrol edip false ise gunu tamamlamayi durdurmali.
 async function flushPendingSetSaves() {
-  const keys = Object.keys(pendingSetSaves);
-  const pendingResults = keys.length ? await Promise.all(keys.map(k => {
+  // Bekleyen TUM debounce'lari hemen tetikle - queuedPerformSetSave kendini
+  // ESZAMANLI (ilk await'ten once) inFlightSetSaves'e kaydettigi icin, asagidaki
+  // Promise.all hem bunlari hem halihazirda devam eden (ör. saveSetImmediate'ten)
+  // yazimlari TEK bir yerden, sirayla/guvenle bekleyebiliyor.
+  Object.keys(pendingSetSaves).forEach(k => {
     const {userId, dayIdx, exIdx, setIdx} = pendingSetSaves[k];
     clearTimeout(saveTimer[k]);
     delete pendingSetSaves[k];
-    return performSetSave(userId, dayIdx, exIdx, setIdx, k);
-  })) : [];
-  // saveSetImmediate ile baslatilmis ama henuz Supabase'den yanit gelmemis
-  // yazimlar da olabilir (ör. kullanici son checkbox'a basip hemen "Gunu
-  // Tamamla"ya tikladiysa) - bunlari beklemezsek finishDay'in hemen
-  // ardindan yaptigi yeniden-okuma bu yazimlari kacirip o setleri
-  // "tamamlanmamis" gosterebilir, weight/reps kalirken sadece done geri
-  // duser (Semih'in son bildirdigi senaryo tam olarak bu).
-  const inFlightResults = await Promise.all(Object.values(inFlightSetSaves));
-  return [...pendingResults, ...inFlightResults].every(ok => ok);
+    queuedPerformSetSave(userId, dayIdx, exIdx, setIdx, k);
+  });
+  const results = await Promise.all(Object.values(inFlightSetSaves));
+  return results.every(ok => ok);
 }
 window.addEventListener('beforeunload', () => { flushPendingSetSaves(); });
 // iOS Safari/PWA'da uygulama arka plana alinip (telefon kilitlenir, baska
