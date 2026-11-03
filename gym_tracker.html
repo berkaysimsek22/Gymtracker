@@ -1125,6 +1125,7 @@ async function saveProgram(userId) {
 // bilemiyordu. Simdi gecici bir hata varsa 2 kez daha (artan bekleme ile)
 // deneniyor, hala basarisizsa false donuyor ki finishDay gunu YANLIŞLIKLA
 // "tamamlandi" olarak isaretlemesin.
+let lastSetSaveError = null;
 async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
   try {
     const storeDi = storageDayIndex(userId, parseInt(dayIdx));
@@ -1190,6 +1191,11 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
       await new Promise(r=>setTimeout(r, 400*attempt));
       return performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt+1);
     }
+    // 3 denemenin hepsi basarisiz oldu - GERCEK hata metnini (ör. RLS/izin,
+    // kisit ihlali) toggleSet/saveSet'in kullaniciya gosterebilmesi icin
+    // sakliyoruz, "internet baglantini kontrol et" gibi genel/yaniltici bir
+    // mesaj yerine artik SEBEBI gorebilelim.
+    lastSetSaveError = (e && (e.message || e.details || e.hint)) || String(e) || 'bilinmeyen hata';
     return false;
   }
 }
@@ -1237,7 +1243,7 @@ async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
     // Yazim basarisiz oldu - sessizce yutmak yerine (kullanici fark etmeden
     // veri kaybolsun) gorunur ama yazmaya devam etmesini ENGELLEMEYEN
     // (alert() gibi degil) kucuk bir uyari gosteriyoruz.
-    if(!ok) showErrorToast('⚠️ Ağırlık/tekrar kaydedilemedi, bağlantını kontrol et.');
+    if(!ok) showErrorToast('⚠️ Ağırlık/tekrar kaydedilemedi: '+(lastSetSaveError||'bilinmeyen hata'));
   }, 600);
 }
 
@@ -2794,7 +2800,7 @@ async function toggleSet(uid,di,ei,si,rs){
     // kullaniciya HEMEN gorunur bir uyari veriyoruz VE optimistic UI'i
     // GERI ALIYORUZ - ekran, veritabaniyla tutarsiz bir "yesil" gostermeye
     // devam etmesin.
-    alert('⚠️ Bu set kaydedilemedi, internet bağlantını kontrol edip tekrar dene.');
+    alert('⚠️ Bu set kaydedilemedi.\n\nSebep: '+(lastSetSaveError||'bilinmeyen hata')+'\n\nBu mesajın ekran görüntüsünü gönderirsen sorunu kesin olarak bulabilirim.');
     Object.assign(setCache[k], {done: !newDone});
     if(newDone){ row?.classList.remove('sdone'); if(btn){btn.classList.remove('chk');btn.textContent='O';} closeRIRPopup(k); }
     else { row?.classList.add('sdone'); if(btn){btn.classList.add('chk');btn.textContent='✓';} }
