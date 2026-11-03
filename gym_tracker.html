@@ -1135,10 +1135,29 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
     // kendi alanini (rir) yazar, digerleri hic kaydedilmemis olurdu.
     const {db_id, ...cacheable} = setCache[k];
     const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...cacheable};
-    let writeError = null;
+    let writeError = null, writtenRow = null;
     if(setCache[k].db_id) {
-      ({error: writeError} = await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id));
-    } else {
+      // ÖNEMLİ: .select() OLMADAN update() yazımın GERÇEKTEN bir satırı
+      // etkileyip etkilemediğini hiç kontrol etmiyordu. Eğer db_id ESKİ/GEÇERSİZ
+      // bir satırı gösteriyorsa (ör. o satır arada silinmiş - dedupe script'i
+      // gibi - ya da RLS sessizce filtreliyorsa), Supabase HATA DÖNDÜRMEZ,
+      // sadece hiçbir şey değişmeden "başarılı" döner. Uygulama "kaydetti"
+      // sanıp öyle gösteriyordu, ama sayfa yenilenince (gerçek veri okunduğunda)
+      // hiç değişmemiş oluyordu - hep AYNI setlerde tekrarlayan, asla kendi
+      // kendine düzelmeyen veri kaybının asıl sebebi buydu. Artık .select() ile
+      // DÖNEN SATIRI kontrol ediyoruz; boş dönerse db_id'yi GEÇERSİZ sayıp
+      // aşağıdaki upsert'e düşüyoruz - o da ESKİ ID'YE değil, benzersiz
+      // (user_id+day_index+exercise_index+set_index) slot'a göre doğru satırı
+      // bulup/oluşturup kaydı KURTARIYOR.
+      const res = await sb.from('workout_sets').update(row).eq('id', setCache[k].db_id).select();
+      if(!res.error && (!res.data || !res.data.length)){
+        setCache[k].db_id = null;
+      } else {
+        writeError = res.error;
+        if(res.data && res.data[0]) writtenRow = res.data[0];
+      }
+    }
+    if(!setCache[k].db_id && !writeError) {
       // scripts/workout-sets-dedupe-and-unique-constraint.sql calistirildiysa
       // (user_id,day_index,exercise_index,set_index) UNIQUE - upsert bu slotu
       // ATOMIK olarak ekler/gunceller (ayri bir "once var mi" sorgusuna/race'e
@@ -1156,9 +1175,14 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
           : await sb.from('workout_sets').insert(row).select().single();
       }
       writeError = res.error;
+      writtenRow = res.data;
       if(res.data) setCache[k].db_id = res.data.id;
     }
     if(writeError) throw writeError;
+    // Hicbir hata yok AMA hicbir satir da donmediyse (ör. RLS sessizce
+    // engelledi) bunu BASARISIZLIK say - sessizce "basarili" donup veriyi
+    // kaybettirmek yerine yeniden denesin/sonunda kullaniciya gorunur hata versin.
+    if(!writtenRow) throw new Error('Yazim sunucuya ulasti ama hicbir satir etkilenmedi');
     return true;
   } catch(e) {
     console.error(`saveSet error (deneme ${attempt}):`, e);
