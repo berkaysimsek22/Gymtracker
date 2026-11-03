@@ -1233,8 +1233,20 @@ async function saveSet(userId, dayIdx, exIdx, setIdx, fields) {
   pendingSetSaves[k] = {userId, dayIdx, exIdx, setIdx};
   saveTimer[k] = setTimeout(async () => {
     delete pendingSetSaves[k];
-    await queuedPerformSetSave(userId, dayIdx, exIdx, setIdx, k);
+    const ok = await queuedPerformSetSave(userId, dayIdx, exIdx, setIdx, k);
+    // Yazim basarisiz oldu - sessizce yutmak yerine (kullanici fark etmeden
+    // veri kaybolsun) gorunur ama yazmaya devam etmesini ENGELLEMEYEN
+    // (alert() gibi degil) kucuk bir uyari gosteriyoruz.
+    if(!ok) showErrorToast('⚠️ Ağırlık/tekrar kaydedilemedi, bağlantını kontrol et.');
   }, 600);
+}
+
+function showErrorToast(msg){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(255,92,56,.4);border-radius:12px;padding:12px 20px;z-index:600;font-size:12px;color:#ff5c38;max-width:85vw;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
 }
 
 // toggleSet (checkmark) bunu kullanir - weight/reps yazimindan farkli olarak
@@ -2775,7 +2787,23 @@ async function toggleSet(uid,di,ei,si,rs){
   const mp=document.getElementById(`mp_${di}_${ei}`);if(mp){mp.textContent=`${done}/${ex.sets}`;mp.className=`meta-pill${done===ex.sets?' done-pill':''}`;}
   done===ex.sets?document.getElementById(`ec_${di}_${ei}`)?.classList.add('completed'):document.getElementById(`ec_${di}_${ei}`)?.classList.remove('completed');
   renderDayTabs();
-  await saveSetImmediate(uid,di,ei,si,fields);
+  const ok = await saveSetImmediate(uid,di,ei,si,fields);
+  if(!ok){
+    // Yazim GERCEKTEN basarisiz oldu (ör. RLS/aglanti sorunu) - sessizce
+    // "kaydedildi" gibi gorunup sayfa yenilenince GERI DONMEK yerine, artik
+    // kullaniciya HEMEN gorunur bir uyari veriyoruz VE optimistic UI'i
+    // GERI ALIYORUZ - ekran, veritabaniyla tutarsiz bir "yesil" gostermeye
+    // devam etmesin.
+    alert('⚠️ Bu set kaydedilemedi, internet bağlantını kontrol edip tekrar dene.');
+    Object.assign(setCache[k], {done: !newDone});
+    if(newDone){ row?.classList.remove('sdone'); if(btn){btn.classList.remove('chk');btn.textContent='O';} closeRIRPopup(k); }
+    else { row?.classList.add('sdone'); if(btn){btn.classList.add('chk');btn.textContent='✓';} }
+    let doneAfterRevert=0;
+    for(let s=0;s<ex.sets;s++){ if(setCache[`${uid}_${di}_${ei}_${s}`]?.done) doneAfterRevert++; }
+    if(mp){ mp.textContent=`${doneAfterRevert}/${ex.sets}`; mp.className=`meta-pill${doneAfterRevert===ex.sets?' done-pill':''}`; }
+    doneAfterRevert===ex.sets?document.getElementById(`ec_${di}_${ei}`)?.classList.add('completed'):document.getElementById(`ec_${di}_${ei}`)?.classList.remove('completed');
+    renderDayTabs();
+  }
 }
 
 function openRIRPopup(k){ document.getElementById('rirpop_'+k)?.classList.add('open'); }
