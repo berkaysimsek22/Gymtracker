@@ -1004,7 +1004,7 @@ async function loadSetsForDay(userId, dayIdx) {
     // Only show done if viewing current week
     const isDone = row.done === true && isCurrentWeek;
     if(row.done === true && doneAt && !isCurrentWeek) staleIds.push(row.id);
-    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDone, done_at: row.done_at, rir: row.rir, ts: row.done_at, db_id: row.id};
+    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDone, done_at: row.done_at, rir: row.rir, db_id: row.id};
   });
   if(staleIds.length){
     sb.from('workout_sets').update({done:false, done_at:null}).in('id', staleIds)
@@ -1134,7 +1134,15 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
     // 600ms'lik debounce'u bitmeden gelen hizli ikinci bir saveSet cagrisi
     // onceki cagrinin (weight/reps/done) alanlarini iptal edip sadece
     // kendi alanini (rir) yazar, digerleri hic kaydedilmemis olurdu.
-    const {db_id, ...cacheable} = setCache[k];
+    // 'ts' DE haric tutuluyor - ASIL BUG BUYDU: loadSetsForDay setCache'e
+    // (hic kullanilmayan, UI-ici bir yardimci olarak eklenmis) 'ts' alanini
+    // koyuyordu, workout_sets tablosunda boyle bir sutun OLMADIGI icin her
+    // UPDATE/INSERT/UPSERT "Could not find the 'ts' column" hatasiyla
+    // SESSIZCE basarisiz oluyordu (eskiden hata kontrol edilmiyordu) -
+    // sadece daha once SUNUCUDAN OKUNMUS (ts cache'e girmis) setlerde
+    // olustugu icin, ayni setler HER SEFERINDE, hicbir onceki fix'ten sonra
+    // bile duzelmeden basarisiz oluyordu.
+    const {db_id, ts, ...cacheable} = setCache[k];
     const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...cacheable};
     let writeError = null, writtenRow = null;
     if(setCache[k].db_id) {
