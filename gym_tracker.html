@@ -2251,12 +2251,18 @@ function renderWeekGrid() {
     const dayDate = new Date(now);
     dayDate.setDate(now.getDate() + dayDiff);
     const isDone = completedByDate.has(localDateStr(dayDate));
+    // Dinlenme gununde "+ Antrenmanı Başlat" ile yapilan EKSTRA (No Excuse/
+    // Cindy/Bring Sally Up) antrenmanlar da bu tarihe session_logs kaydi
+    // dusurur - ama program gunu hala 'rest' oldugu icin bunu normal bir
+    // gun tamamlamasindan (yesil) AYIRT ETMEK icin mavi gosteriliyor.
+    const isExtra = isDone && day.type==='rest';
+    const doneColor = isExtra ? '#38b6ff' : '#34d399';
     let dc = 'rest-d', lbl = 'Rest';
     const shortName = day.name ? (day.type==='rest'?'Rest':day.name.replace(/Dinlenme/gi,'Rest').replace(/Gün /gi,'G').substring(0,6)) : 'Rest';
     if(day.type!=='rest'){dc='gym';lbl=shortName}
     if(day.type==='hiit'||day.type==='cardio'){dc='hiit-d';lbl='HIIT'}
     if(day.type==='amrap'){dc='amrap-d';lbl=(day.name||'WOD').substring(0,6)}
-    if(isDone){dc='done-d';lbl='✓'}
+    if(isDone){dc = isExtra?'extra-d':'done-d'; lbl='✓'}
     if(i===today){dc+=' today-d';if(!isDone)lbl=(day.type==='rest'?'Rest':shortName)}
     const isToday = i===today;
     const dayLabel = editMode && canEdit()
@@ -2265,15 +2271,15 @@ function renderWeekGrid() {
     const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
     const isSelected = pi === curDay;
     const boxStyle = isDone
-      ? 'background:rgba(52,211,153,.25);border-color:#34d399;box-shadow:0 0 8px rgba(52,211,153,.2)'
+      ? `background:${isExtra?'rgba(56,182,255,.2)':'rgba(52,211,153,.25)'};border-color:${doneColor};box-shadow:0 0 8px ${isExtra?'rgba(56,182,255,.2)':'rgba(52,211,153,.2)'}`
       : isSelected
         ? 'border-color:rgba(212,245,60,.5);background:rgba(212,245,60,.06)'
         : '';
     return `<div class="wday${isToday?' today':''}${isSelected?' selected':''}" onclick="selDW(${pi})" style="${boxStyle}">
-      <div class="wday-name" style="${isDone?'color:#34d399':isToday?'color:var(--acc)':''}">${d}</div>
-      <div class="wday-dot ${isDone?'done-d':dc}">${isDone?'✓':''}</div>
+      <div class="wday-name" style="${isDone?'color:'+doneColor:isToday?'color:var(--acc)':''}">${d}</div>
+      <div class="wday-dot ${dc}">${isDone?'✓':''}</div>
       ${dayLabel}
-      <div style="font-size:8px;color:${isDone?'#34d399':'var(--muted)'};margin-top:1px;opacity:0.8">${dateStr}</div>
+      <div style="font-size:8px;color:${isDone?doneColor:'var(--muted)'};margin-top:1px;opacity:0.8">${dateStr}</div>
     </div>`;
   }).join('');
   ['weekGrid','weekGridWO'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=gridHtml; });
@@ -2284,6 +2290,426 @@ function selDW(i){
   showScreen('workout',navBtnFor('workout'));
   renderWeekGrid();
   renderDayContent(curDay);
+}
+
+// ── EKSTRA ANTRENMAN (dinlenme gününde "+ Antrenmanı Başlat") ──
+// Eskiden bu buton changeDayType(di,'full') cagirip gunu PROGRAMA kalici
+// olarak "full" tipine ceviriyordu - ama hic egzersiz eklenmedigi icin
+// (sadece rest/hiit/amrap turleri icin exercises=[] sifirlaniyordu) ekran
+// BOS kaliyordu. Artik program yapisina hic dokunmuyor, bagimsiz/tek
+// seferlik bir bonus antrenman akisi acip sonunda session_logs'a ayrica
+// kaydediyor.
+function showExtraWorkoutModal(){
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px';
+  const cards=[
+    {icon:'🏠', title:'NO EXCUSE', sub:'Ev antrenmanı', meta:'Ekipmansız · 20 dk', action:'showNoExcuseSetup()'},
+    {icon:'🏃', title:'CİNDY', sub:'Classic CrossFit', meta:'20 dk AMRAP', action:'startCindyPlayer()'},
+    {icon:'🎵', title:'BRING SALLY UP', sub:'Push-up Challenge', meta:'3 dk 30 sn · Müzikle sync', action:'showSallyIntro()'},
+  ];
+  modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;color:var(--acc)">EKSTRA ANTRENMAN</h2>
+      <button onclick="closeExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:20px">Dinlenme gününde ne yapmak istiyorsun?</p>
+    ${cards.map(c=>`<div onclick="${c.action}" style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:14px">
+      <div style="font-size:30px">${c.icon}</div>
+      <div><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px">${c.title}</div><div style="font-size:12px;color:var(--text)">${c.sub}</div><div style="font-size:11px;color:var(--muted)">${c.meta}</div></div>
+    </div>`).join('')}
+  </div>`;
+  document.body.appendChild(modal);
+}
+function closeExtraWorkoutModal(){ document.getElementById('extraWorkoutModal')?.remove(); }
+
+// ── NO EXCUSE (HIIT/Circuit, 3 seviye) ──
+const NO_EXCUSE_HIIT = {
+  beginner: ['Squat','Incline Push-up','Reverse Lunge','Mountain Climber','Plank'],
+  intermediate: ['Jump Squat','Push-up','Reverse Lunge','Mountain Climber','Burpee'],
+  advanced: ['Jump Squat','Decline Push-up','Burpee','Mountain Climber','Archer Push-up'],
+};
+const NO_EXCUSE_CIRCUIT = {
+  beginner: [
+    {name:'Squat', target:'15 tekrar'}, {name:'Incline Push-up', target:'10 tekrar'},
+    {name:'Reverse Lunge', target:'10/taraf'}, {name:'Glute Bridge', target:'15 tekrar'},
+    {name:'Plank', target:'40 sn'}, {name:'Mountain Climber', target:'30 sn'}, {name:'Hollow Hold', target:'20 sn'},
+  ],
+  intermediate: [
+    {name:'Bulgarian Split Squat', target:'10/taraf'}, {name:'Push-up', target:'15 tekrar'},
+    {name:'Pike Push-up', target:'10 tekrar'}, {name:'Reverse Lunge', target:'12/taraf'},
+    {name:'Mountain Climber', target:'40 sn'}, {name:'Glute Bridge', target:'15 tekrar'}, {name:'Hollow Hold', target:'25 sn'},
+  ],
+  advanced: [
+    {name:'Pistol Squat', target:'6/taraf'}, {name:'Decline Push-up', target:'12 tekrar'},
+    {name:'Archer Push-up', target:'8/taraf'}, {name:'Bulgarian Split Squat', target:'8/taraf'},
+    {name:'Burpee', target:'8 tekrar'}, {name:'Mountain Climber', target:'45 sn'}, {name:'Hollow Hold', target:'30 sn'},
+  ],
+};
+function capitalizeLevel(l){ return l==='beginner'?'Beginner':l==='intermediate'?'Intermediate':'Advanced'; }
+
+let _noExcuseFormat='hiit', _noExcuseLevel='beginner';
+function showNoExcuseSetup(){
+  _noExcuseFormat='hiit'; _noExcuseLevel='beginner';
+  renderNoExcuseSetup();
+}
+function setNoExcuseFormat(f){ _noExcuseFormat=f; renderNoExcuseSetup(); }
+function setNoExcuseLevel(l){ _noExcuseLevel=l; renderNoExcuseSetup(); }
+function renderNoExcuseSetup(){
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px';
+  const isHiit=_noExcuseFormat==='hiit';
+  modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.5px;color:var(--acc)">🏠 NO EXCUSE</h2>
+      <button onclick="closeExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <div onclick="setNoExcuseFormat('hiit')" style="flex:1;border-radius:14px;padding:16px;border:2px solid ${isHiit?'var(--acc)':'var(--border)'};background:${isHiit?'rgba(212,245,60,.06)':'var(--surface)'};cursor:pointer;text-align:center">
+        <div style="font-size:26px;margin-bottom:6px">🔥</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px">HIIT</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">40sn iş / 20sn dinlenme<br>4 round · ~20 dakika</div>
+      </div>
+      <div onclick="setNoExcuseFormat('circuit')" style="flex:1;border-radius:14px;padding:16px;border:2px solid ${!isHiit?'var(--acc)':'var(--border)'};background:${!isHiit?'rgba(212,245,60,.06)':'var(--surface)'};cursor:pointer;text-align:center">
+        <div style="font-size:26px;margin-bottom:6px">⚡</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px">CIRCUIT</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">7 hareket · 3 round<br>60sn dinlenme · ~20 dakika</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      ${['beginner','intermediate','advanced'].map(l=>`<button onclick="setNoExcuseLevel('${l}')" style="flex:1;padding:9px 4px;border-radius:20px;border:1px solid ${_noExcuseLevel===l?'var(--acc)':'var(--border)'};background:${_noExcuseLevel===l?'var(--acc)':'none'};color:${_noExcuseLevel===l?'#0c0c0c':'var(--text-muted)'};font-size:11px;font-weight:${_noExcuseLevel===l?'700':'400'};cursor:pointer">${capitalizeLevel(l)}</button>`).join('')}
+    </div>
+    <button class="btn btn-acc" style="width:100%" onclick="startNoExcusePlayer()">BAŞLAT</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function startNoExcusePlayer(){
+  if(_noExcuseFormat==='hiit') startNoExcuseHiit(); else startNoExcuseCircuit();
+}
+
+// HIIT player
+let _hiitPlayerState = null;
+function startNoExcuseHiit(){
+  const moves = NO_EXCUSE_HIIT[_noExcuseLevel];
+  _hiitPlayerState = {round:1, totalRounds:4, moveIdx:0, moves, phase:'work', secsLeft:40, paused:false, level:_noExcuseLevel, completedMoves:0};
+  renderHiitPlayer();
+  _hiitPlayerState.timerId = setInterval(tickHiitPlayer, 1000);
+}
+function tickHiitPlayer(){
+  const st=_hiitPlayerState;
+  if(!st || st.paused) return;
+  st.secsLeft--;
+  if(st.secsLeft<=0){
+    if(st.phase==='work'){
+      st.completedMoves++;
+      st.moveIdx++;
+      if(st.moveIdx>=st.moves.length){
+        st.moveIdx=0; st.round++;
+        if(st.round>st.totalRounds){ finishHiitPlayer(); return; }
+      }
+      st.phase='rest'; st.secsLeft=20;
+    } else {
+      st.phase='work'; st.secsLeft=40;
+    }
+  }
+  renderHiitPlayer();
+}
+function toggleHiitPause(){ if(_hiitPlayerState) _hiitPlayerState.paused=!_hiitPlayerState.paused; renderHiitPlayer(); }
+function renderHiitPlayer(){
+  const st=_hiitPlayerState;
+  if(!st) return;
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center';
+  const isWork = st.phase==='work';
+  const curMove = st.moves[st.moveIdx];
+  const nextMove = st.moves[(st.moveIdx+1)%st.moves.length] || st.moves[0];
+  const m=Math.floor(st.secsLeft/60), s=st.secsLeft%60;
+  modal.innerHTML = `<div style="max-width:380px;width:100%">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Round ${st.round} / ${st.totalRounds}</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;margin-bottom:20px">${curMove}</div>
+    <div style="border-radius:20px;padding:30px 16px;margin-bottom:20px;background:${isWork?'rgba(212,245,60,.08)':'rgba(255,255,255,.02)'}">
+      <div style="font-size:13px;font-weight:700;letter-spacing:1px;color:${isWork?'var(--acc)':'var(--text-muted)'};margin-bottom:10px">${isWork?'ÇALIŞIYORSUN':'DİNLEN'}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:80px;line-height:1;color:var(--acc)">${m}:${s.toString().padStart(2,'0')}</div>
+      ${!isWork?`<div style="font-size:12px;color:var(--muted);margin-top:10px">Sıradaki: ${nextMove}</div>`:''}
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="toggleHiitPause()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface2);color:var(--text);font-size:13px;cursor:pointer">${st.paused?'▶ Devam':'❚❚ Durdur'}</button>
+      <button onclick="stopExtraWorkoutPlayer()" style="flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:13px;cursor:pointer">✕ Bitir</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function finishHiitPlayer(){
+  clearInterval(_hiitPlayerState.timerId);
+  const st=_hiitPlayerState; _hiitPlayerState=null;
+  showExtraWorkoutSummary(`No Excuse - HIIT ${capitalizeLevel(st.level)}`, st.completedMoves, st.totalRounds*st.moves.length*60);
+}
+
+// Circuit player
+let _circuitPlayerState = null;
+function startNoExcuseCircuit(){
+  const moves = NO_EXCUSE_CIRCUIT[_noExcuseLevel];
+  _circuitPlayerState = {round:1, totalRounds:3, moveIdx:0, moves, phase:'exercise', restSecsLeft:60, completedMoves:0, level:_noExcuseLevel};
+  renderCircuitPlayer();
+}
+function renderCircuitPlayer(){
+  const st=_circuitPlayerState;
+  if(!st) return;
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center';
+  if(st.phase==='rest'){
+    const m=Math.floor(st.restSecsLeft/60), s=st.restSecsLeft%60;
+    modal.innerHTML = `<div style="max-width:380px;width:100%">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Round ${st.round-1} tamamlandı</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--acc);margin-bottom:20px">DİNLEN</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--acc);margin-bottom:24px">${m}:${s.toString().padStart(2,'0')}</div>
+      <button onclick="stopExtraWorkoutPlayer()" style="padding:12px 24px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:13px;cursor:pointer">✕ Bitir</button>
+    </div>`;
+  } else {
+    const mv = st.moves[st.moveIdx];
+    modal.innerHTML = `<div style="max-width:380px;width:100%">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Round ${st.round} / ${st.totalRounds} · Hareket ${st.moveIdx+1} / ${st.moves.length}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.5px;margin-bottom:6px">${mv.name}</div>
+      <div style="font-size:16px;color:var(--acc);margin-bottom:30px">${mv.target}</div>
+      <button onclick="completeCircuitMove()" class="btn btn-acc" style="width:100%;padding:18px;font-size:16px;margin-bottom:14px">✓ Tamamlandı</button>
+      <button onclick="stopExtraWorkoutPlayer()" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:12px;cursor:pointer">✕ Bitir</button>
+    </div>`;
+  }
+  document.body.appendChild(modal);
+}
+function completeCircuitMove(){
+  const st=_circuitPlayerState;
+  st.completedMoves++;
+  st.moveIdx++;
+  if(st.moveIdx>=st.moves.length){
+    st.moveIdx=0;
+    if(st.round>=st.totalRounds){ finishCircuitPlayer(); return; }
+    st.round++;
+    st.phase='rest'; st.restSecsLeft=60;
+    st.timerId=setInterval(tickCircuitRest,1000);
+  }
+  renderCircuitPlayer();
+}
+function tickCircuitRest(){
+  const st=_circuitPlayerState;
+  if(!st) return;
+  st.restSecsLeft--;
+  if(st.restSecsLeft<=0){ clearInterval(st.timerId); st.phase='exercise'; }
+  renderCircuitPlayer();
+}
+function finishCircuitPlayer(){
+  const st=_circuitPlayerState; _circuitPlayerState=null;
+  showExtraWorkoutSummary(`No Excuse - Circuit ${capitalizeLevel(st.level)}`, st.completedMoves, null);
+}
+
+// ── CİNDY (20dk AMRAP: 5 Pull-up, 10 Push-up, 15 Squat) ──
+let _cindyPlayerState = null;
+function startCindyPlayer(){
+  closeExtraWorkoutModal();
+  _cindyPlayerState = {secsLeft:1200, round:1, moveIdx:0, moves:[{name:'Pull-up',reps:5},{name:'Push-up',reps:10},{name:'Squat',reps:15}], completedMoves:0};
+  renderCindyPlayer();
+  _cindyPlayerState.timerId=setInterval(tickCindy,1000);
+}
+function tickCindy(){
+  const st=_cindyPlayerState;
+  if(!st) return;
+  st.secsLeft--;
+  if(st.secsLeft<=0){ finishCindyPlayer(true); return; }
+  renderCindyPlayer();
+}
+function renderCindyPlayer(){
+  const st=_cindyPlayerState;
+  if(!st) return;
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center';
+  const m=Math.floor(st.secsLeft/60), s=st.secsLeft%60;
+  const mv=st.moves[st.moveIdx];
+  modal.innerHTML=`<div style="max-width:380px;width:100%">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:70px;color:var(--acc);margin-bottom:6px">${m}:${s.toString().padStart(2,'0')}</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Round ${st.round}</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;margin-bottom:28px">${mv.reps} ${mv.name}</div>
+    <button onclick="completeCindyMove()" class="btn btn-acc" style="width:100%;padding:18px;font-size:16px;margin-bottom:14px">✓</button>
+    <button onclick="stopExtraWorkoutPlayer()" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:12px;cursor:pointer">✕ Bitir</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function completeCindyMove(){
+  const st=_cindyPlayerState;
+  if(!st) return;
+  st.completedMoves++;
+  st.moveIdx++;
+  if(st.moveIdx>=st.moves.length){ st.moveIdx=0; st.round++; }
+  renderCindyPlayer();
+}
+function finishCindyPlayer(timeUp){
+  const st=_cindyPlayerState;
+  clearInterval(st.timerId);
+  _cindyPlayerState=null;
+  if(timeUp){
+    const roundsCompleted = st.round-1;
+    document.getElementById('extraWorkoutModal')?.remove();
+    const modal=document.createElement('div');
+    modal.id='extraWorkoutModal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
+    modal.innerHTML=`<div style="max-width:360px"><div style="font-size:40px;margin-bottom:10px">⏱</div><h2 style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc);margin-bottom:10px">Süre Doldu!</h2><p style="font-size:14px;color:var(--text);margin-bottom:24px">${roundsCompleted} round tamamladın</p><button class="btn btn-acc" style="width:100%" onclick="showExtraWorkoutSummary('Cindy', ${st.completedMoves}, 1200)">Devam</button></div>`;
+    document.body.appendChild(modal);
+  } else {
+    showExtraWorkoutSummary('Cindy', st.completedMoves, 1200-st.secsLeft);
+  }
+}
+
+// ── BRING SALLY UP (Flower - Moby, 3:30 sabit up/down zamanlaması) ──
+const SALLY_TIMING = [
+  {t:0,phase:'down'},{t:3,phase:'up'},{t:6,phase:'down'},{t:9,phase:'up'},
+  {t:13,phase:'down'},{t:16,phase:'up'},{t:19,phase:'down'},{t:22,phase:'up'},
+  {t:26,phase:'down'},{t:29,phase:'up'},{t:32,phase:'down'},{t:35,phase:'up'},
+  {t:39,phase:'down'},{t:42,phase:'up'},{t:45,phase:'down'},{t:48,phase:'up'},
+  {t:52,phase:'down'},{t:55,phase:'up'},{t:58,phase:'down'},{t:61,phase:'up'},
+  {t:65,phase:'down'},{t:68,phase:'up'},{t:71,phase:'down'},{t:74,phase:'up'},
+  {t:78,phase:'down'},{t:81,phase:'up'},{t:84,phase:'down'},{t:87,phase:'up'},
+  {t:91,phase:'down'},{t:94,phase:'up'},{t:97,phase:'down'},{t:100,phase:'up'},
+  {t:104,phase:'down'},{t:107,phase:'up'},{t:110,phase:'down'},{t:113,phase:'up'},
+  {t:117,phase:'down'},{t:120,phase:'up'},{t:123,phase:'down'},{t:126,phase:'up'},
+  {t:130,phase:'down'},{t:133,phase:'up'},{t:136,phase:'down'},{t:139,phase:'up'},
+  {t:143,phase:'down'},{t:146,phase:'up'},{t:149,phase:'down'},{t:152,phase:'up'},
+  {t:156,phase:'down'},{t:159,phase:'up'},{t:162,phase:'down'},{t:165,phase:'up'},
+  {t:169,phase:'down'},{t:172,phase:'up'},{t:175,phase:'down'},{t:178,phase:'up'},
+  {t:182,phase:'down'},{t:185,phase:'up'},{t:188,phase:'down'},{t:191,phase:'up'},
+  {t:195,phase:'down'},{t:198,phase:'up'},{t:201,phase:'down'},{t:204,phase:'up'},
+  {t:208,phase:'down'},
+];
+let _sallyPlayerState = null;
+function showSallyIntro(){
+  closeExtraWorkoutModal();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
+  modal.innerHTML=`<div style="max-width:360px">
+    <div style="font-size:40px;margin-bottom:14px">📱</div>
+    <p style="font-size:15px;color:var(--text);line-height:1.6;margin-bottom:24px">Spotify'da <strong>"Flower - Moby"</strong> şarkısını aç,<br>hazır olunca Başlat'a bas</p>
+    <button class="btn btn-acc" style="width:100%" onclick="startSallyPlayer()">BAŞLAT</button>
+    <button onclick="closeExtraWorkoutModal()" style="margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">İptal</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function speakSallyPhase(phase){
+  try{
+    const u = new SpeechSynthesisUtterance(phase==='up'?'Up':'Down');
+    u.lang='en-US';
+    speechSynthesis.speak(u);
+  }catch(e){ console.error('speechSynthesis error:', e); }
+}
+function startSallyPlayer(){
+  _sallyPlayerState = {elapsed:0, total:210, idx:0, lastPhase:'down', upCount:0};
+  renderSallyPlayer();
+  speakSallyPhase('down');
+  _sallyPlayerState.timerId=setInterval(tickSally,1000);
+}
+function tickSally(){
+  const st=_sallyPlayerState;
+  if(!st) return;
+  st.elapsed++;
+  if(st.elapsed>=st.total){ finishSallyPlayer(); return; }
+  while(st.idx<SALLY_TIMING.length-1 && SALLY_TIMING[st.idx+1].t<=st.elapsed) st.idx++;
+  const phase = SALLY_TIMING[st.idx].phase;
+  if(phase!==st.lastPhase){ st.lastPhase=phase; if(phase==='up')st.upCount++; speakSallyPhase(phase); }
+  renderSallyPlayer();
+}
+function renderSallyPlayer(){
+  const st=_sallyPlayerState;
+  if(!st) return;
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  const phase = SALLY_TIMING[st.idx].phase;
+  const isUp = phase==='up';
+  modal.style.cssText=`position:fixed;inset:0;background:${isUp?'rgba(212,245,60,.08)':'rgba(255,255,255,.02)'};z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px`;
+  const pct = Math.min(100, Math.round(st.elapsed/st.total*100));
+  modal.innerHTML=`<div style="max-width:380px;width:100%">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:80px;letter-spacing:1px;color:${isUp?'var(--acc)':'var(--text)'};margin-bottom:20px">${isUp?'⬆ UP':'⬇ DOWN'}</div>
+    <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-bottom:10px"><div style="width:${pct}%;height:100%;background:var(--acc)"></div></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:24px">${Math.floor(st.elapsed/60)}:${(st.elapsed%60).toString().padStart(2,'0')} / 3:30</div>
+    <button onclick="stopExtraWorkoutPlayer()" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:12px;cursor:pointer">✕ Bitir</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function finishSallyPlayer(){
+  const st=_sallyPlayerState;
+  clearInterval(st.timerId);
+  _sallyPlayerState=null;
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
+  modal.innerHTML=`<div style="max-width:360px"><div style="font-size:40px;margin-bottom:10px">💪</div><h2 style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc);margin-bottom:20px">Sally tamamlandı!</h2><button class="btn btn-acc" style="width:100%" onclick="showExtraWorkoutSummary('Bring Sally Up', ${st.upCount}, 210)">Devam</button></div>`;
+  document.body.appendChild(modal);
+}
+
+// "✕ Bitir" - hangi oyuncu aktifse onu zamaninda durdurup, o ana kadarki
+// ilerlemeyle ozet ekranini acar.
+function stopExtraWorkoutPlayer(){
+  if(!confirm('Antrenmanı bitirmek istediğine emin misin?')) return;
+  if(_hiitPlayerState){
+    clearInterval(_hiitPlayerState.timerId);
+    const st=_hiitPlayerState; _hiitPlayerState=null;
+    showExtraWorkoutSummary(`No Excuse - HIIT ${capitalizeLevel(st.level)}`, st.completedMoves, null);
+    return;
+  }
+  if(_circuitPlayerState){
+    clearInterval(_circuitPlayerState.timerId);
+    const st=_circuitPlayerState; _circuitPlayerState=null;
+    showExtraWorkoutSummary(`No Excuse - Circuit ${capitalizeLevel(st.level)}`, st.completedMoves, null);
+    return;
+  }
+  if(_cindyPlayerState){
+    clearInterval(_cindyPlayerState.timerId);
+    const st=_cindyPlayerState; _cindyPlayerState=null;
+    showExtraWorkoutSummary('Cindy', st.completedMoves, 1200-st.secsLeft);
+    return;
+  }
+  if(_sallyPlayerState){
+    clearInterval(_sallyPlayerState.timerId);
+    const st=_sallyPlayerState; _sallyPlayerState=null;
+    showExtraWorkoutSummary('Bring Sally Up', st.upCount, st.elapsed);
+    return;
+  }
+  closeExtraWorkoutModal();
+}
+
+// ── TAMAMLAMA & KAYIT ──
+function showExtraWorkoutSummary(name, setsDone, durationSec){
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
+  const durTxt = durationSec!=null ? fmtDuration(Math.round(durationSec)) : '—';
+  modal.innerHTML=`<div style="max-width:360px;width:100%;background:var(--surface);border:1px solid rgba(212,245,60,.25);border-radius:16px;padding:28px 20px">
+    <div style="font-size:36px;margin-bottom:10px">🏁</div>
+    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${name}</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:20px">⏱ ${durTxt} · ${setsDone} hareket tamamlandı</p>
+    <button class="btn btn-acc" style="width:100%" onclick="saveExtraWorkout(${JSON.stringify(name)},${setsDone})">Kaydet</button>
+    <button onclick="closeExtraWorkoutModal()" style="margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">Kaydetmeden kapat</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+async function saveExtraWorkout(name, setsDone){
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  const {error} = await insertSessionLog({user_id:uid, day_name:name, sets_done:setsDone, volume:0, logged_at:new Date().toISOString()});
+  if(error){ alert('Kaydedilemedi: '+error.message); return; }
+  await loadSessionLogs(uid);
+  renderWeekGrid();
+  closeExtraWorkoutModal();
+  showSuccessToast(`✅ ${name} kaydedildi!`);
 }
 
 async function renderProfile(p) {
@@ -2576,7 +3002,7 @@ async function renderDayContent(di, skipFetch) {
 
   if(day.type==='rest') {
     el.innerHTML = `<div class="rest-card"><div class="emoji">😴</div><h3>Dinlenme Günü</h3><p>Kasların büyür, dinlenirsin.<br>Protein alımına dikkat et 💪</p>
-    ${canEdit()?`<div style="margin-top:14px"><button class="btn btn-outline btn-sm" onclick="changeDayType(${di},'full')">+ Antrenmanı Başlat</button></div>`:''}
+    ${canEdit()?`<div style="margin-top:14px"><button class="btn btn-outline btn-sm" onclick="showExtraWorkoutModal()">+ Antrenmanı Başlat</button></div>`:''}
     </div>`;
     return;
   }
@@ -2640,7 +3066,12 @@ async function renderDayContent(di, skipFetch) {
 
   el.innerHTML = html;
   const exList = document.getElementById('exList');
-  day.exercises.forEach((ex,ei) => exList.appendChild(buildExCard(ex,di,ei)));
+  if(!day.exercises || !day.exercises.length){
+    console.warn(`renderDayContent: gün ${di} (${day.name}) için exercises dizisi boş/tanımsız`, day);
+    exList.innerHTML = '<div class="empty-state">Egzersiz bulunamadı.'+(canEdit()?' Düzenle moduna geçip egzersiz ekleyebilirsin.':'')+'</div>';
+  } else {
+    day.exercises.forEach((ex,ei) => exList.appendChild(buildExCard(ex,di,ei)));
+  }
   setupWorkoutTimerDisplay(uid, di);
 }
 
