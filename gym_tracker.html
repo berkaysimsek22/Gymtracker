@@ -1674,15 +1674,6 @@ function goalDirection(p){
   if(Math.abs(diff) < 0.5) return 'maintain';
   return diff > 0 ? 'bulk' : 'cut';
 }
-function kcalTargetColor(p, alinan, target){
-  if(!target) return 'var(--muted)';
-  const dir = goalDirection(p);
-  if(dir==='bulk') return alinan>=target ? '#34d399' : '#ff5c38';
-  if(dir==='cut') return alinan<=target ? '#34d399' : '#ff5c38';
-  const diff = Math.abs(alinan-target);
-  return diff<=200 ? '#34d399' : diff<=400 ? '#f7c948' : '#ff5c38';
-}
-
 async function renderDashboard(){
   const p = activeProfile();
   if(!p) return;
@@ -1945,66 +1936,65 @@ async function renderDashCalCard(){
   alinan = Math.round(alinan);
   proteinAlinan = Math.round(proteinAlinan);
   const targets = nd.targets||{};
-  const kcalTarget = targets.kcal||0;
   const proteinTarget = targets.protein||0;
   const proteinRatio = proteinTarget>0 ? proteinAlinan/proteinTarget : 0;
   // Protein bari HEDEFTEN BAGIMSIZ hep ayni mantikla renklenir: %80 ustu
   // yesil, %60-80 sari, alti kirmizi.
   const proteinBarColor = proteinTarget<=0 ? 'var(--text-muted)' : proteinRatio>=0.8 ? '#34d399' : proteinRatio>=0.6 ? '#f7c948' : '#ff5c38';
   const proteinPct = proteinTarget>0 ? Math.min(proteinRatio*100,100) : 0;
-  const maint = estimateMaintenanceKcal(p);
-  const activities = await loadTodayActivityLogs(uid);
-  const extraBurn = activities.reduce((s,a)=>s+parseFloat(a.kcal_burned||0),0);
-  const yakilan = Math.round((maint||0) + extraBurn);
-  const net = alinan - yakilan;
-  // Hedef kalori SADECE TDEE'den hesaplanir (bkz. computeGoalCalorieTarget) -
-  // aktivite eklenince DEGISMEZ, "Yakılan" sadece bilgi amaclidir.
+  // Hedef kalori SADECE TDEE'den hesaplanir (computeGoalCalorieTarget) -
+  // aktivite eklenince DEGISMEZ. Kart artik "Yakılan"/"Net" degil, dogrudan
+  // "Kalan" (Hedef - Alınan) gosteriyor - aktiviteler bu hesaba KARISMIYOR,
+  // sadece bilgi amacli "+ Aktivite Ekle" ile loglanabiliyor.
   const target = computeGoalCalorieTarget(p);
-  // Renk: Bulk'ta alinan hedefe ulasti/gecti mi, Cut'ta hedefin altinda mi
-  // kaldi, Maintain'de ±200 kcal bandinda mi - bkz. kcalTargetColor/goalDirection.
-  const color = kcalTargetColor(p, alinan, target);
-  const kcalPct = kcalTarget>0 ? Math.min((alinan/kcalTarget)*100,100) : 0;
-  // "Yakılan" altindaki kisa dokum: otomatik antrenman + manuel aktiviteler
-  // (her biri kendi ikonuyla, ör. "🏋️ 320 kcal + 🚶 150 kcal").
-  const workoutActs = activities.filter(a=>a.activity_type==='workout_auto'||a.activity_type==='workout_auto_edited');
-  const otherActs = activities.filter(a=>a.activity_type!=='workout_auto'&&a.activity_type!=='workout_auto_edited');
-  const breakdownParts = [];
-  const workoutKcalSum = workoutActs.reduce((s,a)=>s+parseFloat(a.kcal_burned||0),0);
-  if(workoutKcalSum>0) breakdownParts.push(`🏋️ ${Math.round(workoutKcalSum)} kcal`);
-  const byOtherType = {};
-  otherActs.forEach(a=>{ byOtherType[a.activity_type]=(byOtherType[a.activity_type]||0)+parseFloat(a.kcal_burned||0); });
-  Object.entries(byOtherType).forEach(([type,k])=>breakdownParts.push(`${ACTIVITY_ICONS[type]||'🏃'} ${Math.round(k)} kcal`));
-  const breakdownHtml = breakdownParts.length ? `<div style="font-size:9px;color:var(--text-muted);margin-top:2px">${breakdownParts.join(' + ')}</div>` : '';
+  const kalan = target!==null ? Math.round(target - alinan) : null;
+  const dir = goalDirection(p);
+  let color = 'var(--muted)', caption = '';
+  if(kalan!==null){
+    if(dir==='bulk'){
+      color = kalan>=0 ? '#34d399' : '#ff5c38';
+      caption = kalan>=0 ? `daha ${kalan} kcal ye` : `${Math.abs(kalan)} kcal aştın`;
+    } else if(dir==='cut'){
+      color = kalan<=0 ? '#34d399' : '#f97316';
+      caption = kalan<=0 ? 'hedefe ulaştın' : `${kalan} kcal kaldı`;
+    } else {
+      color = Math.abs(kalan)<=200 ? '#34d399' : '#f7c948';
+      caption = Math.abs(kalan)<=200 ? 'dengede' : `${Math.abs(kalan)} kcal sapma`;
+    }
+  }
+  const kcalPct = target ? Math.min((alinan/target)*100,100) : 0;
+  const activities = await loadTodayActivityLogs(uid);
   const actList = activities.length ? '<div style="margin-top:12px">' + activities.map(a=>{
     const isAuto = a.activity_type==='workout_auto'||a.activity_type==='workout_auto_edited';
     const label = ACTIVITY_LABELS[a.activity_type] || a.activity_type;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid rgba(255,255,255,.06)">
       <div style="font-size:12px">${ACTIVITY_ICONS[a.activity_type]||'🏃'} ${label} · ${a.duration_min} dk</div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-size:12px;color:#ff5c38">-${Math.round(a.kcal_burned)} kcal</div>
+        <div style="font-size:12px;color:var(--text-muted)">${Math.round(a.kcal_burned)} kcal</div>
         ${isAuto?`<button onclick="editAutoWorkoutKcal('${a.id}',${parseFloat(a.kcal_burned)})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✏️</button>`:''}
         <button onclick="deleteActivityLog('${a.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✕</button>
       </div>
     </div>`;
   }).join('') + '</div>' : '';
-  const maintNote = maint===null ? '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px">Yaş/boy/kilo eksik, BMR tam hesaplanamadı</div>' : '';
+  const targetNote = target===null ? '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:4px">Yaş/boy/kilo eksik, hedef hesaplanamadı</div>' : '';
   el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Kalori Dengesi</div>
       <button onclick="openActivityModal()" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);color:var(--acc);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap">+ Aktivite Ekle</button>
     </div>
     <div style="text-align:center;margin:10px 0 14px">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:44px;line-height:1;color:${color}">${net>0?'+':''}${net}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">net kcal</div>
-      ${maintNote}
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:44px;line-height:1;color:${color}">${kalan===null?'—':(kalan>0?'+':'')+kalan}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">kalan kcal</div>
+      ${caption?`<div style="font-size:11px;color:${color};margin-top:4px;font-weight:600">${caption}</div>`:''}
+      ${targetNote}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
-      <div><div style="font-size:17px;font-weight:700;color:#34d399">${alinan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Alınan</div></div>
-      <div><div style="font-size:17px;font-weight:700;color:#ff5c38">${yakilan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Yakılan</div>${breakdownHtml}</div>
-      <div><div style="font-size:17px;font-weight:700;color:${color}">${net}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Net</div></div>
+      <div><div style="font-size:17px;font-weight:700;color:var(--text)">${alinan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Alınan</div></div>
+      <div><div style="font-size:17px;font-weight:700;color:var(--muted)">${target===null?'—':target}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Hedef</div></div>
+      <div><div style="font-size:17px;font-weight:700;color:${color}">${kalan===null?'—':kalan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Kalan</div></div>
     </div>
-    ${kcalTarget>0?`<div style="margin-top:14px">
-      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Kalori</span><span>${alinan} / ${kcalTarget}</span></div>
+    ${target?`<div style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Kalori</span><span>${alinan} / ${target}</span></div>
       <div class="nut-bar"><div class="nut-bar-fill" style="width:${kcalPct}%;background:${color}"></div></div>
     </div>`:''}
     ${proteinTarget>0?`<div style="margin-top:10px">
@@ -2060,6 +2050,17 @@ async function saveActivityLog(){
   document.getElementById('activityModal')?.remove();
   if(error){ alert('Kaydedilemedi: '+error.message); return; }
   renderDashCalCard();
+  // Aktivite, Kalori Dengesi'ndeki Hedef/Kalan hesabini ETKILEMIYOR - sadece
+  // bilgi amacli kucuk bir onay notu gosteriliyor.
+  showSuccessToast(`🏋️ +${kcal} kcal aktivite yapıldı`);
+}
+
+function showSuccessToast(msg){
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(52,211,153,.4);border-radius:12px;padding:12px 20px;z-index:600;font-size:12px;color:#34d399;max-width:85vw;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3500);
 }
 
 async function deleteActivityLog(id){
