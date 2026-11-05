@@ -2709,7 +2709,26 @@ async function saveExtraWorkout(name, setsDone){
   await loadSessionLogs(uid);
   renderWeekGrid();
   closeExtraWorkoutModal();
+  // Su an bir dinlenme gunu goruntuleniyorsa, az once kaydedilen antrenmani
+  // ("✓ ... / 🗑 Sil") hemen gostersin - sayfa yenilemeye gerek kalmasin.
+  if(activeProgram()[curDay]?.type==='rest') renderDayContent(curDay);
   showSuccessToast(`✅ ${name} kaydedildi!`);
+}
+// Dinlenme gununde o GUNUN TAKVIM TARIHINDE zaten loglanmis bir seans var
+// mi (No Excuse/Cindy/Bring Sally Up gibi) - varsa goster/sil imkani sunmak icin.
+function findExtraWorkoutLogForDay(di){
+  const targetKey = localDateStr(dateForDayIndex(di));
+  return (sessionCache||[]).find(s => localDateStr(new Date(s.logged_at))===targetKey);
+}
+async function deleteExtraWorkoutLog(id, di){
+  if(!confirm('Bu ekstra antrenman kaydı silinsin mi?')) return;
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  const {error} = await sb.from('session_logs').delete().eq('id', id);
+  if(error){ alert('Silinemedi: '+error.message); return; }
+  await loadSessionLogs(uid);
+  renderWeekGrid();
+  renderDayContent(di);
 }
 
 async function renderProfile(p) {
@@ -3001,7 +3020,17 @@ async function renderDayContent(di, skipFetch) {
   if(!skipFetch) await loadSetsForDay(uid, di);
 
   if(day.type==='rest') {
+    // O gunun TAKVIM TARIHINDE zaten loglanmis bir ekstra antrenman (No
+    // Excuse/Cindy/Bring Sally Up) varsa gosterip silme imkani veriyoruz -
+    // yanlislikla kaydedilmis bir seansi geri almak icin.
+    const extraLog = findExtraWorkoutLogForDay(di);
+    const extraHtml = extraLog ? `<div style="margin:16px auto 0;background:var(--surface2);border:1px solid rgba(56,182,255,.3);border-radius:12px;padding:14px;max-width:280px;text-align:left">
+      <div style="font-size:12px;color:var(--acc3);font-weight:700;margin-bottom:4px">✓ ${extraLog.day_name}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${extraLog.sets_done||0} hareket tamamlandı</div>
+      <button onclick="deleteExtraWorkoutLog('${extraLog.id}',${di})" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:11px;cursor:pointer">🗑 Sil</button>
+    </div>` : '';
     el.innerHTML = `<div class="rest-card"><div class="emoji">😴</div><h3>Dinlenme Günü</h3><p>Kasların büyür, dinlenirsin.<br>Protein alımına dikkat et 💪</p>
+    ${extraHtml}
     ${canEdit()?`<div style="margin-top:14px"><button class="btn btn-outline btn-sm" onclick="showExtraWorkoutModal()">+ Antrenmanı Başlat</button></div>`:''}
     </div>`;
     return;
@@ -5273,7 +5302,21 @@ async function applyPopularSplit(id){
   setTimeout(()=>t.remove(),3000);
 }
 
+// "+ Antrenmanı Başlat" (dinlenme günü) ile AYNI 3 bonus antrenum - Workouts
+// sekmesinden de dogrudan baslatilabilsin diye burada da listeleniyor. Ikisi
+// de AYNI player fonksiyonlarini (showNoExcuseSetup/startCindyPlayer/
+// showSallyIntro) kullandigi icin davranis birebir ayni.
+const EXTRA_WORKOUT_QUICKSTART = [
+  {icon:'🏠', title:'NO EXCUSE', sub:'Ev antrenmanı', meta:'Ekipmansız · 20 dk', action:'showNoExcuseSetup()'},
+  {icon:'🏃', title:'CİNDY', sub:'Classic CrossFit', meta:'20 dk AMRAP', action:'startCindyPlayer()'},
+  {icon:'🎵', title:'BRING SALLY UP', sub:'Push-up Challenge', meta:'3 dk 30 sn · Müzikle sync', action:'showSallyIntro()'},
+];
 function renderWoChallenge(el){
+  const quickStartHtml = EXTRA_WORKOUT_QUICKSTART.map(c=>`<div onclick="${c.action}" style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:14px">
+    <div style="font-size:28px">${c.icon}</div>
+    <div style="flex:1"><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px">${c.title}</div><div style="font-size:11px;color:var(--text)">${c.sub}</div><div style="font-size:10px;color:var(--muted)">${c.meta}</div></div>
+    <div style="font-size:18px;color:var(--acc)">▶</div>
+  </div>`).join('');
   const cards = CHALLENGE_LIBRARY.map(c=>{
     const exs = c.exercises.map(ex=>`<div class="wo-ex-item"><div class="n">${ex.name}</div><div class="sr">${ex.reps} tekrar</div></div>`).join('');
     return `<div class="wo-challenge-card">
@@ -5286,7 +5329,10 @@ function renderWoChallenge(el){
       <div class="wo-challenge-note">${c.scoring}</div>
     </div>`;
   }).join('');
-  el.innerHTML = `<div class="wo-section">${cards}
+  el.innerHTML = `<div class="wo-section">
+    <h4 style="font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">⚡ HIZLI BAŞLAT</h4>
+    ${quickStartHtml}
+    ${cards}
     <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.6">Bir güne uygulamak için o günü ✏️ Düzenle modunda "→ Challenge (WOD) Günü" yap.</div>
   </div>`;
 }
