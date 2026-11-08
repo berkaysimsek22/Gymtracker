@@ -896,6 +896,7 @@ async function loadProfile() {
 
   await loadProgramForUser(currentProfile.id);
   await loadSessionLogs(currentProfile.id);
+  await loadDayOverrides(currentProfile.id);
   showMainApp();
   loadExerciseGifCache(); // arka planda, bekletmeden - tablo bos/yoksa sessizce atlanir
   // If came from password reset link, show change password modal
@@ -1496,6 +1497,11 @@ async function switchViewUser(userId) {
   await loadSessionLogs(userId);
   await loadNutrition(userId, curNutDate);
   await loadCustomFoodDB(userId);
+  // dayOverrideCache tarihe gore anahtarlanmis (kullaniciya gore degil) -
+  // baska kullaniciya gecerken mutlaka tazelenmeli, yoksa bir onceki
+  // kullanicinin override'i bu kullanicininmis gibi gorunebilirdi.
+  dayOverrideCache = {};
+  await loadDayOverrides(userId);
   const _todayJS = new Date().getDay();
   curDay = _todayJS === 0 ? 6 : _todayJS - 1;
   editMode = false;
@@ -2243,13 +2249,19 @@ function renderWeekGrid() {
   ['weekLabel','weekLabelWO'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=lblTxt; });
 
   const gridHtml = days.map((d,i) => {
-    const pi = i===0?6:i-1, day = prog[pi]||{type:'rest'};
+    const pi = i===0?6:i-1;
     // Bu hucrenin gercek takvim tarihi (hafta ofsetiyle) - tamamlanma
     // kontrolu artik bu tarihe gore yapiliyor, isim eslesmesine gore degil.
     const now = new Date();
     const dayDiff = i - now.getDay() + weekOffset * 7;
     const dayDate = new Date(now);
     dayDate.setDate(now.getDate() + dayDiff);
+    // Gun bazli override (day_overrides) varsa haftalik grid'de de onu
+    // gostersin - yoksa sekmeye tiklayinca goreceginle (renderDayContent)
+    // tutarsiz gorunurdu. dayOverrideCache sadece BU haftayi tuttugu icin
+    // gecmis/gelecek hafta onizlemesinde (weekOffset!==0) etkisi olmaz.
+    const override = dayOverrideCache[localDateStr(dayDate)];
+    const day = (override ? override.day_data : prog[pi]) || {type:'rest'};
     const isDone = completedByDate.has(localDateStr(dayDate));
     // Dinlenme gununde "+ Antrenmanı Başlat" ile yapilan EKSTRA (No Excuse/
     // Cindy/Bring Sally Up) antrenmanlar da bu tarihe session_logs kaydi
@@ -3012,12 +3024,23 @@ async function selDay(i){curDay=i;persistCurDay();editMode=false;renderDayTabs()
 // anlik "eski" veriyle geri donup yesil isaretlerin kaybolmasina neden
 // olan tekrarlanan sikayetlerin kaynagi buydu).
 async function renderDayContent(di, skipFetch) {
-  const prog = activeProgram(), day = prog[di], el = document.getElementById('dayContent');
+  const prog = activeProgram();
+  // Gun bazli override (day_overrides) varsa, programin kendisini DEGISTIRMEDEN
+  // sadece bu TAKVIM GUNU icin gosterileni degistiriyor - duzenleme ("✏️
+  // Düzenle") bu durumda prog[di]'yi YANLISLIKLA degistirmesin diye kapatiliyor,
+  // tum degisiklikler "📝 Bu Günü Düzenle" (⋯ menusu) uzerinden yapiliyor.
+  const dayOverride = getDayOverride(di);
+  const isOverride = !!dayOverride;
+  const day = isOverride ? dayOverride.day_data : prog[di];
+  const el = document.getElementById('dayContent');
   const uid = activeProfile()?.id;
   if(!uid) return;
 
   // Load sets for this day
   if(!skipFetch) await loadSetsForDay(uid, di);
+
+  const overrideBadge = isOverride ? '<span style="font-size:9px;padding:3px 8px;border-radius:8px;background:rgba(56,182,255,.15);color:var(--acc3);border:1px solid rgba(56,182,255,.3);white-space:nowrap">📌 Bugüne özel</span>' : '';
+  const dayMenuBtn = canEdit() ? `<button class="btn btn-outline btn-sm" onclick="showDayMenu(${di},this)" title="Gün seçenekleri">⋯</button>` : '';
 
   if(day.type==='rest') {
     // O gunun TAKVIM TARIHINDE zaten loglanmis bir ekstra antrenman (No
@@ -3029,15 +3052,17 @@ async function renderDayContent(di, skipFetch) {
       <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${extraLog.sets_done||0} hareket tamamlandı</div>
       <button onclick="deleteExtraWorkoutLog('${extraLog.id}',${di})" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:11px;cursor:pointer">🗑 Sil</button>
     </div>` : '';
-    el.innerHTML = `<div class="rest-card"><div class="emoji">😴</div><h3>Dinlenme Günü</h3><p>Kasların büyür, dinlenirsin.<br>Protein alımına dikkat et 💪</p>
+    el.innerHTML = `${dayMenuBtn?`<div style="display:flex;justify-content:flex-end;gap:6px;padding:8px 16px 0">${overrideBadge}${dayMenuBtn}</div>`:''}
+    <div class="rest-card"><div class="emoji">😴</div><h3>Dinlenme Günü</h3><p>Kasların büyür, dinlenirsin.<br>Protein alımına dikkat et 💪</p>
     ${extraHtml}
     ${canEdit()?`<div style="margin-top:14px"><button class="btn btn-outline btn-sm" onclick="showExtraWorkoutModal()">+ Antrenmanı Başlat</button></div>`:''}
     </div>`;
     return;
   }
-  if(day.type==='hiit'||day.type==='cardio') { renderHIITDay(el,day,di); return; }
-  if(day.type==='amrap') { renderAmrapDay(el,day,di); return; }
+  if(day.type==='hiit'||day.type==='cardio') { renderHIITDay(el,day,di,isOverride); return; }
+  if(day.type==='amrap') { renderAmrapDay(el,day,di,isOverride); return; }
 
+  const canEditHere = canEdit() && !isOverride;
   const total = day.exercises.reduce((s,e)=>s+e.sets,0);
   let doneSets = 0;
   day.exercises.forEach((ex,ei)=>{for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)doneSets++;}});
@@ -3045,15 +3070,17 @@ async function renderDayContent(di, skipFetch) {
 
   let html = `<div class="day-head-row">
     <div class="day-head-left">
-      <input class="day-head-title" value="${day.name}" ${canEdit()?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
-      ${editMode&&canEdit()?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">'+day.type.toUpperCase()+'</span>'}
+      <input class="day-head-title" value="${day.name}" ${canEditHere?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
+      ${editMode&&canEditHere?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">'+day.type.toUpperCase()+'</span>'}
+      ${overrideBadge}
     </div>
     <div class="day-head-right">
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
       <button class="btn btn-outline btn-sm" id="woTimerPill" onclick="toggleWorkoutTimer('${uid}',${di})" title="Antrenman süresi — manuel başlat/durdur, ilk set işaretlenince de otomatik başlar">⏱ Başlat</button>
       <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">💪</button>
-      ${canEdit()&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
-      ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+      ${canEditHere&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
+      ${canEditHere?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+      ${dayMenuBtn}
       ${isDayDoneThisWeek(day.name, di)?
         '<button class="finish-day-btn" onclick="confirmUnfinishDay('+di+')" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399" title="Tamamlanmayı kaldır">✓ Tamamlandı</button>':
         '<button class="finish-day-btn" onclick="confirmFinishDay('+di+')">🏁 Günü Tamamla</button>'
@@ -3061,18 +3088,18 @@ async function renderDayContent(di, skipFetch) {
     </div>
   </div>`;
 
-  if(editMode) {
+  if(editMode&&canEditHere) {
     html += `<div class="edit-banner"><p>✏️ <strong>Düzenleme Modu</strong> — egzersiz ekle, sil, düzenle.</p>
     <button class="btn btn-danger btn-sm" onclick="clearDaySets(${di})">Setleri Sıfırla</button></div>`;
   }
 
-  if(day.warmup!==null||editMode) {
-    html += `<div class="warmup-row">🔥 <input value="${day.warmup||''}" placeholder="Isınma ekle..." ${canEdit()&&editMode?'':'readonly'} style="${!(canEdit()&&editMode)?'pointer-events:none':''}" onchange="prog[${di}].warmup=this.value;saveProgram(activeProfile().id)"></div>`;
+  if(day.warmup!==null||(editMode&&canEditHere)) {
+    html += `<div class="warmup-row">🔥 <input value="${day.warmup||''}" placeholder="Isınma ekle..." ${canEditHere&&editMode?'':'readonly'} style="${!(canEditHere&&editMode)?'pointer-events:none':''}" onchange="prog[${di}].warmup=this.value;saveProgram(activeProfile().id)"></div>`;
   }
 
   html += '<div id="exList"></div>';
 
-  if(editMode&&canEdit()) {
+  if(editMode&&canEditHere) {
     html += `<div class="add-ex-form"><h4>+ Yeni Egzersiz Ekle</h4>
     <div style="position:relative;margin-bottom:8px">
       <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="this.select();filterExercises('')" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
@@ -3097,7 +3124,7 @@ async function renderDayContent(di, skipFetch) {
   const exList = document.getElementById('exList');
   if(!day.exercises || !day.exercises.length){
     console.warn(`renderDayContent: gün ${di} (${day.name}) için exercises dizisi boş/tanımsız`, day);
-    exList.innerHTML = '<div class="empty-state">Egzersiz bulunamadı.'+(canEdit()?' Düzenle moduna geçip egzersiz ekleyebilirsin.':'')+'</div>';
+    exList.innerHTML = '<div class="empty-state">Egzersiz bulunamadı.'+(canEditHere?' Düzenle moduna geçip egzersiz ekleyebilirsin.':'')+'</div>';
   } else {
     day.exercises.forEach((ex,ei) => exList.appendChild(buildExCard(ex,di,ei)));
   }
@@ -3105,6 +3132,185 @@ async function renderDayContent(di, skipFetch) {
 }
 
 function canEdit() { return isAdmin() || currentProfile?.id === activeProfile()?.id; }
+
+// ── GÜN BAZLI DÜZENLEME (day_overrides) ──
+// supabase tablosu (Supabase SQL Editor'de scripts/day-overrides-table.sql
+// calistirilmali):
+// create table public.day_overrides (
+//   id uuid, user_id uuid, date date, day_data jsonb, created_at timestamptz,
+//   unique(user_id, date)
+// );
+// Normal "✏️ Düzenle" modu prog[di]'yi (her hafta TEKRARLANAN slotu)
+// degistirir. Bu ozellik ise SADECE belirli bir TAKVIM GUNUNU (ör. "bu
+// Salı farklı") programın kendisine hiç dokunmadan override eder.
+let dayOverrideCache = {}; // dateStr (YYYY-MM-DD) -> day_overrides satırı
+async function loadDayOverrides(userId){
+  if(!userId) return;
+  const dates = Array.from({length:7},(_,i)=>localDateStr(dateForDayIndex(i)));
+  const {data, error} = await sb.from('day_overrides').select('*').eq('user_id', userId).in('date', dates);
+  if(error){ console.warn('loadDayOverrides error (scripts/day-overrides-table.sql çalıştırılmamış olabilir):', error); return; }
+  dates.forEach(d=>{ delete dayOverrideCache[d]; });
+  (data||[]).forEach(row=>{ dayOverrideCache[row.date] = row; });
+}
+function getDayOverride(di){
+  return dayOverrideCache[localDateStr(dateForDayIndex(di))] || null;
+}
+async function saveDayOverride(dateStr, dayData){
+  const uid = activeProfile()?.id;
+  if(!uid) return false;
+  const {data, error} = await sb.from('day_overrides').upsert({user_id:uid, date:dateStr, day_data:dayData}, {onConflict:'user_id,date'}).select().single();
+  if(error){ alert('Kaydedilemedi: '+error.message); return false; }
+  dayOverrideCache[dateStr] = data;
+  return true;
+}
+async function deleteDayOverride(dateStr){
+  const uid = activeProfile()?.id;
+  if(!uid) return false;
+  const {error} = await sb.from('day_overrides').delete().eq('user_id',uid).eq('date',dateStr);
+  if(error){ alert('Silinemedi: '+error.message); return false; }
+  delete dayOverrideCache[dateStr];
+  return true;
+}
+
+// "⋯" menüsü
+function showDayMenu(di, btnEl){
+  closeDayMenu();
+  const override = getDayOverride(di);
+  const sheet=document.createElement('div');
+  sheet.id='dayMenuSheet';
+  sheet.style.cssText='position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.3)';
+  sheet.onclick=(e)=>{ if(e.target===sheet) closeDayMenu(); };
+  const rect = btnEl.getBoundingClientRect();
+  const top = Math.min(rect.bottom + 6, window.innerHeight-160);
+  const left = Math.min(rect.left, window.innerWidth-210);
+  sheet.innerHTML = `<div style="position:absolute;top:${top}px;left:${Math.max(8,left)}px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    <div onclick="openDayOverrideModal(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06)">📝 Bu Günü Düzenle</div>
+    <div onclick="deleteDayWorkoutConfirm(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);color:#ff5c38">🗑 Bu Günün Antrenmanını Sil</div>
+    ${override?`<div onclick="restoreDayToProgram(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;color:var(--acc)">🔄 Programdaki Haline Döndür</div>`:''}
+  </div>`;
+  document.body.appendChild(sheet);
+}
+function closeDayMenu(){ document.getElementById('dayMenuSheet')?.remove(); }
+async function deleteDayWorkoutConfirm(di){
+  closeDayMenu();
+  if(!confirm('Bu günün antrenmanı silinecek, emin misin?')) return;
+  const dateStr = localDateStr(dateForDayIndex(di));
+  const prog = activeProgram();
+  const restData = {type:'rest', name:'Dinlenme', day:prog[di].day, warmup:null, exercises:[]};
+  const ok = await saveDayOverride(dateStr, restData);
+  if(ok) renderDayContent(di);
+}
+async function restoreDayToProgram(di){
+  closeDayMenu();
+  const dateStr = localDateStr(dateForDayIndex(di));
+  const ok = await deleteDayOverride(dateStr);
+  if(ok) renderDayContent(di);
+}
+
+// "📝 Bu Günü Düzenle" modalı
+let _dayOverrideEdit = null;
+function openDayOverrideModal(di){
+  closeDayMenu();
+  const dateStr = localDateStr(dateForDayIndex(di));
+  const existing = getDayOverride(di);
+  const prog = activeProgram();
+  const base = existing ? existing.day_data : prog[di];
+  _dayOverrideEdit = {
+    di, dateStr,
+    type: base.type==='cardio' ? 'hiit' : (base.type||'full'),
+    name: base.name||'',
+    dayLabel: prog[di].day,
+    exercises: (base.exercises||[]).map(e=>({name:e.name, sets:e.sets||3, reps:e.reps||'10'})),
+    hiit: {work:(base.hiit&&base.hiit.work)||40, rest:(base.hiit&&base.hiit.rest)||20, rounds:(base.hiit&&base.hiit.rounds)||8},
+    amrap: {timeCapSec:(base.amrap&&base.amrap.timeCapSec)||1200, exercises:((base.amrap&&base.amrap.exercises)||[]).map(e=>({name:e.name,reps:e.reps}))},
+  };
+  renderDayOverrideModal();
+}
+function closeDayOverrideModal(){ document.getElementById('dayOverrideModal')?.remove(); _dayOverrideEdit=null; }
+function setDayOverrideType(t){ _dayOverrideEdit.type=t; renderDayOverrideModal(); }
+function setDayOverrideName(v){ _dayOverrideEdit.name=v; }
+function addDayOverrideEx(){ _dayOverrideEdit.exercises.push({name:'', sets:3, reps:'10'}); renderDayOverrideModal(); }
+function delDayOverrideEx(i){ _dayOverrideEdit.exercises.splice(i,1); renderDayOverrideModal(); }
+function updateDayOverrideEx(i, field, val){ _dayOverrideEdit.exercises[i][field] = field==='sets' ? (parseInt(val)||1) : val; }
+function addDayOverrideAmrapEx(){ _dayOverrideEdit.amrap.exercises.push({name:'', reps:10}); renderDayOverrideModal(); }
+function delDayOverrideAmrapEx(i){ _dayOverrideEdit.amrap.exercises.splice(i,1); renderDayOverrideModal(); }
+function updateDayOverrideAmrapEx(i, field, val){ _dayOverrideEdit.amrap.exercises[i][field] = field==='reps' ? (parseInt(val)||1) : val; }
+function renderDayOverrideModal(){
+  document.getElementById('dayOverrideModal')?.remove();
+  const st = _dayOverrideEdit;
+  if(!st) return;
+  const modal=document.createElement('div');
+  modal.id='dayOverrideModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9100;overflow-y:auto;padding:20px 16px 40px';
+  const types=[{id:'full',label:'GYM'},{id:'rest',label:'REST'},{id:'hiit',label:'HIIT'},{id:'amrap',label:'CHALLENGE'}];
+  const typeHtml = types.map(t=>`<button onclick="setDayOverrideType('${t.id}')" style="flex:1;padding:10px 4px;border-radius:10px;border:1px solid ${st.type===t.id?'var(--acc)':'var(--border)'};background:${st.type===t.id?'var(--acc)':'none'};color:${st.type===t.id?'#0c0c0c':'var(--text-muted)'};font-size:11px;font-weight:${st.type===t.id?'700':'400'};cursor:pointer">${t.label}</button>`).join('');
+  let bodyHtml='';
+  if(st.type==='full'){
+    bodyHtml = `<div style="margin-top:14px">
+      <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Egzersizler</label>
+      ${st.exercises.map((ex,i)=>`<div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+        <input value="${ex.name}" placeholder="Egzersiz adı" onchange="updateDayOverrideEx(${i},'name',this.value)" style="flex:2;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px">
+        <input type="number" min="1" value="${ex.sets}" onchange="updateDayOverrideEx(${i},'sets',this.value)" style="width:48px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px;text-align:center">
+        <input value="${ex.reps}" placeholder="reps" onchange="updateDayOverrideEx(${i},'reps',this.value)" style="width:56px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px;text-align:center">
+        <button onclick="delDayOverrideEx(${i})" style="background:none;border:none;color:#ff5c38;font-size:16px;cursor:pointer">✕</button>
+      </div>`).join('')}
+      <button onclick="addDayOverrideEx()" style="margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1px dashed var(--border-strong);background:none;color:var(--muted);font-size:12px;cursor:pointer">+ Egzersiz Ekle</button>
+    </div>`;
+  } else if(st.type==='hiit'){
+    bodyHtml = `<div style="margin-top:14px;display:flex;gap:8px">
+      <div style="flex:1"><label style="font-size:10px;color:var(--muted)">İş (sn)</label><input type="number" value="${st.hiit.work}" onchange="_dayOverrideEdit.hiit.work=parseInt(this.value)||40" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px;margin-top:4px"></div>
+      <div style="flex:1"><label style="font-size:10px;color:var(--muted)">Dinlenme (sn)</label><input type="number" value="${st.hiit.rest}" onchange="_dayOverrideEdit.hiit.rest=parseInt(this.value)||20" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px;margin-top:4px"></div>
+      <div style="flex:1"><label style="font-size:10px;color:var(--muted)">Round</label><input type="number" value="${st.hiit.rounds}" onchange="_dayOverrideEdit.hiit.rounds=parseInt(this.value)||8" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px;margin-top:4px"></div>
+    </div>`;
+  } else if(st.type==='amrap'){
+    bodyHtml = `<div style="margin-top:14px">
+      <label style="font-size:10px;color:var(--muted)">Zaman Sınırı (dk)</label>
+      <input type="number" value="${Math.round(st.amrap.timeCapSec/60)}" onchange="_dayOverrideEdit.amrap.timeCapSec=(parseInt(this.value)||20)*60" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px;margin-top:4px;margin-bottom:12px">
+      <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Hareketler</label>
+      ${st.amrap.exercises.map((ex,i)=>`<div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+        <input value="${ex.name}" placeholder="Hareket adı" onchange="updateDayOverrideAmrapEx(${i},'name',this.value)" style="flex:2;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px">
+        <input type="number" min="1" value="${ex.reps}" onchange="updateDayOverrideAmrapEx(${i},'reps',this.value)" style="width:56px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);font-size:12px;text-align:center">
+        <button onclick="delDayOverrideAmrapEx(${i})" style="background:none;border:none;color:#ff5c38;font-size:16px;cursor:pointer">✕</button>
+      </div>`).join('')}
+      <button onclick="addDayOverrideAmrapEx()" style="margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1px dashed var(--border-strong);background:none;color:var(--muted);font-size:12px;cursor:pointer">+ Hareket Ekle</button>
+    </div>`;
+  }
+  modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;color:var(--acc)">BU GÜNÜ DÜZENLE</h2>
+      <button onclick="closeDayOverrideModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">${typeHtml}</div>
+    <label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Gün Adı</label>
+    <input value="${st.name}" placeholder="ör. Cindy, GB, Dinlenme" onchange="setDayOverrideName(this.value)" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;margin-top:4px">
+    ${bodyHtml}
+    <button class="btn btn-acc" style="width:100%;margin-top:20px" onclick="saveDayOverrideFromModal()">Kaydet</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+async function saveDayOverrideFromModal(){
+  const st = _dayOverrideEdit;
+  if(!st) return;
+  const dayData = {type:st.type, name:st.name||'Antrenman', day:st.dayLabel, warmup:null};
+  if(st.type==='full'){
+    dayData.exercises = st.exercises.filter(e=>e.name.trim()).map(e=>({name:e.name.trim(), muscle:'', sets:e.sets||3, reps:e.reps||'10', restSec:90}));
+    if(!dayData.exercises.length){ alert('En az bir egzersiz ekle.'); return; }
+  } else if(st.type==='rest'){
+    dayData.exercises=[];
+  } else if(st.type==='hiit'){
+    dayData.exercises=[];
+    dayData.hiit={work:st.hiit.work, rest:st.hiit.rest, rounds:st.hiit.rounds};
+  } else if(st.type==='amrap'){
+    dayData.exercises=[];
+    dayData.amrap={timeCapSec:st.amrap.timeCapSec, exercises: st.amrap.exercises.filter(e=>e.name.trim()).map(e=>({name:e.name.trim(), reps:e.reps||10}))};
+  }
+  const di = st.di;
+  const ok = await saveDayOverride(st.dateStr, dayData);
+  if(!ok) return;
+  closeDayOverrideModal();
+  renderDayContent(di);
+  renderWeekGrid();
+}
 
 function buildExCard(ex, di, ei) {
   const uid = activeProfile()?.id;
@@ -3733,11 +3939,15 @@ async function confirmUnfinishDay(di){
   await renderDayContent(di);
 }
 
-function renderHIITDay(el,day,di){
+function renderHIITDay(el,day,di,isOverride){
   const h=day.hiit||{work:40,rest:20,rounds:8};
+  const canEditHere = canEdit() && !isOverride;
+  const overrideBadge = isOverride ? '<span style="font-size:9px;padding:3px 8px;border-radius:8px;background:rgba(56,182,255,.15);color:var(--acc3);border:1px solid rgba(56,182,255,.3);white-space:nowrap">📌 Bugüne özel</span>' : '';
   el.innerHTML=`<div class="day-head-row">
-    <input class="day-head-title" value="${day.name}" ${canEdit()&&editMode?'':'readonly'} onchange="activeProgram()[${di}].name=this.value;saveProgram(activeProfile().id)">
-    ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+    <input class="day-head-title" value="${day.name}" ${canEditHere&&editMode?'':'readonly'} onchange="activeProgram()[${di}].name=this.value;saveProgram(activeProfile().id)">
+    ${overrideBadge}
+    ${canEditHere?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+    ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="showDayMenu(${di},this)" title="Gün seçenekleri">⋯</button>`:''}
   </div>
   <div class="hiit-card"><div class="hiit-head"><h3>⚡ ${day.name}</h3><span style="font-size:10px;color:var(--muted)">${day.day}</span></div>
   <div class="hiit-body">
@@ -3798,10 +4008,12 @@ function amrapTotalRepsPerRound(day){
   return ((day.amrap&&day.amrap.exercises)||[]).reduce((s,ex)=>s+(parseInt(ex.reps)||0),0);
 }
 
-function renderAmrapDay(el,day,di){
+function renderAmrapDay(el,day,di,isOverride){
   const uid=activeProfile()?.id;
   const a=day.amrap||{timeCapSec:1200,exercises:[]};
   const cap=a.timeCapSec||1200;
+  const canEditHere = canEdit() && !isOverride;
+  const overrideBadge = isOverride ? '<span style="font-size:9px;padding:3px 8px;border-radius:8px;background:rgba(56,182,255,.15);color:var(--acc3);border:1px solid rgba(56,182,255,.3);white-space:nowrap">📌 Bugüne özel</span>' : '';
   if(!amrapRunning){
     const saved=loadAmrapState(uid,di);
     amrapRounds=saved?.rounds||0;
@@ -3811,7 +4023,7 @@ function renderAmrapDay(el,day,di){
   const m0=Math.floor(Math.max(0,amrapSecs)/60),s0=Math.max(0,amrapSecs)%60;
   const exRows=(a.exercises||[]).map((ex,ei)=>`
     <div class="amrap-ex-row">
-      ${editMode&&canEdit()?`
+      ${editMode&&canEditHere?`
         <input class="edit-input" style="flex:1" value="${ex.name}" onchange="activeProgram()[${di}].amrap.exercises[${ei}].name=this.value;saveProgram(activeProfile().id)">
         <input class="edit-input" type="number" min="1" style="width:56px;text-align:center" value="${ex.reps}" onchange="activeProgram()[${di}].amrap.exercises[${ei}].reps=parseInt(this.value)||1;saveProgram(activeProfile().id)">
         <button class="del-btn" onclick="delAmrapEx(${di},${ei})">✕</button>
@@ -3819,8 +4031,10 @@ function renderAmrapDay(el,day,di){
     </div>`).join('');
   const isDone=isDayDoneThisWeek(day.name,di);
   el.innerHTML=`<div class="day-head-row">
-    <input class="day-head-title" value="${day.name}" ${canEdit()&&editMode?'':'readonly'} onchange="activeProgram()[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
-    ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+    <input class="day-head-title" value="${day.name}" ${canEditHere&&editMode?'':'readonly'} onchange="activeProgram()[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
+    ${overrideBadge}
+    ${canEditHere?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
+    ${canEdit()?`<button class="btn btn-outline btn-sm" onclick="showDayMenu(${di},this)" title="Gün seçenekleri">⋯</button>`:''}
     ${isDone?
       '<button class="finish-day-btn" onclick="confirmUnfinishDay('+di+')" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399" title="Tamamlanmayı kaldır">✓ Tamamlandı</button>':
       '<button class="finish-day-btn" onclick="confirmFinishAmrap('+di+')">🏁 Antrenmanı Tamamla</button>'
@@ -3829,7 +4043,7 @@ function renderAmrapDay(el,day,di){
   <div class="amrap-card">
     <div class="amrap-head"><h3>🏆 ${day.name}</h3><span style="font-size:10px;color:var(--muted)">${day.day} · AMRAP</span></div>
     <div class="amrap-body">
-      ${editMode&&canEdit()?`<div class="amrap-cap-row">Zaman Sınırı: <input type="number" min="1" value="${Math.round(cap/60)}" onchange="updateAmrapCap(${di},this.value)"> dk</div>`:`<div class="amrap-cap-row">Zaman Sınırı: ${Math.round(cap/60)} dk</div>`}
+      ${editMode&&canEditHere?`<div class="amrap-cap-row">Zaman Sınırı: <input type="number" min="1" value="${Math.round(cap/60)}" onchange="updateAmrapCap(${di},this.value)"> dk</div>`:`<div class="amrap-cap-row">Zaman Sınırı: ${Math.round(cap/60)} dk</div>`}
       <div class="amrap-timer-wrap"><div class="amrap-cd" id="amrapCd">${m0}:${s0.toString().padStart(2,'0')}</div></div>
       <div class="amrap-controls">
         <button class="amrap-start-btn" id="amrapBtn" onclick="toggleAmrap(${di})">${amrapRunning?'⏸ DURAKLAT':'▶ BAŞLAT'}</button>
@@ -3846,7 +4060,7 @@ function renderAmrapDay(el,day,di){
         <button class="btn btn-outline btn-sm" style="flex:1" onclick="undoRound()">↩ Geri Al</button>
       </div>
       <div>${exRows}</div>
-      ${editMode&&canEdit()?`<div class="add-ex-form" style="margin-top:10px">
+      ${editMode&&canEditHere?`<div class="add-ex-form" style="margin-top:10px">
         <h4>+ Egzersiz Ekle</h4>
         <div class="aef-grid">
           <div class="aef-field"><label>Egzersiz Adı</label><input class="aef-input" id="amrap-ex-name" placeholder="ör: Burpee"></div>
@@ -5196,9 +5410,177 @@ function renderWoSplit(el){
       <div class="n">📌 Şu Anki Programım</div>
       <div class="d">Uyguladığın programı buradan görüntüle</div>
     </button>
+    <button class="wo-split-pick" style="border-color:rgba(56,182,255,.35)" onclick="renderCustomSplitBuilder()">
+      <div class="n">🛠 Kendi Split'imi Oluştur</div>
+      <div class="d">Gün sayısı ve önceliğine göre başlangıç şablonu oluştur, sonra kendine göre düzenle.</div>
+    </button>
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin:16px 0 8px">Popüler Split'ler</div>
     ${cards}
   </div>`;
+}
+
+// ── KENDİ SPLİT'İMİ OLUŞTUR ──
+// Kullanıcı gün sayısı + öncelik (Upper/Lower eşit, Upper öncelik, Leg
+// önceliği) seçiyor, biz POPULAR_SPLITS'teki hareketlerle AYNI havuzdan bir
+// başlangıç şablonu üretiyoruz (muscle etiketleri classifyExerciseMuscles ile
+// birebir eşleşsin diye). Uyguladıktan sonra kullanıcı zaten var olan
+// addEx/delEx, gün adı düzenleme ve "📊 Analizi Gör" araçlarıyla şablonu
+// kendi programına dönüştürüyor — bu yüzden burada SADECE üretim + uygulama
+// var, ayrı bir editör yazmaya gerek yok.
+const CUSTOM_SPLIT_POOL = {
+  push: [
+    _woEx('Bench Press','Göğüs',4,'6-8',120),
+    _woEx('Incline DB Press','Göğüs',3,'8-12',90),
+    _woEx('Overhead Press','Omuz',3,'8-10',90),
+    _woEx('Dip','Göğüs · Triceps',3,'AMRAP',90),
+    _woEx('Cable Fly','Göğüs',3,'12-15',60),
+    _woEx('Lateral Raise','Omuz',3,'12-15',60),
+    _woEx('Triceps Pushdown','Triceps',3,'10-15',60),
+    _woEx('Rope Pushdown','Triceps',3,'12-15',45),
+  ],
+  pull: [
+    _woEx('Deadlift','Sırt · Hamstring',4,'5-8',150),
+    _woEx('Pull-Up','Sırt',3,'AMRAP',90),
+    _woEx('Barbell Row','Sırt',3,'8-10',90),
+    _woEx('Lat Pulldown','Sırt',3,'10-12',90),
+    _woEx('Cable Row','Sırt',3,'10-12',90),
+    _woEx('Face Pull','Omuz (Arka)',3,'15-20',60),
+    _woEx('Barbell Curl','Biceps',3,'10-12',60),
+    _woEx('Hammer Curl','Biceps',3,'10-12',60),
+    _woEx('Preacher Curl','Biceps',3,'10-12',60),
+  ],
+  legs: [
+    _woEx('Squat','Quad · Glute',4,'6-10',150),
+    _woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),
+    _woEx('Leg Press','Quad',3,'10-12',90),
+    _woEx('Leg Curl','Hamstring',3,'10-15',60),
+    _woEx('Leg Extension','Quad',3,'12-15',60),
+    _woEx('Walking Lunge','Glute · Quad',3,'10-12',60),
+    _woEx('Calf Raise','Baldır',4,'12-15',45),
+  ],
+  core: [
+    _woEx('Plank','Karın',3,'45sn',60),
+    _woEx('Cable Crunch','Karın',3,'15',60),
+  ],
+};
+const CUSTOM_SPLIT_PATTERNS = {
+  3: ['full','rest','full','rest','full','rest','rest'],
+  4: ['upper','lower','rest','upper','lower','rest','rest'],
+  5: ['upper','lower','push','pull','legs','rest','rest'],
+  6: ['push','pull','legs','push','pull','legs','rest'],
+};
+const CUSTOM_SPLIT_WEEK_DAYS = ['Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi','Pazar'];
+
+// pool'dan `count` hareketi `start`'tan itibaren, taşıp AYNI harekete iki kez
+// denk gelmeyecek şekilde (sınıra çarpınca başa değil geriye kayarak) seçer.
+function _customSplitPick(pool, start, count){
+  count = Math.min(count, pool.length);
+  const s = Math.max(0, Math.min(start, pool.length-count));
+  return pool.slice(s, s+count).map(dc);
+}
+
+function generateCustomSplit(daysPerWeek, priority){
+  const pattern = CUSTOM_SPLIT_PATTERNS[daysPerWeek] || CUSTOM_SPLIT_PATTERNS[4];
+  const upperDelta = priority==='upper' ? 1 : priority==='leg' ? -1 : 0;
+  const legDelta = priority==='leg' ? 1 : priority==='upper' ? -1 : 0;
+  let fullCount=0, upperCount=0, lowerCount=0, pushCount=0, pullCount=0, legsCount=0;
+  return pattern.map((role,i)=>{
+    const day = {name:'Dinlenme',type:'rest',day:CUSTOM_SPLIT_WEEK_DAYS[i],warmup:null,exercises:[]};
+    if(role==='rest') return day;
+    day.type='full';
+    if(role==='full'){
+      const v = fullCount%2; fullCount++;
+      day.name = v===0 ? 'Full Body A' : 'Full Body B';
+      const pushN=Math.max(1,2+upperDelta), pullN=Math.max(1,1+upperDelta), legN=Math.max(1,1+legDelta);
+      day.exercises = [
+        ..._customSplitPick(CUSTOM_SPLIT_POOL.legs, v*2, legN),
+        ..._customSplitPick(CUSTOM_SPLIT_POOL.push, v*2, pushN),
+        ..._customSplitPick(CUSTOM_SPLIT_POOL.pull, v*2, pullN),
+        ..._customSplitPick(CUSTOM_SPLIT_POOL.core, v, 1),
+      ];
+    } else if(role==='upper'){
+      const v = upperCount%2; upperCount++;
+      day.name = v===0 ? 'Upper A' : 'Upper B';
+      const pushN=Math.max(2,3+upperDelta), pullN=Math.max(2,3+upperDelta);
+      day.exercises = [
+        ..._customSplitPick(CUSTOM_SPLIT_POOL.push, v*3, pushN),
+        ..._customSplitPick(CUSTOM_SPLIT_POOL.pull, v*3, pullN),
+      ];
+    } else if(role==='lower'){
+      const v = lowerCount%2; lowerCount++;
+      day.name = v===0 ? 'Lower A' : 'Lower B';
+      day.exercises = _customSplitPick(CUSTOM_SPLIT_POOL.legs, v*2, Math.max(3,5+legDelta));
+    } else if(role==='push'){
+      const v = pushCount%2; pushCount++;
+      day.name = v===0 ? 'Push A' : 'Push B';
+      day.exercises = _customSplitPick(CUSTOM_SPLIT_POOL.push, v*3, Math.max(3,5+upperDelta));
+    } else if(role==='pull'){
+      const v = pullCount%2; pullCount++;
+      day.name = v===0 ? 'Pull A' : 'Pull B';
+      day.exercises = _customSplitPick(CUSTOM_SPLIT_POOL.pull, v*3, Math.max(3,6+upperDelta));
+    } else if(role==='legs'){
+      const v = legsCount%2; legsCount++;
+      day.name = v===0 ? 'Legs A' : 'Legs B';
+      day.exercises = _customSplitPick(CUSTOM_SPLIT_POOL.legs, v*2, Math.max(3,5+legDelta));
+    }
+    return day;
+  });
+}
+
+let _customBuilderDays = 4;
+let _customBuilderPriority = 'equal';
+function renderCustomSplitBuilder(){
+  const el = document.getElementById('woContent');
+  if(!el) return;
+  const dayOpts = [3,4,5,6].map(n=>{
+    const active = _customBuilderDays===n;
+    return `<button onclick="_customBuilderDays=${n};renderCustomSplitBuilder()" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid ${active?'var(--acc4)':'var(--border)'};background:${active?'rgba(212,245,60,.12)':'var(--surface)'};color:${active?'var(--acc4)':'var(--text)'};font-weight:700;font-size:14px;cursor:pointer">${n}</button>`;
+  }).join('');
+  const prios = [
+    {id:'equal', label:'⚖️ Upper/Lower Eşit', d:'Üst ve alt vücuda dengeli hacim.'},
+    {id:'upper', label:'💪 Upper Öncelik', d:'Göğüs/sırt/omuz/kol daha fazla hacim, bacak koruma seviyesinde.'},
+    {id:'leg', label:'🦵 Leg Önceliği', d:'Quad/hamstring/glute/baldır daha fazla hacim, üst vücut koruma seviyesinde.'},
+  ];
+  const prioOpts = prios.map(p=>{
+    const active = _customBuilderPriority===p.id;
+    return `<button onclick="_customBuilderPriority='${p.id}';renderCustomSplitBuilder()" style="width:100%;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid ${active?'var(--acc4)':'var(--border)'};background:${active?'rgba(212,245,60,.12)':'var(--surface)'};cursor:pointer">
+      <div style="font-weight:700;font-size:13px;color:${active?'var(--acc4)':'var(--text)'}">${p.label}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">${p.d}</div>
+    </button>`;
+  }).join('');
+  el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>
+    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">🛠 Kendi Split'imi Oluştur</h3>
+    <p style="font-size:11px;color:var(--muted);margin:4px 0 16px;line-height:1.6">Gün sayısını ve önceliğini seç — en iyi hareketlerden bir başlangıç şablonu oluşturalım. Uyguladıktan sonra hareket ekleyip çıkararak, kas grubu analizine bakarak tamamen kendi programına dönüştür.</p>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">Haftada Kaç Gün?</div>
+    <div style="display:flex;gap:8px;margin-bottom:18px">${dayOpts}</div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">Öncelik</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">${prioOpts}</div>
+    <button class="btn btn-acc" style="width:100%" onclick="previewCustomSplit()">Şablon Oluştur →</button>`;
+}
+
+function previewCustomSplit(){
+  _woSchedule = generateCustomSplit(_customBuilderDays, _customBuilderPriority);
+  const prioLabel = {equal:'Upper/Lower Eşit', upper:'Upper Öncelik', leg:'Leg Önceliği'}[_customBuilderPriority];
+  _woSplitMeta = {id:'custom', name:"Kendi Split'im", tagline:`${_customBuilderDays} gün/hafta · ${prioLabel} · hareketleri ekleyip çıkararak kendine göre düzenle.`, isCustom:true};
+  _woShowAlt = false;
+  renderWoWeekTable();
+}
+
+async function applyCustomSplit(){
+  const p = activeProfile();
+  if(!_woSchedule || !p) return;
+  if(!confirm('Mevcut programın silinip bu şablonla değiştirilecek. Devam edilsin mi?')) return;
+  programs[p.id] = dc(_woSchedule);
+  delete altPrograms[p.id];
+  await saveProgram(p.id);
+  curDay = new Date().getDay()===0?6:new Date().getDay()-1;
+  showScreen('workout', navBtnFor('workout'));
+  renderAll();
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+  t.textContent="🛠 Kendi split'in uygulandı! Hareketleri ekleyip çıkararak sana özel hale getirebilirsin.";
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
 }
 
 // Hafta tablosu + gün detayı: hem "Şu Anki Programım" hem her split detayı bunu kullanır
@@ -5254,9 +5636,10 @@ function renderWoWeekTable(){
   }).join('');
   const altToggle = _woSplitMeta?.altSchedule ? `<button class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="toggleWoAltPreview()">🔁 ${_woShowAlt?'Hafta A\'yı Gör':'Hafta B\'yi Gör'} <span style="color:var(--muted);font-weight:400">(şu an: Hafta ${_woShowAlt?'B':'A'})</span></button>` : '';
   const header = _woSplitMeta ? `<h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>${altToggle}` : '';
-  const applyBtn = _woSplitMeta && canEdit() ? `<button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="applyPopularSplit('${_woSplitMeta.id}')">🚀 Bu Split'i Uygula</button>` : '';
+  const applyBtn = _woSplitMeta && canEdit() ? `<button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="${_woSplitMeta.isCustom?'applyCustomSplit()':`applyPopularSplit('${_woSplitMeta.id}')`}">🚀 Bu Split'i Uygula</button>` : '';
   const analyzeBtn = `<button class="btn btn-outline btn-sm" style="width:100%;margin-top:12px" onclick="showProgramMuscleAnalysis()">📊 Analizi Gör</button>`;
-  el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>
+  const backAction = _woSplitMeta?.isCustom ? 'renderCustomSplitBuilder()' : `renderWoSplit(document.getElementById('woContent'))`;
+  el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="${backAction}">← ${_woSplitMeta?.isCustom?'Gün/Öncelik Seçimi':'Split Listesi'}</button>
     ${header}
     <div class="wo-week-table">${rows}</div>
     ${analyzeBtn}
