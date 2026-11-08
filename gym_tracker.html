@@ -5423,10 +5423,11 @@ function renderWoSplit(el){
 // Kullanıcı gün sayısı + öncelik (Upper/Lower eşit, Upper öncelik, Leg
 // önceliği) seçiyor, biz POPULAR_SPLITS'teki hareketlerle AYNI havuzdan bir
 // başlangıç şablonu üretiyoruz (muscle etiketleri classifyExerciseMuscles ile
-// birebir eşleşsin diye). Uyguladıktan sonra kullanıcı zaten var olan
-// addEx/delEx, gün adı düzenleme ve "📊 Analizi Gör" araçlarıyla şablonu
-// kendi programına dönüştürüyor — bu yüzden burada SADECE üretim + uygulama
-// var, ayrı bir editör yazmaya gerek yok.
+// birebir eşleşsin diye). Şablonu UYGULAMADAN ÖNCE de düzenleyebilsin diye
+// showWoDayDetail'e (bkz. aşağıdaki _woPreviewEditMode) hareket ekle/sil
+// özelliği eklendi — _woSchedule'ı doğrudan mutasyona uğratır, "🚀 Uygula"
+// o haliyle kaydeder. Uyguladıktan sonra zaten var olan gün adı düzenleme ve
+// "📊 Analizi Gör" araçları da kullanılabiliyor.
 const CUSTOM_SPLIT_POOL = {
   push: [
     _woEx('Bench Press','Göğüs',4,'6-8',120),
@@ -5561,8 +5562,9 @@ function renderCustomSplitBuilder(){
 function previewCustomSplit(){
   _woSchedule = generateCustomSplit(_customBuilderDays, _customBuilderPriority);
   const prioLabel = {equal:'Upper/Lower Eşit', upper:'Upper Öncelik', leg:'Leg Önceliği'}[_customBuilderPriority];
-  _woSplitMeta = {id:'custom', name:"Kendi Split'im", tagline:`${_customBuilderDays} gün/hafta · ${prioLabel} · hareketleri ekleyip çıkararak kendine göre düzenle.`, isCustom:true};
+  _woSplitMeta = {id:'custom', name:"Kendi Split'im", tagline:`${_customBuilderDays} gün/hafta · ${prioLabel} · bir güne dokun, "✏️ Düzenle" ile hareket ekleyip çıkararak kendine göre düzenle.`, isCustom:true};
   _woShowAlt = false;
+  _woPreviewEditMode = false;
   renderWoWeekTable();
 }
 
@@ -5646,10 +5648,15 @@ function renderWoWeekTable(){
     ${applyBtn}`;
 }
 
+let _woDayDetailIdx = null;
+let _woPreviewEditMode = false;
+
 function showWoDayDetail(i){
+  _woDayDetailIdx = i;
   const day = _woSchedule && _woSchedule[i];
   const el = document.getElementById('woContent');
   if(!day || !el) return;
+  const canEditPreview = !!(_woSplitMeta?.isCustom && canEdit() && day.type==='full');
   let exsHtml;
   if(day.type==='amrap'){
     const a=day.amrap||{timeCapSec:1200,exercises:[]};
@@ -5658,12 +5665,51 @@ function showWoDayDetail(i){
     const h=day.hiit||{work:40,rest:20,rounds:8};
     exsHtml = `<div class="wo-ex-item"><div class="n">Çalışma ${h.work}sn / Dinlenme ${h.rest}sn</div><div class="sr">${h.rounds} round</div></div>`;
   } else {
-    exsHtml = (day.exercises||[]).map(ex=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div></div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
+    exsHtml = (day.exercises||[]).map((ex,ei)=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div>${canEditPreview&&_woPreviewEditMode?`<button onclick="delExFromPreview(${ei})" style="background:none;border:none;color:#ff5c38;font-size:15px;cursor:pointer;padding:2px 6px" title="Sil">🗑</button>`:''}</div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
   }
   const {typeLabel} = _woDayMeta(day);
   const sub = day.type==='amrap' ? `AMRAP ${Math.round(((day.amrap&&day.amrap.timeCapSec)||1200)/60)}dk` : typeLabel==='Full' ? '' : typeLabel;
-  el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoWeekTable()">← Hafta</button>
-    <div class="wo-day-card"><h4>${day.name} <span>${day.day}${sub?' · '+sub:''}</span></h4>${exsHtml}</div>`;
+  const editToggle = canEditPreview ? `<button class="btn btn-outline btn-sm" onclick="toggleWoPreviewEdit()" style="${_woPreviewEditMode?'border-color:var(--acc4);color:var(--acc4)':''}">${_woPreviewEditMode?'✓ Bitti':'✏️ Düzenle'}</button>` : '';
+  const addForm = (canEditPreview && _woPreviewEditMode) ? `<div class="add-ex-form" style="margin-top:12px"><h4>+ Yeni Egzersiz Ekle</h4>
+    <div style="position:relative;margin-bottom:8px">
+      <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="this.select();filterExercises('')" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
+      <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
+    </div>
+    <div class="aef-grid">
+      <div class="aef-field"><label>Kas Grubu (otomatik)</label><input class="aef-input" id="aef-muscle" placeholder="Egzersiz seçince dolar" readonly style="color:var(--acc)"></div>
+      <div class="aef-field"><label>Set Sayısı</label><input class="aef-input" id="aef-sets" type="number" min="1" max="10" value="3"></div>
+      <div class="aef-field"><label>Tekrar (ör: 12-10-8)</label><input class="aef-input" id="aef-reps" placeholder="12"></div>
+      <div class="aef-field"><label>Dinlenme (sn)</label><input class="aef-input" id="aef-rest" type="number" value="90"></div>
+      <div class="aef-field"><label>Koç İpucu</label><input class="aef-input" id="aef-tip" placeholder="ör: Son sette failure"></div>
+    </div>
+    <button class="btn btn-acc" onclick="addExToPreview()">+ Egzersiz Ekle</button></div>` : '';
+  el.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="renderWoWeekTable()">← Hafta</button>${editToggle}</div>
+    <div class="wo-day-card"><h4>${day.name} <span>${day.day}${sub?' · '+sub:''}</span></h4>${exsHtml}</div>${addForm}`;
+}
+
+function toggleWoPreviewEdit(){ _woPreviewEditMode = !_woPreviewEditMode; showWoDayDetail(_woDayDetailIdx); }
+
+function delExFromPreview(ei){
+  const day = _woSchedule && _woSchedule[_woDayDetailIdx];
+  if(!day) return;
+  if(!confirm(`"${day.exercises[ei].name}" silinsin mi?`)) return;
+  day.exercises.splice(ei,1);
+  showWoDayDetail(_woDayDetailIdx);
+}
+
+function addExToPreview(){
+  const day = _woSchedule && _woSchedule[_woDayDetailIdx];
+  if(!day) return;
+  const name=document.getElementById('aef-name')?.value.trim();
+  if(!name) return alert('Egzersiz adı zorunlu!');
+  day.exercises.push({
+    name, muscle:document.getElementById('aef-muscle')?.value.trim()||'',
+    sets:parseInt(document.getElementById('aef-sets')?.value)||3,
+    reps:document.getElementById('aef-reps')?.value.trim()||'12',
+    restSec:parseInt(document.getElementById('aef-rest')?.value)||90,
+    tip:document.getElementById('aef-tip')?.value.trim()||null
+  });
+  showWoDayDetail(_woDayDetailIdx);
 }
 
 async function applyPopularSplit(id){
