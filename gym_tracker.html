@@ -5713,6 +5713,7 @@ function showWoDayDetail(i){
   const {typeLabel} = _woDayMeta(day);
   const sub = day.type==='amrap' ? `AMRAP ${Math.round(((day.amrap&&day.amrap.timeCapSec)||1200)/60)}dk` : typeLabel==='Full' ? '' : typeLabel;
   const editToggle = canEditPreview ? `<button class="btn btn-outline btn-sm" onclick="toggleWoPreviewEdit()" style="${_woPreviewEditMode?'border-color:var(--acc4);color:var(--acc4)':''}">${_woPreviewEditMode?'✓ Bitti':'✏️ Düzenle'}</button>` : '';
+  const muscleLiveHtml = _woSplitMeta?.isCustom ? renderMiniMuscleVolumeHtml() : '';
   const addForm = (canEditPreview && _woPreviewEditMode) ? `<div class="add-ex-form" style="margin-top:12px"><h4>+ Yeni Egzersiz Ekle</h4>
     ${exerciseRegionPillsHtml()}
     <div style="position:relative;margin-bottom:8px">
@@ -5728,7 +5729,30 @@ function showWoDayDetail(i){
     </div>
     <button class="btn btn-acc" onclick="addExToPreview()">+ Egzersiz Ekle</button></div>` : '';
   el.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="renderWoWeekTable()">← Hafta</button>${editToggle}</div>
+    ${muscleLiveHtml}
     <div class="wo-day-card"><h4>${day.name} <span>${day.day}${sub?' · '+sub:''}</span></h4>${exsHtml}</div>${addForm}`;
+}
+
+// Kendi Split önizlemesinde (showWoDayDetail) hareket ekle/sil yaparken, ayrı
+// bir "📊 Analizi Gör" modalı açıp kapatmaya gerek kalmadan haftalık kas
+// yoğunluğunu AYNI ekranda canlı görebilsin diye — computeMuscleSets zaten
+// _woSchedule üzerinden çalışıyor, her ekle/sil sonrası showWoDayDetail
+// yeniden render edildiğinde bu da güncelleniyor.
+function renderMiniMuscleVolumeHtml(){
+  if(!_woSchedule) return '';
+  const vol = computeMuscleSets(_woSchedule, null);
+  const chips = ANALYSIS_MUSCLE_GROUPS.map(g=>{
+    const sets = (vol[g.id]||{sets:0}).sets;
+    return `<div style="display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:var(--surface2);border:1px solid var(--border)">
+      <span style="width:7px;height:7px;border-radius:50%;background:${muscleVolumeColor(sets)};flex:0 0 auto"></span>
+      <span style="font-size:10px;color:var(--text)">${g.label}</span>
+      <span style="font-size:10px;color:var(--text-muted);font-weight:700">${sets}</span>
+    </div>`;
+  }).join('');
+  return `<div style="margin-bottom:14px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">📊 Haftalık Kas Yoğunluğu</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+  </div>`;
 }
 
 function toggleWoPreviewEdit(){ _woPreviewEditMode = !_woPreviewEditMode; showWoDayDetail(_woDayDetailIdx); }
