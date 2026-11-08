@@ -3101,6 +3101,7 @@ async function renderDayContent(di, skipFetch) {
 
   if(editMode&&canEditHere) {
     html += `<div class="add-ex-form"><h4>+ Yeni Egzersiz Ekle</h4>
+    ${exerciseRegionPillsHtml()}
     <div style="position:relative;margin-bottom:8px">
       <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="this.select();filterExercises('')" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
       <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
@@ -5671,6 +5672,7 @@ function showWoDayDetail(i){
   const sub = day.type==='amrap' ? `AMRAP ${Math.round(((day.amrap&&day.amrap.timeCapSec)||1200)/60)}dk` : typeLabel==='Full' ? '' : typeLabel;
   const editToggle = canEditPreview ? `<button class="btn btn-outline btn-sm" onclick="toggleWoPreviewEdit()" style="${_woPreviewEditMode?'border-color:var(--acc4);color:var(--acc4)':''}">${_woPreviewEditMode?'✓ Bitti':'✏️ Düzenle'}</button>` : '';
   const addForm = (canEditPreview && _woPreviewEditMode) ? `<div class="add-ex-form" style="margin-top:12px"><h4>+ Yeni Egzersiz Ekle</h4>
+    ${exerciseRegionPillsHtml()}
     <div style="position:relative;margin-bottom:8px">
       <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="this.select();filterExercises('')" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
       <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
@@ -6285,18 +6287,52 @@ const EXERCISE_DB = [
   {name:'Leg Curl',muscle:'Hamstring',muscles:['hamstring'],sets:3,reps:'12',restSec:60,tip:'Seated tercih et'},
 ];
 
+// Bölgeye göre ara: pill'e tıklayınca (veya bölge adı birebir yazılınca)
+// EXERCISE_DB'deki o bölgenin TÜM hareketleri, dosyadaki (zaten compound →
+// izolasyon sırasıyla elle düzenlenmiş) best-practice sırasıyla listelenir.
+const EXERCISE_REGIONS = [
+  {label:'Göğüs', tags:['chest'], aliases:['göğüs','gogus','chest']},
+  {label:'Sırt', tags:['lat','mid_back'], aliases:['sırt','sirt','back']},
+  {label:'Bacak', tags:['quad','hamstring','glute_max','glute_med'], aliases:['bacak','leg','legs']},
+  {label:'Omuz', tags:['front_delt','side_delt','rear_delt'], aliases:['omuz','shoulder','shoulders']},
+  {label:'Kol', tags:['biceps','triceps','forearm'], aliases:['kol','arm','arms']},
+  {label:'Baldır', tags:['calves'], aliases:['baldır','baldir','calf','calves']},
+  {label:'Karın', tags:['abs'], aliases:['karın','karin','core','abs']},
+];
+
+function exerciseRegionPillsHtml(){
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px">${EXERCISE_REGIONS.map(r=>
+    `<button type="button" onclick="filterExercisesByRegion('${r.label}')" style="padding:5px 10px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;cursor:pointer">${r.label}</button>`
+  ).join('')}</div>`;
+}
+
+function filterExercisesByRegion(label){
+  const input = document.getElementById('aef-name');
+  if(input) input.value = label;
+  filterExercises(label);
+}
+
 function filterExercises(query){
   const sugg=document.getElementById('exSuggestions');
   const q=(query||'').toLowerCase().trim();
-  const matches=(q?EXERCISE_DB.filter(e=>e.name.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q)):EXERCISE_DB).slice(0,q?8:EXERCISE_DB.length);
+  const region = EXERCISE_REGIONS.find(r=>r.aliases.includes(q));
+  let matches, ranked;
+  if(region){
+    matches = EXERCISE_DB.filter(e=>e.muscles.some(m=>region.tags.includes(m)));
+    ranked = true;
+  } else {
+    matches = (q?EXERCISE_DB.filter(e=>e.name.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q)):EXERCISE_DB).slice(0,q?8:EXERCISE_DB.length);
+    ranked = false;
+  }
   if(!matches.length){sugg.style.display='none';return;}
   sugg.style.display='block';
   // Store matches in global for onclick access
   window._exMatches = matches;
-  sugg.innerHTML=matches.map((e,i)=>`
-    <div onclick="selectExerciseByIndex(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s" onmouseover="this.style.background='rgba(212,245,60,.06)'" onmouseout="this.style.background='none'">
-      <div style="font-size:12px;font-weight:500;color:var(--text)">${e.name}</div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.muscle}</div>
+  sugg.innerHTML=(ranked?`<div style="padding:7px 14px;font-size:10px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em">${region.label} · önerilen sıra</div>`:'')+matches.map((e,i)=>`
+    <div onclick="selectExerciseByIndex(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;display:flex;gap:8px;align-items:baseline" onmouseover="this.style.background='rgba(212,245,60,.06)'" onmouseout="this.style.background='none'">
+      ${ranked?`<span style="font-size:10px;color:var(--acc);font-weight:700;flex:0 0 auto">${i+1}.</span>`:''}
+      <div><div style="font-size:12px;font-weight:500;color:var(--text)">${e.name}</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.muscle}</div></div>
     </div>`).join('');
 }
 
