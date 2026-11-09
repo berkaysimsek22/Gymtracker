@@ -1642,20 +1642,41 @@ async function computeAutoWorkoutKcal(uid){
 // Kullanici kalem ikonuyla ELLE duzenlediyse (activity_type 'workout_auto_edited'
 // olur) bir daha UZERINE YAZILMAZ - kendi girdigi deger kalici kalir, silip
 // tekrar set isaretlemedikce (bkz. asagi) otomatik hesaba donmez.
-async function syncAutoWorkoutKcal(uid){
+//
+// renderDashCalCard birden fazla yerden (ve bazen art arda, await'siz)
+// cagrildigi icin, bu fonksiyon es zamanli iki kez calisirsa ikisi de
+// "mevcut satir yok" gorup AYRI AYRI insert edebiliyordu - ayni gun icin
+// birden fazla "Antrenman (otomatik)" satiri birikmesinin kok sebebi buydu
+// (workout_sets'teki ayni turden yarış durumuyla birebir ayni desen, bkz.
+// queuedPerformSetSave). Cagrilar artik kullanici basina SIRAYLA calisiyor
+// (_syncAutoWorkoutKcalChain), VE calisirken halihazirda birikmis fazla
+// 'workout_auto' satirlari varsa kendiliginden temizleniyor.
+let _syncAutoWorkoutKcalChain = {};
+function syncAutoWorkoutKcal(uid){
+  const prev = _syncAutoWorkoutKcalChain[uid] || Promise.resolve();
+  const next = prev.then(()=>_syncAutoWorkoutKcalImpl(uid)).catch(e=>console.error('syncAutoWorkoutKcal error:', e));
+  _syncAutoWorkoutKcalChain[uid] = next;
+  return next;
+}
+async function _syncAutoWorkoutKcalImpl(uid){
   const {kcal, sets, durationMin} = await computeAutoWorkoutKcal(uid);
   const {data: existing} = await sb.from('activity_logs').select('*').eq('user_id', uid).eq('date', todayStr()).in('activity_type', ['workout_auto','workout_auto_edited']);
-  const editedRow = (existing||[]).find(a=>a.activity_type==='workout_auto_edited');
-  if(editedRow) return;
-  const autoRow = (existing||[]).find(a=>a.activity_type==='workout_auto');
-  if(!sets){
-    if(autoRow) await sb.from('activity_logs').delete().eq('id', autoRow.id);
+  const rows = existing||[];
+  const editedRow = rows.find(a=>a.activity_type==='workout_auto_edited');
+  if(editedRow){
+    // Elle duzenlenmis satir kalici - ama onceki yaris durumundan kalma
+    // fazladan 'workout_auto' kopyalari varsa onlari temizle.
+    const extras = rows.filter(a=>a.id!==editedRow.id);
+    if(extras.length) await sb.from('activity_logs').delete().in('id', extras.map(a=>a.id));
     return;
   }
-  if(autoRow){
-    if(Math.round(parseFloat(autoRow.kcal_burned))===kcal && Math.round(parseFloat(autoRow.duration_min))===durationMin) return;
-    await sb.from('activity_logs').delete().eq('id', autoRow.id);
+  const autoRows = rows.filter(a=>a.activity_type==='workout_auto');
+  if(!sets){
+    if(autoRows.length) await sb.from('activity_logs').delete().in('id', autoRows.map(a=>a.id));
+    return;
   }
+  if(autoRows.length===1 && Math.round(parseFloat(autoRows[0].kcal_burned))===kcal && Math.round(parseFloat(autoRows[0].duration_min))===durationMin) return;
+  if(autoRows.length) await sb.from('activity_logs').delete().in('id', autoRows.map(a=>a.id));
   await sb.from('activity_logs').insert({user_id:uid, date:todayStr(), activity_type:'workout_auto', duration_min:durationMin, kcal_burned:kcal});
 }
 async function editAutoWorkoutKcal(id, currentKcal){
@@ -1958,8 +1979,10 @@ async function renderDashCalCard(){
   let color = 'var(--muted)', caption = '';
   if(kalan!==null){
     if(dir==='bulk'){
-      color = kalan>=0 ? '#34d399' : '#ff5c38';
-      caption = kalan>=0 ? `daha ${kalan} kcal ye` : `${Math.abs(kalan)} kcal aştın`;
+      // Bulk'ta hedefi aşmak kötü değil - fazla kalori kas gelişimini
+      // destekler, bu yüzden aşım da yeşil/pozitif gösteriliyor (kırmızı değil).
+      color = '#34d399';
+      caption = kalan>=0 ? `daha ${kalan} kcal ye` : `${Math.abs(kalan)} kcal fazla aldın, bulk için iyi`;
     } else if(dir==='cut'){
       color = kalan<=0 ? '#34d399' : '#f97316';
       caption = kalan<=0 ? 'hedefe ulaştın' : `${kalan} kcal kaldı`;
@@ -3485,6 +3508,11 @@ async function toggleSet(uid,di,ei,si,rs){
     if(mp){ mp.textContent=`${doneAfterRevert}/${ex.sets}`; mp.className=`meta-pill${doneAfterRevert===ex.sets?' done-pill':''}`; }
     doneAfterRevert===ex.sets?document.getElementById(`ec_${di}_${ei}`)?.classList.add('completed'):document.getElementById(`ec_${di}_${ei}`)?.classList.remove('completed');
     renderDayTabs();
+  } else if(newDone){
+    // Bu seti isaretlemek gunun SON eksik setiyse, "Günü Tamamla"ya elle
+    // basmayi beklemeden otomatik tetikle (zamanlayiciyi durdurup suresini
+    // kaydetmek dahil - finishDay zaten bunu yapiyor).
+    await autoFinishIfAllSetsDone(uid, di);
   }
 }
 
@@ -3830,13 +3858,13 @@ function isDayDoneThisWeek(dayName, di){
   return sessionCache.some(s=>s.day_name===dayName && localDateStr(new Date(s.logged_at))===targetKey);
 }
 
-function confirmFinishDay(di){
+// confirmFinishDay (elle) VE autoFinishIfAllSetsDone (otomatik) tarafindan
+// ortak kullanilan hesaplama: toplam tamamlanan set, hacim, ve agirlik/tekrar
+// girilmeden isaretlenmis ("atlandı") setler.
+function computeFinishDayStats(di){
   const prog=activeProgram()[di];
   const uid=activeProfile()?.id;
   let sets=0,vol=0;
-  // "Atlandı": kullanici seti isaretlemis (done) ama agirlik VEYA tekrar
-  // hic girmemis - bu setler hacme dahil edilmiyor, gunu tamamlamadan once
-  // ayrica uyariliyor (bkz. asagidaki confirm).
   const skipped=[];
   prog.exercises.forEach((ex,ei)=>{
     for(let s=0;s<ex.sets;s++){
@@ -3847,6 +3875,40 @@ function confirmFinishDay(di){
       vol+=parseFloat(d.weight||0)*parseInt(d.reps?.split(/[-,]/)[0]||ex.reps.split(/[-,]/)[0]||10);
     }
   });
+  return {sets, vol, skipped};
+}
+
+// Antrenman sirasinda bir setin isaretlenmesi gunun TUM setlerini
+// tamamliyorsa (yani son eksik set buysa), "Günü Tamamla" butonuna elle
+// basmayi beklemeden otomatik tetikler - zamanlayiciyi durdurup suresini
+// kaydetmek dahil (finishDay zaten yapiyor). Sadece normal (tip 'full')
+// gunlerde calisir; AMRAP/HIIT gunlerinin kendi tamamlama akisi var.
+// isDayDoneThisWeek kontrolu sayesinde bir kez tetiklendikten sonra (ör.
+// kullanici bir seti acip tekrar isaretlerse) tekrar tetiklenmez.
+async function autoFinishIfAllSetsDone(uid, di){
+  const prog = activeProgram()?.[di];
+  if(!prog || prog.type!=='full' || !prog.exercises || !prog.exercises.length) return;
+  if(isDayDoneThisWeek(prog.name, di)) return;
+  const allDone = prog.exercises.every((ex,ei)=>{
+    if(!ex.sets) return false;
+    for(let s=0;s<ex.sets;s++){ if(!setCache[`${uid}_${di}_${ei}_${s}`]?.done) return false; }
+    return true;
+  });
+  if(!allDone) return;
+  const {sets, vol, skipped} = computeFinishDayStats(di);
+  if(!sets) return;
+  if(skipped.length){
+    const byEx={};
+    skipped.forEach(sk=>{byEx[sk.exercise]=(byEx[sk.exercise]||0)+1;});
+    const summary=Object.entries(byEx).map(([name,c])=>`${name} (${c} set)`).join(', ');
+    if(!confirm(`Tüm setleri işaretledin! ${summary} atlandı (ağırlık/tekrar girilmedi) - yine de günü tamamlamak istiyor musun?`)) return;
+  }
+  await finishDay(di, sets, Math.round(vol), skipped.length?skipped:null);
+}
+
+function confirmFinishDay(di){
+  const prog=activeProgram()[di];
+  const {sets, vol, skipped} = computeFinishDayStats(di);
   if(skipped.length){
     const byEx={};
     skipped.forEach(sk=>{byEx[sk.exercise]=(byEx[sk.exercise]||0)+1;});
