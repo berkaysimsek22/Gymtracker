@@ -5282,52 +5282,52 @@ function _woExDetailed(name, muscle, warmup, setsDef, restSec, tip){
 const POPULAR_SPLITS = [
   {id:'full_body', name:'Full Body', days:3, tagline:'Her antrenmanda tüm vücut — başlangıç/orta seviye için en verimli frekans.',
     schedule:[
-      {name:'Full Body A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Squat','Quad · Glute',3,'8-10',120),_woEx('Bench Press','Göğüs',3,'8-10',120),_woEx('Barbell Row','Sırt',3,'8-10',90),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Plank','Karın',3,'45sn',60)]},
+      {name:'Full Body A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Squat','Quad · Glute',3,'8-10',120),_woEx('Incline Bench Press','Göğüs (Üst)',3,'8-10',120),_woEx('Seated Row','Sırt',3,'8-10',90),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Plank','Karın',3,'45sn',60)]},
       {name:'Dinlenme',type:'rest',day:'Salı',warmup:null,exercises:[]},
-      {name:'Full Body B',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Incline DB Press','Göğüs',3,'10-12',90),_woEx('Lat Pulldown','Sırt',3,'10-12',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'15',60)]},
+      {name:'Full Body B',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Flat Bench Press','Göğüs',3,'10-12',90),_woEx('Pull-Up','Sırt',3,'10-12',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'15',60)]},
       {name:'Dinlenme',type:'rest',day:'Perşembe',warmup:null,exercises:[]},
-      {name:'Full Body A',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Squat','Quad · Glute',3,'8-10',120),_woEx('Bench Press','Göğüs',3,'8-10',120),_woEx('Barbell Row','Sırt',3,'8-10',90),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Plank','Karın',3,'45sn',60)]},
+      {name:'Full Body A',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Squat','Quad · Glute',3,'8-10',120),_woEx('Incline Bench Press','Göğüs (Üst)',3,'8-10',120),_woEx('Seated Row','Sırt',3,'8-10',90),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Plank','Karın',3,'45sn',60)]},
       {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'ppl_x2', name:'Push / Pull / Legs', days:6, tagline:'İtiş, çekiş ve bacak günleri haftada 2x — hacim ve kas gelişimi için klasik.',
     schedule:[
-      {name:'Push A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Bench Press','Göğüs',4,'6-8',120),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Incline DB Press','Göğüs',3,'8-12',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Triceps Pushdown','Triceps',3,'10-15',60)]},
-      {name:'Pull A',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Deadlift','Sırt · Hamstring',4,'5-8',150),_woEx('Pull-Up','Sırt',3,'AMRAP',90),_woEx('Barbell Row','Sırt',3,'8-10',90),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Barbell Curl','Biceps',3,'10-12',60)]},
-      {name:'Legs A',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'6-8',150),_woEx('Romanian Deadlift','Hamstring',3,'8-10',120),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Leg Curl','Hamstring',3,'10-15',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
-      {name:'Push B',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Incline Barbell Press','Göğüs (Üst)',4,'8-10',120),_woEx('DB Shoulder Press','Omuz',3,'8-12',90),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Lateral Raise','Omuz',3,'15',60),_woEx('Rope Pushdown','Triceps',3,'12-15',45)]},
-      {name:'Pull B',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Weighted Pull-Up','Sırt',4,'6-10',120),_woEx('T-Bar Row','Sırt',3,'8-10',90),_woEx('Lat Pulldown','Sırt',3,'10-12',90),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Preacher Curl','Biceps',3,'10-12',60)]},
-      {name:'Legs B',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Front Squat','Quad',4,'8-10',120),_woEx('Leg Extension','Quad',3,'12-15',60),_woEx('Walking Lunge','Glute · Quad',3,'12',60),_woEx('Seated Leg Curl','Hamstring',3,'12-15',60),_woEx('Standing Calf Raise','Baldır',4,'15',45)]},
+      {name:'Push A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Incline Bench Press','Göğüs (Üst)',4,'6-8',120),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Flat Bench Press','Göğüs',3,'8-12',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Overhead Triceps Extension','Triceps',3,'10-15',60)]},
+      {name:'Pull A',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Deadlift','Sırt · Hamstring',4,'5-8',150),_woEx('Pull-Up','Sırt',3,'AMRAP',90),_woEx('Seated Row','Sırt',3,'8-10',90),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Barbell Curl','Biceps',3,'10-12',60)]},
+      {name:'Legs A',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'6-8',150),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Front Squat','Quad',3,'10-12',90),_woEx('Seated Leg Curl','Hamstring',3,'10-15',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
+      {name:'Push B',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Cable Fly','Göğüs',4,'8-10',120),_woEx('Shoulder Press','Omuz',3,'8-12',90),_woEx('Dumbbell Fly','Göğüs',3,'12-15',60),_woEx('Cable Lateral Raise','Omuz',3,'15',60),_woEx('Tricep Pushdown','Triceps',3,'12-15',45)]},
+      {name:'Pull B',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Chin-Up','Sırt · Biceps',4,'6-10',120),_woEx('Chest Supported Row','Sırt',3,'8-10',90),_woEx('Lat Pulldown','Sırt',3,'10-12',90),_woEx('Reverse Pec Deck','Omuz (Arka)',3,'15-20',60),_woEx('Incline DB Curl','Biceps',3,'10-12',60)]},
+      {name:'Legs B',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Leg Press','Quad',4,'8-10',120),_woEx('Leg Extension','Quad',3,'12-15',60),_woEx('Walking Lunge','Glute · Quad',3,'12',60),_woEx('Lying Leg Curl','Hamstring',3,'12-15',60),_woEx('Seated Calf Raise','Baldır',4,'15',45)]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'upper_lower', name:'Upper / Lower', days:4, tagline:'Üst/alt vücut ayrımı, haftada 2x tekrar — güç ve hacim dengesi.',
     schedule:[
-      {name:'Upper A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Bench Press','Göğüs',4,'6-8',120),_woEx('Barbell Row','Sırt',4,'6-8',120),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Lat Pulldown','Sırt',3,'10-12',90),_woEx('Barbell Curl','Biceps',3,'10-12',60),_woEx('Triceps Pushdown','Triceps',3,'10-12',60)]},
-      {name:'Lower A',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'6-8',150),_woEx('Romanian Deadlift','Hamstring',3,'8-10',120),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Leg Curl','Hamstring',3,'10-12',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
+      {name:'Upper A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Incline Bench Press','Göğüs (Üst)',4,'6-8',120),_woEx('Seated Row','Sırt',4,'6-8',120),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Pull-Up','Sırt',3,'10-12',90),_woEx('Barbell Curl','Biceps',3,'10-12',60),_woEx('Overhead Triceps Extension','Triceps',3,'10-12',60)]},
+      {name:'Lower A',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'6-8',150),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Front Squat','Quad',3,'10-12',90),_woEx('Seated Leg Curl','Hamstring',3,'10-12',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
       {name:'Dinlenme',type:'rest',day:'Çarşamba',warmup:null,exercises:[]},
-      {name:'Upper B',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Incline DB Press','Göğüs',4,'8-12',90),_woEx('Pull-Up','Sırt',4,'AMRAP',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Cable Row','Sırt',3,'10-12',90),_woEx('Hammer Curl','Biceps',3,'10-12',60),_woEx('Overhead Triceps Extension','Triceps',3,'10-12',60)]},
-      {name:'Lower B',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Deadlift','Hamstring · Sırt',4,'5-8',150),_woEx('Front Squat','Quad',3,'8-10',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Seated Leg Curl','Hamstring',3,'10-12',60),_woEx('Standing Calf Raise','Baldır',4,'12-15',45)]},
+      {name:'Upper B',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Flat Bench Press','Göğüs',4,'8-12',90),_woEx('Chin-Up','Sırt · Biceps',4,'AMRAP',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Chest Supported Row','Sırt',3,'10-12',90),_woEx('Incline DB Curl','Biceps',3,'10-12',60),_woEx('Tricep Pushdown','Triceps',3,'10-12',60)]},
+      {name:'Lower B',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Deadlift','Hamstring · Sırt',4,'5-8',150),_woEx('Leg Press','Quad',3,'8-10',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Lying Leg Curl','Hamstring',3,'10-12',60),_woEx('Seated Calf Raise','Baldır',4,'12-15',45)]},
       {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'bro_split', name:'Bro Split', days:5, tagline:'Her gün ayrı bir kas grubu — bodybuilding\'in en klasik programı.',
     schedule:[
-      {name:'Göğüs',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Bench Press','Göğüs',4,'8-10',120),_woEx('Incline DB Press','Göğüs (Üst)',3,'8-12',90),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Dip','Göğüs · Triceps',3,'AMRAP',90),_woEx('Push Up','Göğüs',2,'AMRAP',60)]},
-      {name:'Sırt',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Deadlift','Sırt · Hamstring',4,'6-8',150),_woEx('Pull-Up','Sırt',3,'AMRAP',90),_woEx('Barbell Row','Sırt',3,'8-10',90),_woEx('Lat Pulldown','Sırt',3,'10-12',90),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60)]},
-      {name:'Bacak',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'8-10',150),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Romanian Deadlift','Hamstring',3,'8-10',120),_woEx('Leg Extension','Quad',3,'12-15',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
-      {name:'Omuz',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Overhead Press','Omuz',4,'8-10',120),_woEx('Lateral Raise','Omuz',4,'12-15',60),_woEx('Rear Delt Fly','Omuz (Arka)',3,'15',60),_woEx('Front Raise','Omuz (Ön)',3,'12-15',60),_woEx('Shrug','Trapez',3,'12-15',60)]},
-      {name:'Kol',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Barbell Curl','Biceps',4,'10-12',60),_woEx('Hammer Curl','Biceps',3,'10-12',60),_woEx('Close Grip Bench','Triceps',3,'8-10',90),_woEx('Triceps Pushdown','Triceps',3,'10-15',45),_woEx('Preacher Curl','Biceps',3,'10-12',60)]},
+      {name:'Göğüs',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Incline Bench Press','Göğüs (Üst)',4,'8-10',120),_woEx('Flat Bench Press','Göğüs',3,'8-12',90),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Dumbbell Fly','Göğüs',3,'AMRAP',90),_woEx('Push Up','Göğüs',2,'AMRAP',60)]},
+      {name:'Sırt',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Deadlift','Sırt · Hamstring',4,'6-8',150),_woEx('Pull-Up','Sırt',3,'AMRAP',90),_woEx('Seated Row','Sırt',3,'8-10',90),_woEx('Chin-Up','Sırt · Biceps',3,'10-12',90),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60)]},
+      {name:'Bacak',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'8-10',150),_woEx('Front Squat','Quad',3,'10-12',90),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Leg Press','Quad',3,'12-15',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
+      {name:'Omuz',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Overhead Press','Omuz',4,'8-10',120),_woEx('Lateral Raise','Omuz',4,'12-15',60),_woEx('Reverse Pec Deck','Omuz (Arka)',3,'15',60),_woEx('Front Raise','Omuz (Ön)',3,'12-15',60),_woEx('Shrug','Trapez',3,'12-15',60)]},
+      {name:'Kol',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Barbell Curl','Biceps',4,'10-12',60),_woEx('Incline DB Curl','Biceps',3,'10-12',60),_woEx('Overhead Triceps Extension','Triceps',3,'8-10',90),_woEx('Tricep Pushdown','Triceps',3,'10-15',45),_woEx('Hammer Curl','Biceps',3,'10-12',60)]},
       {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'arnold', name:'Arnold Split', days:6, tagline:'Arnold Schwarzenegger\'in klasik programı: Göğüs&Sırt / Omuz&Kol / Bacak, x2.',
     schedule:[
-      {name:'Göğüs & Sırt',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Bench Press','Göğüs',4,'8-10',120),_woEx('Barbell Row','Sırt',4,'8-10',120),_woEx('Incline DB Press','Göğüs',3,'10-12',90),_woEx('Pull-Up','Sırt',3,'AMRAP',90),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60)]},
-      {name:'Omuz & Kol',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Overhead Press','Omuz',4,'8-10',120),_woEx('Barbell Curl','Biceps',3,'10-12',60),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Close Grip Bench','Triceps',3,'8-10',90),_woEx('Front Raise','Omuz (Ön)',3,'12-15',60),_woEx('Hammer Curl','Biceps',3,'10-12',60)]},
-      {name:'Bacak',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'8-10',150),_woEx('Romanian Deadlift','Hamstring',3,'8-10',120),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Leg Curl','Hamstring',3,'10-12',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
-      {name:'Göğüs & Sırt',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Incline Barbell Press','Göğüs (Üst)',4,'8-12',90),_woEx('T-Bar Row','Sırt',4,'8-12',90),_woEx('Dip','Göğüs · Triceps',3,'AMRAP',90),_woEx('Lat Pulldown','Sırt',3,'10-12',90),_woEx('Cable Row','Sırt',3,'10-12',90),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60)]},
-      {name:'Omuz & Kol',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('DB Shoulder Press','Omuz',4,'8-12',90),_woEx('Preacher Curl','Biceps',3,'10-12',60),_woEx('Cable Lateral Raise','Omuz',3,'12-15',60),_woEx('Rope Pushdown','Triceps',3,'12-15',45),_woEx('Rear Delt Fly','Omuz (Arka)',3,'15',60),_woEx('Reverse Curl','Ön Kol',3,'12-15',60)]},
-      {name:'Bacak',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Front Squat','Quad',4,'8-10',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Leg Extension','Quad',3,'12-15',60),_woEx('Seated Leg Curl','Hamstring',3,'12-15',60),_woEx('Standing Calf Raise','Baldır',4,'15',45)]},
+      {name:'Göğüs & Sırt',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Incline Bench Press','Göğüs (Üst)',4,'8-10',120),_woEx('Seated Row','Sırt',4,'8-10',120),_woEx('Flat Bench Press','Göğüs',3,'10-12',90),_woEx('Pull-Up','Sırt',3,'AMRAP',90),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60)]},
+      {name:'Omuz & Kol',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Overhead Press','Omuz',4,'8-10',120),_woEx('Barbell Curl','Biceps',3,'10-12',60),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Overhead Triceps Extension','Triceps',3,'8-10',90),_woEx('Front Raise','Omuz (Ön)',3,'12-15',60),_woEx('Incline DB Curl','Biceps',3,'10-12',60)]},
+      {name:'Bacak',type:'full',day:'Çarşamba',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'8-10',150),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Front Squat','Quad',3,'10-12',90),_woEx('Seated Leg Curl','Hamstring',3,'10-12',60),_woEx('Calf Raise','Baldır',4,'12-15',45)]},
+      {name:'Göğüs & Sırt',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Dumbbell Fly','Göğüs',4,'8-12',90),_woEx('Chest Supported Row','Sırt',4,'8-12',90),_woEx('Dip','Göğüs · Triceps',3,'AMRAP',90),_woEx('Chin-Up','Sırt · Biceps',3,'10-12',90),_woEx('Cable Row','Sırt',3,'10-12',90),_woEx('Reverse Pec Deck','Omuz (Arka)',3,'15-20',60)]},
+      {name:'Omuz & Kol',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Shoulder Press','Omuz',4,'8-12',90),_woEx('Hammer Curl','Biceps',3,'10-12',60),_woEx('Cable Lateral Raise','Omuz',3,'12-15',60),_woEx('Tricep Pushdown','Triceps',3,'12-15',45),_woEx('Face Pull','Omuz (Arka)',3,'15',60),_woEx('Reverse Curl','Ön Kol',3,'12-15',60)]},
+      {name:'Bacak',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Leg Press','Quad',4,'8-10',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Leg Extension','Quad',3,'12-15',60),_woEx('Lying Leg Curl','Hamstring',3,'12-15',60),_woEx('Seated Calf Raise','Baldır',4,'15',45)]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'phul', name:'PHUL', days:4, tagline:'Power Hypertrophy Upper Lower — bir gün güç, bir gün hacim odaklı.',
@@ -5335,8 +5335,8 @@ const POPULAR_SPLITS = [
       {name:'Upper Power',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Bench Press','Göğüs',5,'3-5',150),_woEx('Barbell Row','Sırt',5,'3-5',150),_woEx('Overhead Press','Omuz',3,'6-8',120),_woEx('Lat Pulldown','Sırt',3,'6-8',90),_woEx('Barbell Curl','Biceps',3,'8-10',60)]},
       {name:'Lower Power',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Squat','Quad · Glute',5,'3-5',180),_woEx('Deadlift','Hamstring · Sırt',3,'3-5',180),_woEx('Leg Press','Quad',3,'8-10',90),_woEx('Leg Curl','Hamstring',3,'8-10',60),_woEx('Calf Raise','Baldır',4,'8-10',45)]},
       {name:'Dinlenme',type:'rest',day:'Çarşamba',warmup:null,exercises:[]},
-      {name:'Upper Hypertrophy',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Incline DB Press','Göğüs',3,'8-12',90),_woEx('Cable Row','Sırt',3,'8-12',90),_woEx('Lateral Raise','Omuz',3,'10-15',60),_woEx('Face Pull','Omuz (Arka)',3,'12-15',60),_woEx('Hammer Curl','Biceps',3,'8-12',60),_woEx('Triceps Pushdown','Triceps',3,'8-12',60)]},
-      {name:'Lower Hypertrophy',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Front Squat','Quad',3,'8-12',90),_woEx('Romanian Deadlift','Hamstring',3,'8-12',90),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Seated Leg Curl','Hamstring',3,'10-12',60),_woEx('Standing Calf Raise','Baldır',3,'12-15',45)]},
+      {name:'Upper Hypertrophy',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Incline Bench Press','Göğüs (Üst)',3,'8-12',90),_woEx('Seated Row','Sırt',3,'8-12',90),_woEx('Lateral Raise','Omuz',3,'10-15',60),_woEx('Face Pull','Omuz (Arka)',3,'12-15',60),_woEx('Barbell Curl','Biceps',3,'8-12',60),_woEx('Overhead Triceps Extension','Triceps',3,'8-12',60)]},
+      {name:'Lower Hypertrophy',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Squat','Quad · Glute',3,'8-12',90),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-12',90),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Seated Leg Curl','Hamstring',3,'10-12',60),_woEx('Calf Raise','Baldır',3,'12-15',45)]},
       {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
@@ -5345,9 +5345,9 @@ const POPULAR_SPLITS = [
       {name:'Upper Power',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Bench Press','Göğüs',3,'3-5',150),_woEx('Weighted Pull-Up','Sırt',3,'3-5',150),_woEx('Overhead Press','Omuz',3,'5-8',120),_woEx('Barbell Row','Sırt',3,'5-8',120),_woEx('Barbell Curl','Biceps',2,'6-8',60)]},
       {name:'Lower Power',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Squat','Quad · Glute',3,'3-5',180),_woEx('Deadlift','Hamstring · Sırt',3,'3-5',180),_woEx('Leg Press','Quad',3,'8-10',90),_woEx('Leg Curl','Hamstring',3,'8-10',60)]},
       {name:'Dinlenme',type:'rest',day:'Çarşamba',warmup:null,exercises:[]},
-      {name:'Sırt & Omuz Hipertrofi',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Lat Pulldown','Sırt',4,'8-12',90),_woEx('T-Bar Row','Sırt',3,'8-12',90),_woEx('Cable Row','Sırt',3,'10-12',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Shrug','Trapez',3,'12-15',60)]},
-      {name:'Bacak Hipertrofi',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Front Squat','Quad',4,'8-12',90),_woEx('Leg Extension','Quad',3,'12-15',60),_woEx('Romanian Deadlift','Hamstring',3,'8-12',90),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Calf Raise','Baldır',3,'12-15',45)]},
-      {name:'Göğüs & Kol Hipertrofi',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Incline DB Press','Göğüs',4,'8-12',90),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Dip','Göğüs · Triceps',3,'AMRAP',90),_woEx('Hammer Curl','Biceps',3,'8-12',60),_woEx('Preacher Curl','Biceps',3,'8-12',60),_woEx('Rope Pushdown','Triceps',3,'10-15',45)]},
+      {name:'Sırt & Omuz Hipertrofi',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Pull-Up','Sırt',4,'8-12',90),_woEx('Seated Row','Sırt',3,'8-12',90),_woEx('Chest Supported Row','Sırt',3,'10-12',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Shrug','Trapez',3,'12-15',60)]},
+      {name:'Bacak Hipertrofi',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'8-12',90),_woEx('Front Squat','Quad',3,'12-15',60),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-12',90),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Calf Raise','Baldır',3,'12-15',45)]},
+      {name:'Göğüs & Kol Hipertrofi',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Incline Bench Press','Göğüs (Üst)',4,'8-12',90),_woEx('Flat Bench Press','Göğüs',3,'12-15',60),_woEx('Overhead Triceps Extension','Triceps',3,'AMRAP',90),_woEx('Barbell Curl','Biceps',3,'8-12',60),_woEx('Incline DB Curl','Biceps',3,'8-12',60),_woEx('Tricep Pushdown','Triceps',3,'10-15',45)]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'531', name:'5/3/1 (Wendler)', days:4, tagline:'Jim Wendler\'ın kuvvet programı — 4 ana harekete odaklanır, yavaş ve istikrarlı ilerleme.',
@@ -5429,36 +5429,40 @@ function renderWoSplit(el){
 // özelliği eklendi — _woSchedule'ı doğrudan mutasyona uğratır, "🚀 Uygula"
 // o haliyle kaydeder. Uyguladıktan sonra zaten var olan gün adı düzenleme ve
 // "📊 Analizi Gör" araçları da kullanılabiliyor.
+// "Full Body" (3 günlük) üretimi bu havuzdan pozisyona göre dilim alıyor —
+// isimler, aşağıdaki CUSTOM_SPLIT_SUBGROUP_POOL ve hipertrofi POPULAR_SPLITS
+// şablonlarıyla AYNI best-practice sırasını (EXERCISE_DB kökenli) yansıtacak
+// şekilde güncellendi.
 const CUSTOM_SPLIT_POOL = {
   push: [
-    _woEx('Bench Press','Göğüs',4,'6-8',120),
-    _woEx('Incline DB Press','Göğüs',3,'8-12',90),
-    _woEx('Overhead Press','Omuz',3,'8-10',90),
+    _woEx('Incline Bench Press','Göğüs (Üst)',4,'8,8,6,6',120),
+    _woEx('Flat Bench Press','Göğüs',4,'8,8,6,6',120),
+    _woEx('Overhead Press','Omuz',4,'8,8,6,6',120),
     _woEx('Dip','Göğüs · Triceps',3,'AMRAP',90),
     _woEx('Cable Fly','Göğüs',3,'12-15',60),
-    _woEx('Lateral Raise','Omuz',3,'12-15',60),
-    _woEx('Triceps Pushdown','Triceps',3,'10-15',60),
-    _woEx('Rope Pushdown','Triceps',3,'12-15',45),
+    _woEx('Lateral Raise','Omuz',3,'15',60),
+    _woEx('Overhead Triceps Extension','Triceps',3,'12',60),
+    _woEx('Tricep Pushdown','Triceps',3,'15',60),
   ],
   pull: [
     _woEx('Deadlift','Sırt · Hamstring',4,'5-8',150),
-    _woEx('Pull-Up','Sırt',3,'AMRAP',90),
-    _woEx('Barbell Row','Sırt',3,'8-10',90),
-    _woEx('Lat Pulldown','Sırt',3,'10-12',90),
-    _woEx('Cable Row','Sırt',3,'10-12',90),
+    _woEx('Pull-Up','Sırt',4,'AMRAP',90),
+    _woEx('Seated Row','Sırt',3,'10-10-10',90),
+    _woEx('Chin-Up','Sırt · Biceps',3,'AMRAP',90),
+    _woEx('Chest Supported Row','Sırt',4,'10,10,8,8',90),
     _woEx('Face Pull','Omuz (Arka)',3,'15-20',60),
-    _woEx('Barbell Curl','Biceps',3,'10-12',60),
-    _woEx('Hammer Curl','Biceps',3,'10-12',60),
-    _woEx('Preacher Curl','Biceps',3,'10-12',60),
+    _woEx('Barbell Curl','Biceps',3,'10,10,8',60),
+    _woEx('Incline DB Curl','Biceps',3,'12',60),
+    _woEx('Hammer Curl','Biceps',3,'12',60),
   ],
   legs: [
-    _woEx('Squat','Quad · Glute',4,'6-10',150),
-    _woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),
-    _woEx('Leg Press','Quad',3,'10-12',90),
-    _woEx('Leg Curl','Hamstring',3,'10-15',60),
-    _woEx('Leg Extension','Quad',3,'12-15',60),
+    _woEx('Squat','Quad · Glute',4,'8,8,6,6',150),
+    _woEx('Romanian Deadlift','Hamstring · Glute',3,'10,8,8',90),
+    _woEx('Front Squat','Quad',4,'8,6,6',120),
+    _woEx('Seated Leg Curl','Hamstring',3,'12',60),
+    _woEx('Leg Press','Quad · Glute',4,'12,10,10',90),
     _woEx('Walking Lunge','Glute · Quad',3,'10-12',60),
-    _woEx('Calf Raise','Baldır',4,'12-15',45),
+    _woEx('Calf Raise','Baldır',4,'15',45),
   ],
   core: [
     _woEx('Plank','Karın',3,'45sn',60),
@@ -5488,19 +5492,23 @@ function _customSplitPick(pool, start, count){
 // practice sıralı havuz var; hedef HAREKET SAYISI (sete değil, üç setlik
 // hareket sayısına göre) hesaplanıp o alt grubun uygun günlerine round-robin
 // dağıtılıyor — böylece her alt grup haftada en az birkaç kez temsil ediliyor.
+// Bu havuzlar artık EXERCISE_DB'deki aynı best-practice sıralamadan (bkz.
+// filterExercises'teki bölge araması) birebir besleniyor — uydurma isimler
+// yok (ör. eski "Arnold Press"/"Leaning Lateral Raise" kaldırıldı), hepsi
+// EXERCISE_DB'de gerçekten var olan hareketler, aynı sırayla.
 const CUSTOM_SPLIT_SUBGROUP_POOL = {
-  chest: [_woEx('Bench Press','Göğüs',4,'6-8',120),_woEx('Incline DB Press','Göğüs',3,'8-12',90),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Dip','Göğüs · Triceps',3,'AMRAP',90)],
-  lat: [_woEx('Pull-Up','Sırt',3,'AMRAP',90),_woEx('Lat Pulldown','Sırt',3,'10-12',90),_woEx('Weighted Pull-Up','Sırt',3,'6-10',120),_woEx('Chin-Up','Sırt',3,'AMRAP',90)],
-  rhomboid: [_woEx('Barbell Row','Sırt',3,'8-10',90),_woEx('Cable Row','Sırt',3,'10-12',90),_woEx('T-Bar Row','Sırt',3,'8-10',90),_woEx('Chest Supported Row','Sırt',3,'10-12',90)],
-  front_delt: [_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('DB Shoulder Press','Omuz',3,'8-12',90),_woEx('Seated DB Shoulder Press','Omuz',3,'10-12',90),_woEx('Arnold Press','Omuz',3,'10-12',90)],
-  side_delt: [_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Cable Lateral Raise','Omuz',3,'15-20',60),_woEx('Leaning Lateral Raise','Omuz',3,'12-15',60),_woEx('Machine Lateral Raise','Omuz',3,'15',60)],
-  rear_delt: [_woEx('Face Pull','Omuz',3,'15-20',60),_woEx('Rear Delt Fly','Omuz',3,'15',60),_woEx('Reverse Pec Deck','Omuz',3,'15',60),_woEx('Reverse Fly','Omuz',3,'15',60)],
-  biceps: [_woEx('Barbell Curl','Biceps',3,'10-12',60),_woEx('Hammer Curl','Biceps',3,'10-12',60),_woEx('Preacher Curl','Biceps',3,'10-12',60),_woEx('Incline DB Curl','Biceps',3,'12',60)],
-  triceps: [_woEx('Triceps Pushdown','Triceps',3,'10-15',60),_woEx('Rope Pushdown','Triceps',3,'12-15',45),_woEx('Overhead Triceps Extension','Triceps',3,'10-12',60),_woEx('Close Grip Bench','Göğüs · Triceps',3,'8-10',90)],
-  quad: [_woEx('Squat','Quad · Glute',4,'6-10',150),_woEx('Front Squat','Quad',3,'8-10',120),_woEx('Leg Press','Quad · Glute',3,'10-12',90),_woEx('Leg Extension','Quad',3,'12-15',60)],
-  hamstring: [_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Leg Curl','Hamstring',3,'10-15',60),_woEx('Seated Leg Curl','Hamstring',3,'10-15',60),_woEx('Good Morning','Hamstring · Glute',3,'10',90)],
-  glute: [_woEx('Hip Thrust','Glute',3,'10-12',90),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Bulgarian Split Squat','Glute · Quad',3,'10',90)],
-  calves: [_woEx('Calf Raise','Baldır',4,'12-15',45),_woEx('Standing Calf Raise','Baldır',4,'15',45),_woEx('Seated Calf Raise','Baldır',3,'15',45)],
+  chest: [_woEx('Incline Bench Press','Göğüs (Üst)',4,'8,8,6,6',120),_woEx('Flat Bench Press','Göğüs',4,'8,8,6,6',120),_woEx('Cable Fly','Göğüs',3,'12-15',60),_woEx('Dumbbell Fly','Göğüs',3,'12',60)],
+  lat: [_woEx('Pull-Up','Sırt',4,'AMRAP',90),_woEx('Chin-Up','Sırt · Biceps',3,'AMRAP',90),_woEx('Lat Pulldown','Sırt',3,'12',90),_woEx('Straight Arm Pushdown','Sırt',3,'15',60)],
+  rhomboid: [_woEx('Seated Row','Sırt',3,'10-10-10',90),_woEx('Chest Supported Row','Sırt',4,'10,10,8,8',90),_woEx('Cable Row','Sırt',3,'12',90),_woEx('Barbell Row','Sırt',4,'8,8,6',120)],
+  front_delt: [_woEx('Overhead Press','Omuz',4,'8,8,6,6',120),_woEx('Shoulder Press','Omuz',3,'12,10,8',90),_woEx('Seated DB Shoulder Press','Omuz',4,'10-12',90)],
+  side_delt: [_woEx('Lateral Raise','Omuz',3,'15',60),_woEx('Cable Lateral Raise','Omuz',4,'15-20',60)],
+  rear_delt: [_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Reverse Pec Deck','Omuz (Arka)',3,'15',60)],
+  biceps: [_woEx('Barbell Curl','Biceps',3,'10,10,8',60),_woEx('Incline DB Curl','Biceps',3,'12',60),_woEx('Hammer Curl','Biceps',3,'12',60),_woEx('Preacher Curl','Biceps',3,'12',60)],
+  triceps: [_woEx('Overhead Triceps Extension','Triceps',3,'12',60),_woEx('Tricep Pushdown','Triceps',3,'15',60),_woEx('JM Press','Triceps',3,'10',90),_woEx('Close Grip Bench','Triceps · Göğüs',3,'10',90)],
+  quad: [_woEx('Squat','Quad · Glute',4,'8,8,6,6',150),_woEx('Front Squat','Quad',4,'8,6,6',120),_woEx('Leg Press','Quad · Glute',4,'12,10,10',90),_woEx('Leg Extension','Quad',3,'15',60)],
+  hamstring: [_woEx('Romanian Deadlift','Hamstring · Glute',3,'10,8,8',90),_woEx('Seated Leg Curl','Hamstring',3,'12',60),_woEx('Lying Leg Curl','Hamstring',3,'12',60),_woEx('Good Morning','Hamstring · Glute',3,'10',90)],
+  glute: [_woEx('Hip Thrust','Glute',4,'12-10-8-6',120),_woEx('Walking Lunge','Glute · Quad',3,'12',60),_woEx('Bulgarian Split Squat','Glute · Quad',3,'10,8',90)],
+  calves: [_woEx('Calf Raise','Baldır',4,'15',45),_woEx('Seated Calf Raise','Baldır',4,'15',45),_woEx('Standing Calf Raise','Baldır',4,'15',45)],
 };
 const CUSTOM_SPLIT_UPPER_SUBGROUPS = ['chest','lat','rhomboid','front_delt','side_delt','rear_delt','biceps','triceps'];
 const CUSTOM_SPLIT_LOWER_SUBGROUPS = ['quad','hamstring','glute','calves'];
@@ -5521,7 +5529,13 @@ function _customSplitAllocate(subgroups, dayIdxs, targetTotal, daySlots){
     const k = cursor[sg]||0; cursor[sg]=k+1;
     const dayIdx = dayIdxs[k % dayIdxs.length];
     const pool = CUSTOM_SPLIT_SUBGROUP_POOL[sg];
-    daySlots[dayIdx].push(dc(pool[k % pool.length]));
+    const usedNames = new Set(daySlots[dayIdx].map(e=>e.name));
+    // havuz kısa, gün sayısı periyoduyla çakışırsa (ör. 2 hareketlik havuz +
+    // 2 günlük döngü) aynı güne aynı hareket ikinci kez düşebilir - bulana
+    // kadar bir sonraki havuz indeksini dene.
+    let poolIdx = k % pool.length, tries = 0;
+    while(usedNames.has(pool[poolIdx].name) && tries < pool.length){ poolIdx = (poolIdx+1) % pool.length; tries++; }
+    daySlots[dayIdx].push(dc(pool[poolIdx]));
   }
 }
 
