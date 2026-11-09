@@ -5764,6 +5764,23 @@ function showWoDayDetail(i){
 // yoğunluğunu AYNI ekranda canlı görebilsin diye — computeMuscleSets zaten
 // _woSchedule üzerinden çalışıyor, her ekle/sil sonrası showWoDayDetail
 // yeniden render edildiğinde bu da güncelleniyor.
+// Gerçek süre session_logs.duration_sec'te tutuluyor ama YENİ/önizlenen bir
+// şablonun henüz hiç geçmişi yok - bu yüzden set sayısı + dinlenme süresinden
+// kaba bir TAHMİN çıkarıyoruz (set başına ~35sn fiili çalışma + sabit ~5dk
+// ısınma/geçiş payı). Kesin değil, sadece "bu gün ne kadar sürer" fikri versin diye.
+const EST_SEC_PER_SET = 35;
+const EST_WARMUP_OVERHEAD_SEC = 300;
+function estimateDaySeconds(day){
+  if(!day || day.type!=='full') return 0;
+  return (day.exercises||[]).reduce((s,e)=> s + (e.sets||0)*((e.restSec||60)+EST_SEC_PER_SET), 0) + EST_WARMUP_OVERHEAD_SEC;
+}
+function fmtEstDuration(sec){
+  const m = Math.round(sec/60);
+  if(m<60) return `~${m} dk`;
+  const h = Math.floor(m/60), mm = m%60;
+  return mm ? `~${h}sa ${mm}dk` : `~${h}sa`;
+}
+
 function renderMiniMuscleVolumeHtml(){
   if(!_woSchedule) return '';
   const vol = computeMuscleSets(_woSchedule, null);
@@ -5775,8 +5792,12 @@ function renderMiniMuscleVolumeHtml(){
       <span style="font-size:10px;color:var(--text-muted);font-weight:700">${sets}</span>
     </div>`;
   }).join('');
+  const trainingDays = _woSchedule.filter(d=>d.type==='full');
+  const avgSec = trainingDays.length ? trainingDays.reduce((s,d)=>s+estimateDaySeconds(d),0)/trainingDays.length : 0;
+  const avgRow = trainingDays.length ? `<div style="font-size:12px;color:var(--text);margin-bottom:10px">⏱️ Ortalama Antrenman Süresi: <strong style="color:var(--acc)">${fmtEstDuration(avgSec)}</strong> <span style="color:var(--text-muted);font-size:10px">(tahmini, set + dinlenme süresine göre)</span></div>` : '';
   return `<div style="margin-bottom:14px">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">📊 Haftalık Kas Yoğunluğu</div>
+    ${avgRow}
     <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
   </div>`;
 }
