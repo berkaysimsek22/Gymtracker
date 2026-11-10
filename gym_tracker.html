@@ -60,6 +60,113 @@ try{
     --card-shadow:0 2px 12px rgba(0,0,0,.08);
   }
 }
+/* ── BERQ "DARK GYM HERITAGE" — SADECE Ana Sayfa + Profil ── */
+/* Kapsam KASITLI olarak #screen-dashboard/#screen-profile ile sinirli - diger
+   her ekran (Workout, Beslenme, Workouts, İstatistik) ayni paylasilan CSS
+   degiskenlerini (var(--surface), var(--border), var(--text-muted)...) ve
+   paylasilan sinifi (.btn, .stat-card, .wday...) kullandigi icin, degiskenleri
+   SADECE bu iki ekranin icinde yeniden tanimlamak - render fonksiyonlarinin
+   HICBIRINE dokunmadan - kartlarin/butonlarin/baslik yazilarinin tamami
+   otomatik olarak yeni temaya gecmesini sagliyor. Marka limeti (--acc) KASITLI
+   OLARAK degistirilmedi (brief'in "keep the existing brand lime" maddesi) -
+   boylece eski ve yeni ekranlar arasinda iki farkli yesil tonu olusmuyor.
+   .wday/.week-grid gibi #weekGridWO (Workout ekrani) ile PAYLASILAN siniflar
+   kasten DOKUNULMADAN birakildi - oradaki kapsam #weekGrid (sadece Ana Sayfa)
+   ID'siyle daraltildi. */
+#screen-dashboard, #screen-profile{
+  background:#111210;
+  --bg:#111210; --bg-elev:#171812;
+  --surface:#22231F; --surface2:#241811; --surface3:#38251B;
+  --border:rgba(182,154,88,.16); --border-strong:rgba(182,154,88,.3);
+  --text:#E8E5DA; --text-sub:#929187; --text-muted:#929187; --muted:#929187;
+  --card-shadow:0 3px 18px rgba(0,0,0,.55);
+  --bq-walnut:#241811; --bq-espresso:#38251B; --bq-brass:#B69A58; --bq-olive:#858653;
+}
+/* Cok hafif tahta damar dokusu - sadece kart yuzeylerinde, SVG turbulence ile
+   (harici dosya/kutuphane yok), opaklik cok dusuk tutuldu ("subtle"). */
+#screen-dashboard .prof-section, #screen-profile .prof-section,
+#screen-dashboard .stat-card, #screen-dashboard .bq-card{
+  position:relative;
+}
+.bq-grain::before{
+  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  opacity:.05; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+#screen-dashboard .bq-eyebrow, #screen-profile .bq-eyebrow{
+  color:var(--bq-brass); font-size:10px; text-transform:uppercase; letter-spacing:1.2px; font-weight:700;
+}
+#screen-dashboard .bq-chalk-heading, #screen-profile .bq-chalk-heading{
+  font-family:'Bebas Neue',sans-serif; color:var(--text); letter-spacing:.5px;
+  text-shadow:0 0 1px rgba(232,229,218,.35), 0 0 14px rgba(232,229,218,.08);
+}
+/* "Bu Hafta" takvimi - SADECE #weekGrid (Ana Sayfa), #weekGridWO (Workout
+   ekrani) kapsam disi birakildi. */
+#weekGrid.week-grid .wday{ background:var(--bq-walnut); border-color:var(--border); }
+#weekGrid.week-grid .wday.today{ background:var(--acc-dim); border-color:var(--acc); }
+#weekGrid.week-grid .wday-dot.rest-d{ background:var(--bq-espresso); }
+/* Gunluk antrenman karatahtasi (renderDashTodayCard) */
+#dashTodayCard .bq-chalkboard{
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.12), transparent 40%),
+    var(--bq-espresso);
+  border:1px solid var(--border-strong);
+  border-radius:16px; padding:18px 18px 10px; cursor:pointer;
+  box-shadow:var(--card-shadow), inset 0 0 40px rgba(0,0,0,.35);
+}
+#dashTodayCard .bq-chalk-row{
+  position:relative; overflow:hidden;
+  display:flex; align-items:baseline; gap:10px;
+  padding:9px 2px; border-bottom:1px dashed rgba(232,229,218,.12);
+}
+#dashTodayCard .bq-chalk-row:last-child{ border-bottom:none; }
+#dashTodayCard .bq-chalk-num{ color:var(--bq-brass); font-size:12px; font-weight:700; flex:0 0 auto; width:16px; }
+#dashTodayCard .bq-chalk-name{
+  flex:1; min-width:0; color:var(--text); font-size:14px; font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  transition:opacity .6s ease;
+}
+#dashTodayCard .bq-chalk-sr{ color:var(--text-muted); font-size:12px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
+#dashTodayCard .bq-chalk-check{
+  flex:0 0 auto; width:16px; text-align:center; color:var(--acc); font-size:13px; font-weight:700;
+  opacity:0; transform:scale(.4); transition:all .4s cubic-bezier(.34,1.56,.64,1);
+}
+#dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-name{ opacity:.4; text-decoration:line-through; text-decoration-color:var(--acc); text-decoration-thickness:2px; }
+#dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-check{ opacity:1; transform:scale(1); }
+#dashTodayCard .bq-chalk-row.bq-erased::before{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent, rgba(232,229,218,.18), transparent);
+  transform:translateX(-120%); animation:bq-erase-sweep .7s ease forwards; pointer-events:none;
+}
+@keyframes bq-erase-sweep{ to{ transform:translateX(120%); } }
+@media (prefers-reduced-motion: reduce){
+  #dashTodayCard .bq-chalk-name, #dashTodayCard .bq-chalk-check{ transition:none!important; }
+  #dashTodayCard .bq-chalk-row.bq-erased::before{ animation:none!important; display:none; }
+}
+/* Acik tema secilmisse (elle ya da sistem tercihiyle) Dark Gym Heritage'in
+   kart/yuzey renkleri yerine mevcut acik temaya donulur - brief'in kapsami
+   dark bir kimlik oldugu icin acik modda walnut/chalkboard'u ZORLAMIYORUZ.
+   Gunluk antrenman karatahtasi (.bq-chalkboard) ise BILINCLI OLARAK istisna -
+   "siyah okul tahtasi" kendi basina sabit bir tasarim ogesi, acik modda da
+   koyu kalmasi amaclaniyor (brief'teki "black chalkboards" ogesiyle tutarli). */
+:root[data-theme="light"] #screen-dashboard, :root[data-theme="light"] #screen-profile{
+  background:var(--bg);
+  --surface:#ffffff; --surface2:#f0f0f0; --surface3:#e4e4e4;
+  --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
+  --text:#111111; --text-sub:#555555; --text-muted:#888888; --muted:#888888;
+  --card-shadow:0 2px 12px rgba(0,0,0,.08);
+  --bq-brass:#9a7f3f; --bq-olive:#6d6e45;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]) #screen-dashboard, :root:not([data-theme="dark"]) #screen-profile{
+    background:var(--bg);
+    --surface:#ffffff; --surface2:#f0f0f0; --surface3:#e4e4e4;
+    --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
+    --text:#111111; --text-sub:#555555; --text-muted:#888888; --muted:#888888;
+    --card-shadow:0 2px 12px rgba(0,0,0,.08);
+    --bq-brass:#9a7f3f; --bq-olive:#6d6e45;
+  }
+}
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;padding-bottom:80px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;transition:background-color .2s,color .2s}
 input,textarea,select,button{font-family:'Inter',sans-serif}
 button{user-select:none;cursor:pointer}
@@ -544,20 +651,22 @@ button:active{transform:scale(.97)}
   <div class="person-bar" id="personBar" style="display:none"></div>
 
   <div class="screen active" id="screen-dashboard">
-    <div class="quote-banner">
-      <div class="quote-text" id="quoteText"></div>
-      <div class="quote-author" id="quoteAuthor"></div>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0">
-      <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
-      <div id="weekLabel" style="font-size:10px;color:var(--muted)">Bu Hafta</div>
-      <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
-    </div>
-    <div class="week-grid" id="weekGrid"></div>
-    <div style="padding:18px 16px 0">
-      <h2 id="dashGreeting" style="font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:.5px">Merhaba 👋</h2>
-      <div id="dashSummaryLine" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
-      <div id="dashMotivation" style="font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic"></div>
+    <div class="bq-header" style="background:linear-gradient(180deg, var(--bq-walnut), transparent); padding-bottom:4px; margin:-1px -1px 0">
+      <div class="quote-banner">
+        <div class="quote-text" id="quoteText"></div>
+        <div class="quote-author" id="quoteAuthor"></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0">
+        <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
+        <div id="weekLabel" class="bq-eyebrow">Bu Hafta</div>
+        <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
+      </div>
+      <div class="week-grid" id="weekGrid"></div>
+      <div style="padding:18px 16px 0">
+        <h2 id="dashGreeting" class="bq-chalk-heading" style="font-size:32px">Merhaba 👋</h2>
+        <div id="dashSummaryLine" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
+        <div id="dashMotivation" style="font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic"></div>
+      </div>
     </div>
     <div id="dashTodayCard" style="margin:14px 16px 0"></div>
     <div id="dashNextWorkout" style="margin:10px 16px 0"></div>
@@ -636,8 +745,8 @@ button:active{transform:scale(.97)}
 
   <!-- PROFILE SCREEN -->
   <div class="screen" id="screen-profile">
-    <div style="padding:18px 16px 0;display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px">Profil</h2>
+    <div style="background:linear-gradient(180deg, var(--bq-walnut), transparent); padding:18px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <h2 class="bq-chalk-heading" style="font-size:28px">Profil</h2>
       <div style="display:flex;gap:6px;align-items:center">
         <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
         <button class="logout-btn" onclick="logout()">çıkış</button>
@@ -1893,12 +2002,49 @@ function goToTodayWorkout(){
   renderDayContent(curDay);
 }
 
+// "Günlük antrenman karatahtasi" (BERQ Dark Gym Heritage) - normal (tip
+// 'full') günlerde gercek egzersiz listesini numarali, set×tekrarli olarak
+// gösterir; her egzersizin TÜM setleri isaretlenmisse (setCache'ten, aynen
+// toggleSet'in kontrol ettigi gibi) satir "tebesirle silinmis" gorunumüne
+// gecer. Bu sadece GORSEL bir yansima - tamamlama islemi hala Antrenman
+// ekraninda oldugu gibi calisiyor, buradaki karta tiklamak oraya goturuyor
+// (goToTodayWorkout, degismedi). AMRAP/HIIT/Dinlenme gunleri icin eski
+// basit ozet karti korunuyor (sayisal set listesi o gun tiplerinde anlamli
+// degil).
 function renderDashTodayCard(){
   const el = document.getElementById('dashTodayCard');
   if(!el) return;
   const todayIdx = new Date().getDay()===0?6:new Date().getDay()-1;
   const prog = activeProgram();
   const day = prog[todayIdx] || {type:'rest'};
+  const uid = activeProfile()?.id;
+
+  if(day.type==='full' && day.exercises && day.exercises.length){
+    const rows = day.exercises.map((ex,ei)=>{
+      let done=0;
+      for(let s=0;s<ex.sets;s++){ if(setCache[`${uid}_${todayIdx}_${ei}_${s}`]?.done) done++; }
+      const erased = ex.sets>0 && done===ex.sets;
+      return `<div class="bq-chalk-row" data-erased="${erased?1:0}">
+        <span class="bq-chalk-num">${ei+1}.</span>
+        <span class="bq-chalk-name">${ex.name}</span>
+        <span class="bq-chalk-sr">${ex.sets}×${ex.reps}</span>
+        <span class="bq-chalk-check">✓</span>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div class="bq-chalkboard bq-grain" onclick="goToTodayWorkout()">
+      <div class="bq-eyebrow">Bugünün Antrenmanı</div>
+      <div class="bq-chalk-heading" style="font-size:22px;margin:2px 0 8px">${day.name||'Antrenman'}</div>
+      <div>${rows}</div>
+    </div>`;
+    // Zaten tamamlanmis satirlari BIR SONRAKI FRAME'de "erased" yapiyoruz ki
+    // CSS transition/animasyonu her ekrana donuste gercekten OYNASIN (ayni
+    // anda insert+class olursa tarayici gecisi atlar).
+    requestAnimationFrame(()=>{
+      el.querySelectorAll('.bq-chalk-row[data-erased="1"]').forEach(r=>r.classList.add('bq-erased'));
+    });
+    return;
+  }
+
   const isRest = day.type==='rest';
   const exCount = isRest?0:(day.type==='amrap'?((day.amrap&&day.amrap.exercises)||[]).length:(day.type==='hiit'||day.type==='cardio')?0:(day.exercises||[]).length);
   const typeLabel = isRest?'Dinlenme Günü':(day.type==='hiit'||day.type==='cardio')?'HIIT':day.type==='amrap'?'AMRAP':'Antrenman Günü';
