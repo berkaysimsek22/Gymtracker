@@ -121,24 +121,16 @@ try{
    raptiye basi, hafif egik not karti. */
 #screen-dashboard .bq-quote-pinned{
   position:relative; margin:22px 16px 14px; padding:16px 12px 10px;
-  border-radius:4px; overflow:hidden;
-  background:linear-gradient(135deg,#8a5a2e,#6b3c14 50%,#4a280d);
+  background:rgba(232,228,216,.045); border-radius:3px;
   box-shadow:0 8px 16px rgba(0,0,0,.45);
   transform:rotate(-0.7deg);
-}
-#screen-dashboard .bq-quote-pinned::after{
-  content:''; position:absolute; inset:0; pointer-events:none; opacity:.18; mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.06' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-}
-#screen-dashboard .bq-quote-pinned .quote-text, #screen-dashboard .bq-quote-pinned .quote-author{
-  color:#ffffff; position:relative;
 }
 #screen-dashboard .bq-quote-pinned::before{
   content:''; position:absolute; top:-9px; left:50%; transform:translateX(-50%);
   width:15px; height:15px; border-radius:50%;
-  background:radial-gradient(circle at 32% 30%, #ffffff 0%, #e4e4e4 55%, #b8b8b8 100%);
-  box-shadow:0 2px 4px rgba(0,0,0,.6), inset 1px 1px 2px rgba(255,255,255,.5);
-  z-index:2;
+  background:radial-gradient(circle at 32% 30%, #8a5a2e 0%, #6b3c14 55%, #3a1f09 100%);
+  box-shadow:0 2px 4px rgba(0,0,0,.6), inset 1px 1px 2px rgba(255,255,255,.25);
+  z-index:1;
 }
 /* "Bu Hafta" takvimi - SADECE #weekGrid (Ana Sayfa); #weekGridWO (Workout
    ekranı, aynı .wday sınıfını paylaşıyor) kapsam dışı bırakıldı. */
@@ -2045,6 +2037,23 @@ function goToTodayWorkout(){
   renderDayContent(curDay);
 }
 
+// Ana Sayfa'daki "Bugünün Antrenmanı" kas grubu kartı icin SADECE sade,
+// kaba bolgesel Turkce etiketler (orn. "Pectoral" -> "Göğüs") doner -
+// Istatistik ekranindaki detayli 15 alt-grup analizini yapan
+// classifyExerciseMuscles ile KARISTIRILMASIN, bu bilincli olarak daha
+// kaba/okunakli bir bolgeleme.
+function dashMuscleRegion(muscleStr){
+  const m = (muscleStr||'').toLowerCase();
+  if(!m) return 'Diğer';
+  if(/pectoral|pec\b|göğüs|gogus|chest/.test(m)) return 'Göğüs';
+  if(/sırt|sirt|\bback\b|latissimus|\blat\b|rhomboid|trapez|\btrap\b/.test(m)) return 'Sırt';
+  if(/omuz|shoulder|delt/.test(m)) return 'Omuz';
+  if(/biceps|bicep|triceps|tricep|brachialis|\bkol\b|\barm\b|forearm|ön kol|on kol/.test(m)) return 'Kol';
+  if(/bacak|\bleg\b|quad|hamstring|kalça|kalca|glute|baldır|baldir|calf|calves/.test(m)) return 'Bacak';
+  if(/karın|karin|\babs\b|\bcore\b|abdominis/.test(m)) return 'Karın';
+  return reportPrimaryMuscle(muscleStr);
+}
+
 // "Günlük antrenman karatahtasi" (BERQ Dark Gym Heritage) - normal (tip
 // 'full') günlerde gercek egzersiz listesini numarali, set×tekrarli olarak
 // gösterir; her egzersizin TÜM setleri isaretlenmisse (setCache'ten, aynen
@@ -2068,7 +2077,7 @@ function renderDashTodayCard(){
     // siralanmis, detaysiz (set/tekrar/egzersiz adi yok) bir liste.
     const groupMap = {};
     day.exercises.forEach((ex,ei)=>{
-      const g = reportPrimaryMuscle(ex.muscle);
+      const g = dashMuscleRegion(ex.muscle);
       if(!groupMap[g]) groupMap[g] = {sets:0, exIdxs:[]};
       groupMap[g].sets += parseInt(ex.sets)||0;
       groupMap[g].exIdxs.push(ei);
@@ -2084,6 +2093,7 @@ function renderDashTodayCard(){
       return `<div class="bq-chalk-row" data-erased="${allDone?1:0}">
         <span class="bq-chalk-num">${gi+1}.</span>
         <span class="bq-chalk-name">${g.name}</span>
+        <span class="bq-chalk-sr">${g.sets} set</span>
         <span class="bq-chalk-check">✓</span>
       </div>`;
     }).join('');
