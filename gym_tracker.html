@@ -69,13 +69,10 @@ try{
    butonlar otomatik yeni temaya geçiyor. Bu kez marka limeti de BİLİNÇLİ
    OLARAK değişti (#b8f443) - kullanıcı bu değeri özellikle verdi. */
 #screen-dashboard, #screen-profile{
-  background-color:#1a1008;
-  background-image:
-    repeating-linear-gradient(180deg, rgba(0,0,0,.12) 0px, rgba(0,0,0,.12) 1px, transparent 1px, transparent 23px),
-    repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0px, rgba(0,0,0,.08) 1px, transparent 1px, transparent 46px);
+  background-color:#090c08;
   --board:#090c08;
   --chalk:#e8e4d8; --chalk2:rgba(232,228,216,.65); --chalk3:rgba(232,228,216,.38);
-  --lime:#b8f443; --frame:#6b3c14;
+  --lime:#b8f443;
   --surface:var(--board); --surface2:#140f09; --surface3:#1d160c;
   --border:rgba(232,228,216,.16); --border-strong:rgba(232,228,216,.3);
   --text:var(--chalk); --text-sub:var(--chalk2); --text-muted:var(--chalk2); --muted:var(--chalk2);
@@ -120,7 +117,7 @@ try{
   padding:9px 2px; border-bottom:1px dashed rgba(232,228,216,.14);
 }
 #dashTodayCard .bq-chalk-row:last-child{ border-bottom:none; }
-#dashTodayCard .bq-chalk-num{ color:var(--frame); font-size:12px; font-weight:700; flex:0 0 auto; width:16px; filter:brightness(1.8); }
+#dashTodayCard .bq-chalk-num{ color:var(--chalk2); font-size:12px; font-weight:700; flex:0 0 auto; width:16px; }
 #dashTodayCard .bq-chalk-name{
   flex:1; min-width:0; color:var(--chalk); font-size:14px; font-weight:600;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -165,7 +162,7 @@ try{
 }
 /* Alt navigasyon - TÜM ekranlarda görünen tek paylaşılan eleman, bu yüzden
    global olarak yeniden renklendi (brief'in açık isteği). */
-.bottom-nav{ background:#0a0a08; border-top:3px solid #6b3c14; }
+.bottom-nav{ background:#0a0a08; border-top:3px solid rgba(232,228,216,.15); }
 .nav-btn{ color:rgba(232,228,216,.28); }
 .nav-btn:hover, .nav-btn.active{ color:#b8f443; }
 .nav-btn.active::after{ background:#b8f443; }
