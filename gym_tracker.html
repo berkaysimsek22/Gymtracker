@@ -102,6 +102,21 @@ try{
   font-family:'Caveat',cursive; font-size:19px; color:var(--chalk3); font-style:italic;
   text-align:center; padding:6px 0 2px;
 }
+/* "Bu Ay" rozeti - SADECE bu kucuk kutu icin bilincli olarak geri getirilen
+   vintage ahsap plaket gorunumu (brief'in acik istegi), temanin geri kalani
+   (duz kara tahta) etkilenmiyor. */
+#screen-dashboard .bq-wood-badge{
+  position:relative; min-width:64px; text-align:center; padding:8px 10px 7px;
+  border-radius:7px; overflow:hidden;
+  background:linear-gradient(135deg,#8a5a2e,#6b3c14 45%,#4a280d);
+  box-shadow:inset 0 2px 3px rgba(255,255,255,.18), inset 0 -3px 6px rgba(0,0,0,.5), 0 3px 8px rgba(0,0,0,.5);
+}
+#screen-dashboard .bq-wood-badge::before{
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:.18; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.06' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+#screen-dashboard .bq-wood-label{ font-size:8px; text-transform:uppercase; letter-spacing:.8px; color:rgba(255,255,255,.75); position:relative; }
+#screen-dashboard .bq-wood-value{ font-family:'Caveat',cursive; font-weight:700; font-size:21px; line-height:1.15; margin-top:1px; position:relative; }
 /* Alıntı - tahtaya raptiyeyle tutturulmuş kağıt gibi: ustte kucuk bir
    raptiye basi, hafif egik not karti. */
 #screen-dashboard .bq-quote-pinned{
@@ -681,16 +696,14 @@ button:active{transform:scale(.97)}
         <div class="bq-divider"></div>
 
         <div>
-          <h2 id="dashGreeting" class="bq-chalk-heading bq-script" style="font-size:30px;margin:0">Merhaba 👋</h2>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+            <h2 id="dashGreeting" class="bq-chalk-heading bq-script" style="font-size:30px;margin:0">Merhaba 👋</h2>
+            <div id="dashMonthBadge" style="flex-shrink:0"></div>
+          </div>
           <div id="dashSummaryLine" style="font-size:12px;color:var(--chalk2);margin-top:2px"></div>
           <div id="dashMotivation" style="font-size:11px;color:var(--chalk3);margin-top:6px;font-style:italic"></div>
           <div id="dashTodayCard" style="margin-top:12px"></div>
-          <div id="dashNextWorkout" style="margin-top:10px"></div>
         </div>
-
-        <div class="bq-divider"></div>
-
-        <div id="dashStatsRow"></div>
 
         <div class="bq-divider"></div>
 
@@ -1863,13 +1876,12 @@ async function renderDashboard(){
   renderDashGreeting();
   renderDashMotivation();
   renderDashTodayCard();
-  renderDashNextWorkout();
+  renderDashMonthBadge();
   renderDashWeekDots();
   renderDashLastWorkout();
   renderDashRestSuggestion();
   await Promise.all([
     renderDashCalCard(),
-    renderDashStatsRow(),
     renderDashWater(),
     renderDashPRCard(),
     renderDashWeightTrend(),
@@ -1910,30 +1922,6 @@ function renderDashMotivation(){
     }
   }
   el.textContent = msg;
-}
-
-// "Sonraki Antrenman" - ABA/BAB rotasyonuna gore YARININ gun indexi icin
-// hangi haftanin (A/B) programi gecerliyse onu okur (programForDate), "bugunun
-// paritesi" degil - cunku hafta Pazar->Pazartesi gecisinde A/B degisebiliyor.
-function renderDashNextWorkout(){
-  const el = document.getElementById('dashNextWorkout');
-  if(!el) return;
-  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
-  const tIdx = tomorrow.getDay()===0?6:tomorrow.getDay()-1;
-  const day = programForDate(tomorrow)[tIdx] || {type:'rest'};
-  if(day.type==='rest'){
-    el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)">
-      <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--text-muted);background:var(--surface3);padding:2px 8px;border-radius:8px;flex-shrink:0">YARIN</span>
-      <span>Yarın dinlenme günü 😴</span>
-    </div>`;
-    return;
-  }
-  const exCount = day.type==='amrap' ? ((day.amrap&&day.amrap.exercises)||[]).length : (day.type==='hiit'||day.type==='cardio') ? 0 : (day.exercises||[]).length;
-  const countTxt = exCount>0 ? ` — ${exCount} egzersiz` : '';
-  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 16px;display:flex;align-items:center;gap:8px;font-size:12px">
-    <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:var(--acc);background:var(--acc-dim);padding:2px 8px;border-radius:8px;flex-shrink:0">YARIN</span>
-    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${day.name||''}${countTxt}</span>
-  </div>`;
 }
 
 // "Son Antrenman Özeti" - sessionCache zaten login sirasinda en son 50
@@ -2131,7 +2119,6 @@ function renderDashWeekDots(){
     </div>`;
   }).join('');
   el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
-    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:12px">Bu Hafta</div>
     <div style="display:flex;justify-content:space-between">${dots}</div>
   </div>`;
 }
@@ -2185,6 +2172,14 @@ async function renderDashCalCard(){
     }
   }
   const kcalPct = target ? Math.min((alinan/target)*100,100) : 0;
+  // "Bu Ay" kart yukarida (Merhaba yaninda) tasindigindan, bu iki satir
+  // (ort. protein + son kilo) eskiden ayri bir 3'lu istatistik satirindaydi -
+  // artik Kalori Dengesi'nin icine tasindi, Ana Sayfa'da tekrarlanmasin diye.
+  const avgProtein = await avgProteinLast7Days(uid);
+  let lastWeight = p?.weight || null;
+  const {data: wData} = await sb.from('weight_logs').select('weight,date').eq('user_id', uid).order('date', {ascending:false}).limit(1);
+  if(wData && wData.length) lastWeight = wData[0].weight;
+  const avgProteinDisp = avgProtein!==null ? `${avgProtein}g` : '—';
   const activities = await loadTodayActivityLogs(uid);
   const actList = activities.length ? '<div style="margin-top:12px">' + activities.map(a=>{
     const isAuto = a.activity_type==='workout_auto'||a.activity_type==='workout_auto_edited';
@@ -2223,6 +2218,10 @@ async function renderDashCalCard(){
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Protein</span><span>${proteinAlinan} / ${proteinTarget}g</span></div>
       <div class="nut-bar"><div class="nut-bar-fill" style="width:${proteinPct}%;background:${proteinBarColor}"></div></div>
     </div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
+      <div><div style="font-size:17px;font-weight:700;color:var(--text)">${avgProteinDisp}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ort. Protein (7g)</div></div>
+      <div><div style="font-size:17px;font-weight:700;color:var(--text)">${lastWeight?lastWeight+' kg':'—'}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Son Kilo</div></div>
+    </div>
     ${actList}
   </div>`;
 }
@@ -2349,54 +2348,19 @@ function showConfetti(){
   setTimeout(()=>container.remove(),3800);
 }
 
-async function renderDashStatsRow(){
-  const el = document.getElementById('dashStatsRow');
+// "Merhaba [ad]" basliginin yanindaki kucuk ahsap rozet - sadece bu kutu
+// icin BILINCLI olarak vintage ahsap cerceve geri getirildi (brief'in acik
+// istegi), temanin geri kalani (duz kara tahta) degismedi.
+function renderDashMonthBadge(){
+  const el = document.getElementById('dashMonthBadge');
   if(!el) return;
-  const p = activeProfile();
-  const uid = p?.id;
-  let lastWeight = p?.weight || null;
-  if(uid){
-    const {data} = await sb.from('weight_logs').select('weight,date').eq('user_id', uid).order('date', {ascending:false}).limit(1);
-    if(data && data.length) lastWeight = data[0].weight;
-  }
+  const uid = activeProfile()?.id;
   const monthCount = computeMonthlyWorkoutCount();
-  const monthColor = monthlyGoalColor(monthCount);
-  const monthSub = monthlyGoalSubtitle(monthCount);
+  const color = monthlyGoalColor(monthCount);
   maybeCelebrateMonthlyGoal(uid, monthCount);
-
-  // Ort. protein (son 7 gun) + hedefe gore renk. Profilde ayri bir "protein
-  // hedefi" alani yok - Beslenme sekmesindeki gunluk hedef (bugune ait,
-  // calcMacros ile otomatik ya da elle girilen) "profildeki hedef" yerine
-  // kullanildi, cunku kullanicinin asil takip ettigi deger bu.
-  let avgProtein = null, proteinTarget = 0;
-  if(uid){
-    avgProtein = await avgProteinLast7Days(uid);
-    const nd = await loadNutrition(uid, todayStr());
-    proteinTarget = nd.targets?.protein || 0;
-  }
-  let proteinColor = 'var(--text)';
-  if(avgProtein!==null && proteinTarget>0){
-    const ratio = avgProtein/proteinTarget;
-    proteinColor = ratio>=1 ? 'var(--success)' : ratio>=0.8 ? 'var(--warning)' : 'var(--danger)';
-  }
-  const proteinDisp = avgProtein!==null ? `${avgProtein}g` : '—';
-
-  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
-      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Bu Ay</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px;color:${monthColor}">${monthCount} / ${MONTHLY_GOAL}</div>
-      <div style="font-size:9px;color:${monthColor};margin-top:1px">${monthSub}</div>
-    </div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
-      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ort. Protein</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px;color:${proteinColor}">${proteinDisp}</div>
-      <div style="font-size:9px;color:var(--muted);margin-top:1px">son 7 gün</div>
-    </div>
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center">
-      <div style="font-size:22px">⚖️</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;margin-top:2px">${lastWeight?lastWeight+' kg':'—'}</div>
-      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Son Kilo</div>
-    </div>
+  el.innerHTML = `<div class="bq-wood-badge">
+    <div class="bq-wood-label">Bu Ay</div>
+    <div class="bq-wood-value" style="color:${color}">${monthCount}/${MONTHLY_GOAL}</div>
   </div>`;
 }
 
