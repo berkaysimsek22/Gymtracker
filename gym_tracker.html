@@ -5050,8 +5050,8 @@ function renderMeals(nd){
       <div class="meal-head" onclick="toggleMeal(${mi})">
         <input class="meal-time-inp" value="${meal.time||''}" placeholder="00:00" onclick="event.stopPropagation()" onchange="updMeal(${mi},'time',this.value)">
         <input class="meal-name-inp" placeholder="Öğün adı..." value="${meal.name||''}" onclick="event.stopPropagation()" onchange="updMeal(${mi},'name',this.value)">
-        <div class="meal-cals" id="meal_kcal_${mi}">${Math.round(mc)} kcal</div>
         <button class="del-btn" onclick="event.stopPropagation();delMeal(${mi})">🗑</button>
+        <div class="meal-cals" id="meal_kcal_${mi}">${Math.round(mc)} kcal</div>
         <div class="meal-arr">⌄</div>
       </div>
       <div class="meal-macro-sum" id="meal_macrosum_${mi}" onclick="toggleMeal(${mi})">
