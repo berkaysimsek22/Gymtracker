@@ -102,7 +102,21 @@ try{
   font-family:'Caveat',cursive; font-size:19px; color:var(--chalk3); font-style:italic;
   text-align:center; padding:6px 0 2px;
 }
-@media (max-width:380px){ #screen-dashboard .bq-2col{ grid-template-columns:1fr; } }
+/* Alıntı - tahtaya raptiyeyle tutturulmuş kağıt gibi: ustte kucuk bir
+   raptiye basi, hafif egik not karti. */
+#screen-dashboard .bq-quote-pinned{
+  position:relative; margin:22px 16px 14px; padding:16px 12px 10px;
+  background:rgba(232,228,216,.045); border-radius:3px;
+  box-shadow:0 8px 16px rgba(0,0,0,.45);
+  transform:rotate(-0.7deg);
+}
+#screen-dashboard .bq-quote-pinned::before{
+  content:''; position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+  width:15px; height:15px; border-radius:50%;
+  background:radial-gradient(circle at 32% 30%, #ff8a65 0%, #d32f2f 55%, #8e1c1c 100%);
+  box-shadow:0 2px 4px rgba(0,0,0,.6), inset 1px 1px 2px rgba(255,255,255,.35);
+  z-index:1;
+}
 /* "Bu Hafta" takvimi - SADECE #weekGrid (Ana Sayfa); #weekGridWO (Workout
    ekranı, aynı .wday sınıfını paylaşıyor) kapsam dışı bırakıldı. */
 #weekGrid.week-grid .wday{ background:var(--surface2); border-color:var(--border); }
@@ -652,13 +666,6 @@ button:active{transform:scale(.97)}
   <div class="screen active" id="screen-dashboard">
     <div class="bq-board" style="margin:10px 12px 0">
 
-        <div class="quote-banner" style="padding:10px 6px 4px">
-          <div class="quote-text bq-script" id="quoteText" style="font-size:20px;min-height:2.4em"></div>
-          <div class="quote-author" id="quoteAuthor"></div>
-        </div>
-
-        <div class="bq-divider"></div>
-
         <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
           <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--chalk2);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
           <div id="weekLabel" class="bq-eyebrow">Bu Hafta</div>
@@ -666,18 +673,19 @@ button:active{transform:scale(.97)}
         </div>
         <div class="week-grid" id="weekGrid"></div>
 
+        <div class="quote-banner bq-quote-pinned">
+          <div class="quote-text bq-script" id="quoteText" style="font-size:20px;min-height:2.4em"></div>
+          <div class="quote-author" id="quoteAuthor"></div>
+        </div>
+
         <div class="bq-divider"></div>
 
-        <div class="bq-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
-          <div>
-            <h2 id="dashGreeting" class="bq-chalk-heading bq-script" style="font-size:30px;margin:0">Merhaba 👋</h2>
-            <div id="dashSummaryLine" style="font-size:12px;color:var(--chalk2);margin-top:2px"></div>
-            <div id="dashMotivation" style="font-size:11px;color:var(--chalk3);margin-top:6px;font-style:italic"></div>
-          </div>
-          <div>
-            <div id="dashTodayCard"></div>
-            <div id="dashNextWorkout" style="margin-top:10px"></div>
-          </div>
+        <div>
+          <h2 id="dashGreeting" class="bq-chalk-heading bq-script" style="font-size:30px;margin:0">Merhaba 👋</h2>
+          <div id="dashSummaryLine" style="font-size:12px;color:var(--chalk2);margin-top:2px"></div>
+          <div id="dashMotivation" style="font-size:11px;color:var(--chalk3);margin-top:6px;font-style:italic"></div>
+          <div id="dashTodayCard" style="margin-top:12px"></div>
+          <div id="dashNextWorkout" style="margin-top:10px"></div>
         </div>
 
         <div class="bq-divider"></div>
