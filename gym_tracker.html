@@ -700,6 +700,7 @@ button:active{transform:scale(.97)}
     <div id="nutChartSection" style="margin:10px 16px 0"></div>
     <div class="pr-section"><h3>Kişisel Rekorlar</h3><div id="prList"></div></div>
     <div class="pr-section" style="margin-top:14px"><h3>Favori PR</h3><div id="favoritePrCard"></div></div>
+    <div class="pr-section" style="margin-top:14px"><h3>💊 Takviye Takibi</h3><div id="suppStreakList"></div></div>
     <div class="pr-section" style="margin-top:14px"><h3>Egzersiz Bazlı Ortalama RIR</h3><div id="rirStatsList"></div></div>
   </div>
 
@@ -4660,6 +4661,7 @@ async function renderStats(){
   const keys=Object.keys(prs);
   document.getElementById('prList').innerHTML=keys.length?keys.map(n=>`<div class="pr-item"><div class="pr-ex">${n}</div><div class="pr-v">${prs[n].w} kg</div><div class="pr-d">${prs[n].d}</div></div>`).join(''):'<div class="empty-state">Henüz ağırlık girilmedi.</div>';
   await renderFavoritePr(uid);
+  await renderSuppStreakCard(uid);
   // Egzersiz bazli ortalama RIR - ayni setCache uzerinden (bkz. yukaridaki
   // PR dongusu) hesaplanir; setCache sadece bu oturumda ACILMIS gunlerin
   // verisini tutar (loadSetsForDay gun bazli cagriliyor), bu yuzden PR
@@ -4811,6 +4813,35 @@ async function loadWeekSupplementLogs(userId, dayStrs){
   if(error){ console.warn('loadWeekSupplementLogs error:', error); return []; }
   return data||[];
 }
+// İstatistik ekranındaki "Takviye Takibi" kartı - her takviye için kaç
+// GÜNDÜR (bugünden, bugün henüz işaretlenmediyse dünden geriye doğru ardışık
+// olarak) işaretlendiğini ve toplam kaç gün işaretlendiğini gösterir.
+async function renderSuppStreakCard(uid){
+  const el = document.getElementById('suppStreakList');
+  if(!el) return;
+  if(!uid){ el.innerHTML = ''; return; }
+  const supps = await loadSupplements(uid);
+  if(!supps.length){ el.innerHTML = '<div class="empty-state">Henüz takviye eklenmedi (Profil &gt; Takviyelerim).</div>'; return; }
+  const {data, error} = await sb.from('supplement_logs').select('supplement_id,date').eq('user_id', uid).eq('taken', true);
+  if(error){ console.warn('renderSuppStreakCard error:', error); el.innerHTML = '<div class="empty-state">Takviye geçmişi yüklenemedi.</div>'; return; }
+  const bySupp = {};
+  (data||[]).forEach(r=>{ (bySupp[r.supplement_id] = bySupp[r.supplement_id] || new Set()).add(r.date); });
+  el.innerHTML = supps.map(s=>{
+    const dates = bySupp[s.id] || new Set();
+    const total = dates.size;
+    let streak = 0;
+    const cursor = new Date();
+    if(!dates.has(localDateStr(cursor))) cursor.setDate(cursor.getDate()-1);
+    while(dates.has(localDateStr(cursor))){ streak++; cursor.setDate(cursor.getDate()-1); }
+    const streakTxt = streak>0 ? `🔥 ${streak} gündür` : 'Henüz başlamadı';
+    return `<div class="pr-item">
+      <div class="pr-ex">${s.name}${s.dose?` <span style="color:var(--text-muted);font-weight:400">· ${s.dose}</span>`:''}</div>
+      <div class="pr-v" style="font-size:14px;color:${streak>0?'var(--acc)':'var(--text-muted)'}">${streakTxt}</div>
+      <div class="pr-d">toplam ${total} gün</div>
+    </div>`;
+  }).join('');
+}
+
 async function saveSupplementLog(suppId, dateStr, taken){
   const uid = activeProfile()?.id;
   if(!uid) return;
