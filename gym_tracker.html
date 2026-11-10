@@ -26,7 +26,7 @@ try{
 }catch(e){}
 </script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Caveat:wght@400;600;700&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;outline:none;-webkit-tap-highlight-color:transparent}
 *{scrollbar-width:none}
 *::-webkit-scrollbar{display:none}
@@ -60,82 +60,100 @@ try{
     --card-shadow:0 2px 12px rgba(0,0,0,.08);
   }
 }
-/* ── BERQ "DARK GYM HERITAGE" — SADECE Ana Sayfa + Profil ── */
-/* Kapsam KASITLI olarak #screen-dashboard/#screen-profile ile sinirli - diger
-   her ekran (Workout, Beslenme, Workouts, İstatistik) ayni paylasilan CSS
-   degiskenlerini (var(--surface), var(--border), var(--text-muted)...) ve
-   paylasilan sinifi (.btn, .stat-card, .wday...) kullandigi icin, degiskenleri
-   SADECE bu iki ekranin icinde yeniden tanimlamak - render fonksiyonlarinin
-   HICBIRINE dokunmadan - kartlarin/butonlarin/baslik yazilarinin tamami
-   otomatik olarak yeni temaya gecmesini sagliyor. Marka limeti (--acc) KASITLI
-   OLARAK degistirilmedi (brief'in "keep the existing brand lime" maddesi) -
-   boylece eski ve yeni ekranlar arasinda iki farkli yesil tonu olusmuyor.
-   .wday/.week-grid gibi #weekGridWO (Workout ekrani) ile PAYLASILAN siniflar
-   kasten DOKUNULMADAN birakildi - oradaki kapsam #weekGrid (sadece Ana Sayfa)
-   ID'siyle daraltildi. */
+/* ── GYM TRACKER — "OLD SCHOOL IRON GYM" (ahşap çerçeveli kara tahta) ──
+   Sadece Ana Sayfa + Profil ekranlarına özel (alt navigasyon hariç - o tüm
+   ekranlarda görünen TEK paylaşılan eleman olduğu için global renklendi).
+   Aynı kapsamlama stratejisi: #screen-dashboard/#screen-profile içinde
+   paylaşılan CSS değişkenlerini (var(--surface), var(--border)...) yeniden
+   tanımlayarak render fonksiyonlarının çoğuna dokunmadan tüm kartlar/
+   butonlar otomatik yeni temaya geçiyor. Bu kez marka limeti de BİLİNÇLİ
+   OLARAK değişti (#b8f443) - kullanıcı bu değeri özellikle verdi. */
 #screen-dashboard, #screen-profile{
-  background:#111210;
-  --bg:#111210; --bg-elev:#171812;
-  --surface:#22231F; --surface2:#241811; --surface3:#38251B;
-  --border:rgba(182,154,88,.16); --border-strong:rgba(182,154,88,.3);
-  --text:#E8E5DA; --text-sub:#929187; --text-muted:#929187; --muted:#929187;
-  --card-shadow:0 3px 18px rgba(0,0,0,.55);
-  --bq-walnut:#241811; --bq-espresso:#38251B; --bq-brass:#B69A58; --bq-olive:#858653;
+  background-color:#1a1008;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(0,0,0,.12) 0px, rgba(0,0,0,.12) 1px, transparent 1px, transparent 23px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.08) 0px, rgba(0,0,0,.08) 1px, transparent 1px, transparent 46px);
+  --board:#090c08;
+  --chalk:#e8e4d8; --chalk2:rgba(232,228,216,.65); --chalk3:rgba(232,228,216,.38);
+  --lime:#b8f443; --frame:#6b3c14;
+  --surface:var(--board); --surface2:#140f09; --surface3:#1d160c;
+  --border:rgba(232,228,216,.16); --border-strong:rgba(232,228,216,.3);
+  --text:var(--chalk); --text-sub:var(--chalk2); --text-muted:var(--chalk2); --muted:var(--chalk2);
+  --acc:var(--lime); --acc-dim:rgba(184,244,67,.14); --acc-border:rgba(184,244,67,.3);
+  --card-shadow:0 4px 20px rgba(0,0,0,.6);
 }
-/* Cok hafif tahta damar dokusu - sadece kart yuzeylerinde, SVG turbulence ile
-   (harici dosya/kutuphane yok), opaklik cok dusuk tutuldu ("subtle"). */
-#screen-dashboard .prof-section, #screen-profile .prof-section,
-#screen-dashboard .stat-card, #screen-dashboard .bq-card{
-  position:relative;
+#screen-dashboard .bq-script, #screen-profile .bq-script{ font-family:'Caveat',cursive; }
+/* Bölüm ayırıcı - brief'teki tarif birebir. */
+#screen-dashboard .bq-divider, #screen-profile .bq-divider{
+  height:1px; background:rgba(232,228,216,.28); box-shadow:0 1px 0 rgba(0,0,0,.4); margin:14px 0;
 }
-.bq-grain::before{
-  content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
-  opacity:.05; mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+/* 4 katmanlı ahşap çerçeve (dıştan içe: koyu dış, ahşap şerit+damar, oyuk
+   gölge, iç çizgi) - Ana Sayfa'daki TEK büyük tahta ve Profil başlığı için
+   statik HTML'de elle iç içe yazıldı (bkz. şablon). */
+#screen-dashboard .bq-frame, #screen-profile .bq-frame{ padding:3px; background:#1e0a02; border-radius:10px; }
+#screen-dashboard .bq-frame-wood, #screen-profile .bq-frame-wood{
+  padding:4px; border-radius:9px; position:relative; overflow:hidden;
+  background:linear-gradient(135deg,#c8824a,#a06030,#7a4820,#a06030,#c8824a);
+  box-shadow:inset 1px 1px 2px rgba(255,255,255,.35), inset -1px -1px 3px rgba(0,0,0,.5);
 }
-#screen-dashboard .bq-eyebrow, #screen-profile .bq-eyebrow{
-  color:var(--bq-brass); font-size:10px; text-transform:uppercase; letter-spacing:1.2px; font-weight:700;
+#screen-dashboard .bq-frame-wood::before, #screen-profile .bq-frame-wood::before{
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:.2; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.06' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
 }
-#screen-dashboard .bq-chalk-heading, #screen-profile .bq-chalk-heading{
-  font-family:'Bebas Neue',sans-serif; color:var(--text); letter-spacing:.5px;
-  text-shadow:0 0 1px rgba(232,229,218,.35), 0 0 14px rgba(232,229,218,.08);
+#screen-dashboard .bq-frame-carved, #screen-profile .bq-frame-carved{
+  padding:10px; border-radius:7px;
+  background:linear-gradient(135deg,#2a1004,#3a1808,#2a1004);
+  box-shadow:inset 4px 4px 10px rgba(0,0,0,.9);
 }
-/* "Bu Hafta" takvimi - SADECE #weekGrid (Ana Sayfa), #weekGridWO (Workout
-   ekrani) kapsam disi birakildi. */
-#weekGrid.week-grid .wday{ background:var(--bq-walnut); border-color:var(--border); }
-#weekGrid.week-grid .wday.today{ background:var(--acc-dim); border-color:var(--acc); }
-#weekGrid.week-grid .wday-dot.rest-d{ background:var(--bq-espresso); }
-/* Gunluk antrenman karatahtasi (renderDashTodayCard) */
-#dashTodayCard .bq-chalkboard{
-  background:
-    linear-gradient(180deg, rgba(0,0,0,.12), transparent 40%),
-    var(--bq-espresso);
-  border:1px solid var(--border-strong);
-  border-radius:16px; padding:18px 18px 10px; cursor:pointer;
-  box-shadow:var(--card-shadow), inset 0 0 40px rgba(0,0,0,.35);
+#screen-dashboard .bq-frame-inner, #screen-profile .bq-frame-inner{
+  overflow:hidden; border-radius:5px; box-shadow:inset 0 0 0 1px rgba(180,120,60,.3);
 }
+#screen-dashboard .bq-board, #screen-profile .bq-board{ background:var(--board); padding:16px; }
+/* Ikincil kartlar (PR, kilo trendi, su takibi vb.) icin TEK div'lik, kutulanmis
+   box-shadow halkalariyla sadelestirilmis "mini cerceve" yaklasimi - ayni
+   gorsel dil, ama her render fonksiyonunu 4 kat ic ice div'e cevirmeden. */
+#screen-dashboard .bq-frame-sm, #screen-profile .bq-frame-sm{
+  background:var(--board); border-radius:8px; margin:14px 2px; position:relative;
+  box-shadow:0 0 0 3px #1e0a02, 0 0 0 7px #a06030, 0 0 0 8px rgba(180,120,60,.35), inset 3px 3px 8px rgba(0,0,0,.6);
+}
+#screen-dashboard .bq-frame-sm:empty, #screen-profile .bq-frame-sm:empty{ display:none; box-shadow:none; margin:0; }
+#screen-profile .bq-frame-sm{ padding:14px; }
+#screen-profile .bq-frame-sm .prof-section{ background:transparent; border:none; box-shadow:none; padding:0; }
+#screen-dashboard .bq-notes{
+  font-family:'Caveat',cursive; font-size:19px; color:var(--chalk3); font-style:italic;
+  text-align:center; padding:6px 0 2px;
+}
+@media (max-width:380px){ #screen-dashboard .bq-2col{ grid-template-columns:1fr; } }
+/* "Bu Hafta" takvimi - SADECE #weekGrid (Ana Sayfa); #weekGridWO (Workout
+   ekranı, aynı .wday sınıfını paylaşıyor) kapsam dışı bırakıldı. */
+#weekGrid.week-grid .wday{ background:var(--surface2); border-color:var(--border); }
+#weekGrid.week-grid .wday.today{ background:var(--acc-dim); border-color:var(--lime); }
+#weekGrid.week-grid .wday-dot.rest-d{ background:#1d160c; }
+/* Günlük antrenman "karatahtası" (renderDashTodayCard) - artık büyük
+   tahtanın kendi İÇİNDE (ayrı bir çerçeveye ihtiyacı yok, var(--board) zaten
+   kara tahta zemini). */
 #dashTodayCard .bq-chalk-row{
   position:relative; overflow:hidden;
   display:flex; align-items:baseline; gap:10px;
-  padding:9px 2px; border-bottom:1px dashed rgba(232,229,218,.12);
+  padding:9px 2px; border-bottom:1px dashed rgba(232,228,216,.14);
 }
 #dashTodayCard .bq-chalk-row:last-child{ border-bottom:none; }
-#dashTodayCard .bq-chalk-num{ color:var(--bq-brass); font-size:12px; font-weight:700; flex:0 0 auto; width:16px; }
+#dashTodayCard .bq-chalk-num{ color:var(--frame); font-size:12px; font-weight:700; flex:0 0 auto; width:16px; filter:brightness(1.8); }
 #dashTodayCard .bq-chalk-name{
-  flex:1; min-width:0; color:var(--text); font-size:14px; font-weight:600;
+  flex:1; min-width:0; color:var(--chalk); font-size:14px; font-weight:600;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   transition:opacity .6s ease;
 }
-#dashTodayCard .bq-chalk-sr{ color:var(--text-muted); font-size:12px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
+#dashTodayCard .bq-chalk-sr{ color:var(--chalk2); font-size:12px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
 #dashTodayCard .bq-chalk-check{
-  flex:0 0 auto; width:16px; text-align:center; color:var(--acc); font-size:13px; font-weight:700;
+  flex:0 0 auto; width:16px; text-align:center; color:var(--lime); font-size:13px; font-weight:700;
   opacity:0; transform:scale(.4); transition:all .4s cubic-bezier(.34,1.56,.64,1);
 }
-#dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-name{ opacity:.4; text-decoration:line-through; text-decoration-color:var(--acc); text-decoration-thickness:2px; }
+#dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-name{ opacity:.4; text-decoration:line-through; text-decoration-color:var(--lime); text-decoration-thickness:2px; }
 #dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-check{ opacity:1; transform:scale(1); }
 #dashTodayCard .bq-chalk-row.bq-erased::before{
   content:''; position:absolute; inset:0;
-  background:linear-gradient(90deg, transparent, rgba(232,229,218,.18), transparent);
+  background:linear-gradient(90deg, transparent, rgba(232,228,216,.18), transparent);
   transform:translateX(-120%); animation:bq-erase-sweep .7s ease forwards; pointer-events:none;
 }
 @keyframes bq-erase-sweep{ to{ transform:translateX(120%); } }
@@ -143,30 +161,32 @@ try{
   #dashTodayCard .bq-chalk-name, #dashTodayCard .bq-chalk-check{ transition:none!important; }
   #dashTodayCard .bq-chalk-row.bq-erased::before{ animation:none!important; display:none; }
 }
-/* Acik tema secilmisse (elle ya da sistem tercihiyle) Dark Gym Heritage'in
-   kart/yuzey renkleri yerine mevcut acik temaya donulur - brief'in kapsami
-   dark bir kimlik oldugu icin acik modda walnut/chalkboard'u ZORLAMIYORUZ.
-   Gunluk antrenman karatahtasi (.bq-chalkboard) ise BILINCLI OLARAK istisna -
-   "siyah okul tahtasi" kendi basina sabit bir tasarim ogesi, acik modda da
-   koyu kalmasi amaclaniyor (brief'teki "black chalkboards" ogesiyle tutarli). */
+/* Açık tema seçilmişse bu iki ekran da mevcut açık palete döner - ahşap/
+   karatahta kimliği bilinçli olarak koyu bir kimlik, açık modda zorlanmıyor. */
 :root[data-theme="light"] #screen-dashboard, :root[data-theme="light"] #screen-profile{
-  background:var(--bg);
+  background-color:var(--bg); background-image:none;
   --surface:#ffffff; --surface2:#f0f0f0; --surface3:#e4e4e4;
   --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
   --text:#111111; --text-sub:#555555; --text-muted:#888888; --muted:#888888;
+  --acc:#5a9e00; --acc-dim:rgba(90,158,0,.12); --acc-border:rgba(90,158,0,.3);
   --card-shadow:0 2px 12px rgba(0,0,0,.08);
-  --bq-brass:#9a7f3f; --bq-olive:#6d6e45;
 }
 @media (prefers-color-scheme: light){
   :root:not([data-theme="dark"]) #screen-dashboard, :root:not([data-theme="dark"]) #screen-profile{
-    background:var(--bg);
+    background-color:var(--bg); background-image:none;
     --surface:#ffffff; --surface2:#f0f0f0; --surface3:#e4e4e4;
     --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
     --text:#111111; --text-sub:#555555; --text-muted:#888888; --muted:#888888;
+    --acc:#5a9e00; --acc-dim:rgba(90,158,0,.12); --acc-border:rgba(90,158,0,.3);
     --card-shadow:0 2px 12px rgba(0,0,0,.08);
-    --bq-brass:#9a7f3f; --bq-olive:#6d6e45;
   }
 }
+/* Alt navigasyon - TÜM ekranlarda görünen tek paylaşılan eleman, bu yüzden
+   global olarak yeniden renklendi (brief'in açık isteği). */
+.bottom-nav{ background:#0a0a08; border-top:3px solid #6b3c14; }
+.nav-btn{ color:rgba(232,228,216,.28); }
+.nav-btn:hover, .nav-btn.active{ color:#b8f443; }
+.nav-btn.active::after{ background:#b8f443; }
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;padding-bottom:80px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;transition:background-color .2s,color .2s}
 input,textarea,select,button{font-family:'Inter',sans-serif}
 button{user-select:none;cursor:pointer}
@@ -651,33 +671,55 @@ button:active{transform:scale(.97)}
   <div class="person-bar" id="personBar" style="display:none"></div>
 
   <div class="screen active" id="screen-dashboard">
-    <div class="bq-header" style="background:linear-gradient(180deg, var(--bq-walnut), transparent); padding-bottom:4px; margin:-1px -1px 0">
-      <div class="quote-banner">
-        <div class="quote-text" id="quoteText"></div>
-        <div class="quote-author" id="quoteAuthor"></div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 16px 0">
-        <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
-        <div id="weekLabel" class="bq-eyebrow">Bu Hafta</div>
-        <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
-      </div>
-      <div class="week-grid" id="weekGrid"></div>
-      <div style="padding:18px 16px 0">
-        <h2 id="dashGreeting" class="bq-chalk-heading" style="font-size:32px">Merhaba 👋</h2>
-        <div id="dashSummaryLine" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
-        <div id="dashMotivation" style="font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic"></div>
-      </div>
+    <div class="bq-frame" style="margin:10px 12px 0">
+      <div class="bq-frame-wood"><div class="bq-frame-carved"><div class="bq-frame-inner"><div class="bq-board">
+
+        <div class="quote-banner" style="padding:10px 6px 4px">
+          <div class="quote-text bq-script" id="quoteText" style="font-size:20px;min-height:2.4em"></div>
+          <div class="quote-author" id="quoteAuthor"></div>
+        </div>
+
+        <div class="bq-divider"></div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
+          <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--chalk2);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
+          <div id="weekLabel" class="bq-eyebrow">Bu Hafta</div>
+          <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--chalk2);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
+        </div>
+        <div class="week-grid" id="weekGrid"></div>
+
+        <div class="bq-divider"></div>
+
+        <div class="bq-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+          <div>
+            <h2 id="dashGreeting" class="bq-chalk-heading bq-script" style="font-size:30px;margin:0">Merhaba 👋</h2>
+            <div id="dashSummaryLine" style="font-size:12px;color:var(--chalk2);margin-top:2px"></div>
+            <div id="dashMotivation" style="font-size:11px;color:var(--chalk3);margin-top:6px;font-style:italic"></div>
+          </div>
+          <div>
+            <div id="dashTodayCard"></div>
+            <div id="dashNextWorkout" style="margin-top:10px"></div>
+          </div>
+        </div>
+
+        <div class="bq-divider"></div>
+
+        <div id="dashStatsRow"></div>
+
+        <div class="bq-divider"></div>
+
+        <div class="bq-notes">📝 Notların için bu alan yakında açılacak...</div>
+
+      </div></div></div></div>
     </div>
-    <div id="dashTodayCard" style="margin:14px 16px 0"></div>
-    <div id="dashNextWorkout" style="margin:10px 16px 0"></div>
-    <div id="dashPRCard" style="margin:10px 16px 0"></div>
-    <div id="dashStatsRow" style="margin:12px 16px 0"></div>
-    <div id="dashWeightTrend" style="margin:12px 16px 0"></div>
-    <div id="dashWeekDots" style="margin:12px 16px 0"></div>
-    <div id="dashCalCard" style="margin:12px 16px 0"></div>
-    <div id="dashWaterCard" style="margin:12px 16px 0"></div>
-    <div id="dashLastWorkout" style="margin:12px 16px 0"></div>
-    <div id="dashRestSuggestion" style="margin:12px 16px 0;padding-bottom:20px"></div>
+
+    <div id="dashPRCard" class="bq-frame-sm"></div>
+    <div id="dashWeightTrend" class="bq-frame-sm"></div>
+    <div id="dashWeekDots" class="bq-frame-sm"></div>
+    <div id="dashCalCard" class="bq-frame-sm"></div>
+    <div id="dashWaterCard" class="bq-frame-sm"></div>
+    <div id="dashLastWorkout" class="bq-frame-sm"></div>
+    <div id="dashRestSuggestion" class="bq-frame-sm" style="margin-bottom:20px"></div>
   </div>
 
   <div class="screen" id="screen-workout">
@@ -746,30 +788,51 @@ button:active{transform:scale(.97)}
 
   <!-- PROFILE SCREEN -->
   <div class="screen" id="screen-profile">
-    <div style="background:linear-gradient(180deg, var(--bq-walnut), transparent); padding:18px 16px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <h2 class="bq-chalk-heading" style="font-size:28px">Profil</h2>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
-        <button class="logout-btn" onclick="logout()">çıkış</button>
-      </div>
-    </div>
-    <div class="prof-section" style="margin:12px 16px 0">
-      <h3>Görünüm</h3>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <span style="font-size:12px;color:var(--text-muted)">Koyu / Açık tema</span>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-outline btn-sm" id="themeToggleBtn" onclick="toggleTheme()">🌙 Koyu</button>
-          <button class="btn btn-outline btn-sm" onclick="hardRefresh()" title="Önbelleği temizle ve sayfayı yenile">↻ Yenile</button>
+    <div class="bq-frame" style="margin:10px 12px 0">
+      <div class="bq-frame-wood"><div class="bq-frame-carved"><div class="bq-frame-inner"><div class="bq-board">
+
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+          <div>
+            <div class="bq-eyebrow">Profil</div>
+            <h2 id="profNameHeading" class="bq-chalk-heading bq-script" style="font-size:34px;margin:2px 0 0">Sporcu</h2>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+            <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
+            <button class="logout-btn" onclick="logout()">çıkış</button>
+          </div>
         </div>
-      </div>
+
+        <div class="bq-divider"></div>
+
+        <div id="profGoalsLine" style="font-size:12px;color:var(--chalk2);line-height:1.7"></div>
+
+        <div class="bq-divider"></div>
+
+        <div class="prof-section" style="background:transparent;border:none;box-shadow:none;padding:0">
+          <h3>Ayarlar</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <span style="font-size:12px;color:var(--chalk2)">Koyu / Açık tema</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline btn-sm" id="themeToggleBtn" onclick="toggleTheme()">🌙 Koyu</button>
+              <button class="btn btn-outline btn-sm" onclick="hardRefresh()" title="Önbelleği temizle ve sayfayı yenile">↻ Yenile</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bq-divider"></div>
+
+        <div id="profStatsLine" style="font-size:12px;color:var(--chalk2);line-height:1.7"></div>
+
+      </div></div></div></div>
     </div>
-    <div id="profileEditCard" style="margin:12px 16px 0"></div>
-    <div id="weightLogCard" style="margin:10px 16px 0"></div>
-    <div id="adminReportCard" style="margin:10px 16px 0"></div>
-    <div id="autoProgCard" style="margin:10px 16px 0"></div>
-    <div id="deleteProfileCard" style="margin:10px 16px 0"></div>
-    <div id="suppCard" style="margin:10px 16px 0"></div>
-    <div id="selfDeleteAccountCard" style="margin:10px 16px 0;padding-bottom:20px"></div>
+
+    <div id="profileEditCard" class="bq-frame-sm"></div>
+    <div id="weightLogCard" class="bq-frame-sm"></div>
+    <div id="adminReportCard" class="bq-frame-sm"></div>
+    <div id="autoProgCard" class="bq-frame-sm"></div>
+    <div id="deleteProfileCard" class="bq-frame-sm"></div>
+    <div id="suppCard" class="bq-frame-sm"></div>
+    <div id="selfDeleteAccountCard" class="bq-frame-sm" style="margin-bottom:20px"></div>
   </div>
 
   <div class="screen" id="screen-workouts">
@@ -7383,6 +7446,7 @@ async function addWeightLog(uid){
 function renderProfileScreen(){
   const p = activeProfile();
   if(!p) return;
+  renderProfileHeader(p);
   renderProfileEditCard(p);
   renderWeightLogCard(p);
   renderAdminReportCard();
@@ -7471,6 +7535,35 @@ async function deleteProfile(){
   t.textContent='🗑 Profil silindi';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
+}
+
+// Profil ekranı büyük tahtasının üst bölümü - isim başlığı, hedef/kilo
+// özeti ("başlangıç" olarak ilk kaydedilen weight_logs satırı kullanılıyor,
+// ayrı bir DB alanı yok) ve kısa bir antrenman istatistiği özeti.
+async function renderProfileHeader(p){
+  const nameEl = document.getElementById('profNameHeading');
+  if(nameEl) nameEl.textContent = p.name || 'Sporcu';
+
+  const goalsEl = document.getElementById('profGoalsLine');
+  if(goalsEl){
+    let startWeight = null;
+    if(p.id){
+      const {data} = await sb.from('weight_logs').select('weight,date').eq('user_id', p.id).order('date', {ascending:true}).limit(1);
+      if(data && data.length) startWeight = data[0].weight;
+    }
+    const parts = [];
+    if(p.weight) parts.push(`Mevcut: <b style="color:var(--chalk)">${p.weight} kg</b>`);
+    if(p.target_weight) parts.push(`Hedef: <b style="color:var(--lime)">${p.target_weight} kg</b>`);
+    if(startWeight) parts.push(`Başlangıç: ${startWeight} kg`);
+    goalsEl.innerHTML = parts.length ? parts.join(' &nbsp;·&nbsp; ') : 'Hedeflerini belirlemek için aşağıdaki formu doldur.';
+  }
+
+  const statsEl = document.getElementById('profStatsLine');
+  if(statsEl && p.id){
+    const monthCount = computeMonthlyWorkoutCount();
+    const {count} = await sb.from('session_logs').select('id', {count:'exact', head:true}).eq('user_id', p.id);
+    statsEl.innerHTML = `Bu ay <b style="color:var(--lime)">${monthCount}</b> antrenman &nbsp;·&nbsp; Toplam <b style="color:var(--lime)">${count||0}</b> antrenman`;
+  }
 }
 
 function renderProfileEditCard(p){
