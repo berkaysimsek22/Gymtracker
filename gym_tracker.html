@@ -87,34 +87,16 @@ try{
 #screen-dashboard .bq-divider, #screen-profile .bq-divider{
   height:1px; background:rgba(232,228,216,.28); box-shadow:0 1px 0 rgba(0,0,0,.4); margin:14px 0;
 }
-/* 4 katmanlı ahşap çerçeve (dıştan içe: koyu dış, ahşap şerit+damar, oyuk
-   gölge, iç çizgi) - Ana Sayfa'daki TEK büyük tahta ve Profil başlığı için
-   statik HTML'de elle iç içe yazıldı (bkz. şablon). */
-#screen-dashboard .bq-frame, #screen-profile .bq-frame{ padding:3px; background:#1e0a02; border-radius:10px; }
-#screen-dashboard .bq-frame-wood, #screen-profile .bq-frame-wood{
-  padding:4px; border-radius:9px; position:relative; overflow:hidden;
-  background:linear-gradient(135deg,#c8824a,#a06030,#7a4820,#a06030,#c8824a);
-  box-shadow:inset 1px 1px 2px rgba(255,255,255,.35), inset -1px -1px 3px rgba(0,0,0,.5);
+/* Çerçevesiz düz kara tahta - tek yüzey, dekoratif ahşap katmanları yok. */
+#screen-dashboard .bq-board, #screen-profile .bq-board{
+  background:var(--board); padding:16px; border-radius:10px;
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
 }
-#screen-dashboard .bq-frame-wood::before, #screen-profile .bq-frame-wood::before{
-  content:''; position:absolute; inset:0; pointer-events:none; opacity:.2; mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.06' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-}
-#screen-dashboard .bq-frame-carved, #screen-profile .bq-frame-carved{
-  padding:10px; border-radius:7px;
-  background:linear-gradient(135deg,#2a1004,#3a1808,#2a1004);
-  box-shadow:inset 4px 4px 10px rgba(0,0,0,.9);
-}
-#screen-dashboard .bq-frame-inner, #screen-profile .bq-frame-inner{
-  overflow:hidden; border-radius:5px; box-shadow:inset 0 0 0 1px rgba(180,120,60,.3);
-}
-#screen-dashboard .bq-board, #screen-profile .bq-board{ background:var(--board); padding:16px; }
-/* Ikincil kartlar (PR, kilo trendi, su takibi vb.) icin TEK div'lik, kutulanmis
-   box-shadow halkalariyla sadelestirilmis "mini cerceve" yaklasimi - ayni
-   gorsel dil, ama her render fonksiyonunu 4 kat ic ice div'e cevirmeden. */
+/* Ikincil kartlar (PR, kilo trendi, su takibi vb.) - duz kara tahta paneli,
+   cerceve halkasi yok. */
 #screen-dashboard .bq-frame-sm, #screen-profile .bq-frame-sm{
-  background:var(--board); border-radius:8px; margin:14px 2px; position:relative;
-  box-shadow:0 0 0 3px #1e0a02, 0 0 0 7px #a06030, 0 0 0 8px rgba(180,120,60,.35), inset 3px 3px 8px rgba(0,0,0,.6);
+  background:var(--board); border-radius:10px; margin:14px 2px; position:relative;
+  box-shadow:0 3px 14px rgba(0,0,0,.45);
 }
 #screen-dashboard .bq-frame-sm:empty, #screen-profile .bq-frame-sm:empty{ display:none; box-shadow:none; margin:0; }
 #screen-profile .bq-frame-sm{ padding:14px; }
@@ -671,8 +653,7 @@ button:active{transform:scale(.97)}
   <div class="person-bar" id="personBar" style="display:none"></div>
 
   <div class="screen active" id="screen-dashboard">
-    <div class="bq-frame" style="margin:10px 12px 0">
-      <div class="bq-frame-wood"><div class="bq-frame-carved"><div class="bq-frame-inner"><div class="bq-board">
+    <div class="bq-board" style="margin:10px 12px 0">
 
         <div class="quote-banner" style="padding:10px 6px 4px">
           <div class="quote-text bq-script" id="quoteText" style="font-size:20px;min-height:2.4em"></div>
@@ -710,7 +691,6 @@ button:active{transform:scale(.97)}
 
         <div class="bq-notes">📝 Notların için bu alan yakında açılacak...</div>
 
-      </div></div></div></div>
     </div>
 
     <div id="dashPRCard" class="bq-frame-sm"></div>
@@ -788,8 +768,7 @@ button:active{transform:scale(.97)}
 
   <!-- PROFILE SCREEN -->
   <div class="screen" id="screen-profile">
-    <div class="bq-frame" style="margin:10px 12px 0">
-      <div class="bq-frame-wood"><div class="bq-frame-carved"><div class="bq-frame-inner"><div class="bq-board">
+    <div class="bq-board" style="margin:10px 12px 0">
 
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
           <div>
@@ -823,7 +802,6 @@ button:active{transform:scale(.97)}
 
         <div id="profStatsLine" style="font-size:12px;color:var(--chalk2);line-height:1.7"></div>
 
-      </div></div></div></div>
     </div>
 
     <div id="profileEditCard" class="bq-frame-sm"></div>
