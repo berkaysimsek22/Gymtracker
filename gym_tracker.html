@@ -5348,6 +5348,20 @@ async function geminiFetch(body){
 // alan AYRI bir input ile kamera, capture'siz baska bir input ile galeri
 // garanti altina alindi; kullanici ikisinden birini seciyor.
 function showPhotoSourceMenu(btnEl, camId, galId){
+  // iOS'ta capture'siz input[accept="image/*"] zaten kendi yerlesik "Fotoğraf
+  // Kütüphanesi / Fotoğraf Çek / Dosya Seç" sheet'ini tek basina gosteriyor -
+  // ustune bizim ozel menumuzu de eklemek iPhone'da IKI KERE sorulmasina
+  // (once bizim menu, sonra iOS'un kendi sheet'i) sebep oluyordu. Bu yuzden
+  // iOS'ta kendi menumuzu hic gostermeden dogrudan galeri (capture'siz)
+  // input'u tetikliyoruz - tek adimda hem kamera hem galeri secenegi zaten
+  // geliyor. Android'de capture'siz input bu garantiyi vermedigi icin
+  // (orijinal "Android'ler resim atsın diye" fix'i) eski iki secenekli ozel
+  // menu aynen korunuyor.
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  if(isIOS){
+    document.getElementById(galId).click();
+    return;
+  }
   document.getElementById('photoSrcMenu')?.remove();
   const rect = btnEl.getBoundingClientRect();
   const menu = document.createElement('div');
