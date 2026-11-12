@@ -273,6 +273,18 @@ button:active{transform:scale(.97)}
 .wo-subtabs{display:flex;gap:6px;padding:14px 16px 0;overflow-x:auto}
 .wo-subtab{flex-shrink:0;padding:8px 14px;min-height:40px;display:flex;align-items:center;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s}
 .wo-subtab.active{background:var(--acc);color:#080808;border-color:var(--acc)}
+/* "Egzersizler" kutuphanesi (Workouts > Egzersizler alt sekmesi) */
+.wo-ex-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 14px;color:var(--text);font-size:14px;min-height:44px}
+.wo-ex-chip{flex-shrink:0;padding:6px 12px;min-height:32px;display:flex;align-items:center;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);font-size:11px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s}
+.wo-ex-chip.active{background:var(--acc-dim);color:var(--acc);border-color:var(--acc-border)}
+.wo-ex-letter{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;padding:14px 2px 6px}
+.wo-ex-row{display:flex;align-items:center;gap:12px;padding:10px 4px;cursor:pointer;border-bottom:1px solid var(--border)}
+.wo-ex-row img{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#fff;flex-shrink:0}
+.wo-ex-thumb-empty{width:44px;height:44px;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.wo-ex-row-info{flex:1;min-width:0}
+.wo-ex-row-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wo-ex-row-muscle{font-size:11px;color:#ef4444;margin-top:1px}
+.wo-ex-row-arr{color:var(--text-muted);font-size:13px;flex-shrink:0}
 .wo-section{margin-top:16px}
 .wo-day-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--card-shadow)}
 .wo-day-card h4{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
@@ -840,6 +852,7 @@ button:active{transform:scale(.97)}
       <button class="wo-subtab active" onclick="switchWoTab('split',this)">📋 Split</button>
       <button class="wo-subtab" onclick="switchWoTab('challenge',this)">🏆 Challenge</button>
       <button class="wo-subtab" onclick="switchWoTab('muscle',this)">💪 Kas Grubu</button>
+      <button class="wo-subtab" onclick="switchWoTab('exercises',this)">📚 Egzersizler</button>
     </div>
     <div id="woContent" style="padding:0 16px 20px"></div>
   </div>
@@ -3754,12 +3767,18 @@ function groupSetHistoryByDay(rows){
   return sessions;
 }
 
-let _exDetail = null; // {di, ei, name, dbRow, localRow, sessions, tab, chart}
+let _exDetail = null; // {name, dbRow, localRow, sessions, tab, chart}
 async function showExerciseDetailModal(di, ei){
   const ex = activeProgram()[di]?.exercises?.[ei];
   if(!ex) return;
+  await showExerciseDetailModalByName(ex.name);
+}
+// Antrenman gunundeki bir egzersizden (showExerciseDetailModal) ya da
+// Workouts > Egzersizler kutuphanesinden (showExerciseDetailModalByIndex)
+// AYNI modal acilsin diye isim bazli cekirdek burada - program gunu/index'i
+// gerektirmez.
+async function showExerciseDetailModalByName(name){
   closeExerciseDetailModal();
-  const name = ex.name;
   const uid = activeProfile()?.id;
   const dbRow = findExerciseDbRow(name);
   const localRow = EXERCISE_DB.find(e=>normalizeExName(e.name)===normalizeExName(name)) || null;
@@ -3769,7 +3788,7 @@ async function showExerciseDetailModal(di, ei){
     if(error) console.error('showExerciseDetailModal set_history error:', error);
     else sessions = groupSetHistoryByDay(data||[]);
   }
-  _exDetail = {di, ei, name, dbRow, localRow, sessions, tab:'about', chart:null};
+  _exDetail = {name, dbRow, localRow, sessions, tab:'about', chart:null};
   const modal=document.createElement('div');
   modal.id='exDetailModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:700;display:flex;align-items:flex-end;justify-content:center';
@@ -5796,6 +5815,7 @@ function renderWoTab(tab){
   if(tab==='split') renderWoSplit(el);
   else if(tab==='challenge') renderWoChallenge(el);
   else if(tab==='muscle') renderWoMuscle(el);
+  else if(tab==='exercises') renderWoExercises(el);
 }
 
 // ── POPÜLER SPLİTLER (internetteki en favori 10 program) ──
@@ -6850,6 +6870,63 @@ function renderWoMuscle(el, activeRegion){
       + '</div>';
   }
   el.innerHTML = `<div class="wo-muscle-grid">${buttons}</div>${rankingHtml}`;
+}
+
+// ── "EGZERSİZLER" KÜTÜPHANESİ (Workouts > Egzersizler) ──
+// Tam ExerciseDB kataloğu (~1300 hareket) RapidAPI'nin ücretsiz planında
+// gezilemiyor (bkz. supabase/functions/import-exercisedb/index.ts'teki not),
+// bu yüzden gezilebilir liste olarak zaten var olan yerel EXERCISE_DB
+// (egzersiz ekleme aramasında da kullanılan ayni liste) kullanılıyor - GIF'ler
+// sadece Supabase'e şimdiye kadar içe aktarılmış hareketler için görünüyor,
+// digerleri icin "ℹ️" ile acilan detay modali "GIF henüz eklenmedi" gösterir.
+let _woExFilter = {search:'', bodyPart:'all', equipment:'all'};
+function renderWoExercises(el){
+  const bodyParts = ['all','Göğüs','Sırt','Omuz','Kol','Bacak','Kalça','Karın'];
+  const equipmentSet = new Set();
+  EXERCISE_DB.forEach(ex=>{ const eq = findExerciseDbRow(ex.name)?.equipment; if(eq) equipmentSet.add(eq); });
+  const equipments = ['all', ...[...equipmentSet].sort((a,b)=>a.localeCompare(b,'tr'))];
+  el.innerHTML = `
+    <input type="text" class="wo-ex-search" id="woExSearch" placeholder="Hareket ara..." value="${_woExFilter.search}" oninput="_woExFilter.search=this.value;renderWoExerciseList()">
+    <div style="display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px">
+      ${bodyParts.map(r=>`<button class="wo-ex-chip${_woExFilter.bodyPart===r?' active':''}" onclick="_woExFilter.bodyPart='${r}';renderWoExerciseList()">${r==='all'?'Tüm Bölgeler':r}</button>`).join('')}
+    </div>
+    ${equipments.length>1?`<div style="display:flex;gap:6px;overflow-x:auto;padding:0 0 10px">
+      ${equipments.map(eq=>`<button class="wo-ex-chip${_woExFilter.equipment===eq?' active':''}" onclick="_woExFilter.equipment='${eq.replace(/'/g,"\\'")}';renderWoExerciseList()">${eq==='all'?'Tüm Ekipman':eq}</button>`).join('')}
+    </div>`:''}
+    <div id="woExList"></div>
+  `;
+  renderWoExerciseList();
+}
+function renderWoExerciseList(){
+  const listEl = document.getElementById('woExList');
+  if(!listEl) return;
+  const q = normalizeExName(_woExFilter.search);
+  let items = EXERCISE_DB.map((ex,i)=>({...ex, _idx:i})).filter(ex=>{
+    if(q && !normalizeExName(ex.name).includes(q)) return false;
+    if(_woExFilter.bodyPart!=='all' && dashMuscleRegion(ex.muscle)!==_woExFilter.bodyPart) return false;
+    if(_woExFilter.equipment!=='all' && (findExerciseDbRow(ex.name)?.equipment!==_woExFilter.equipment)) return false;
+    return true;
+  });
+  items.sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  if(!items.length){ listEl.innerHTML = '<div class="empty-state">Eşleşen hareket bulunamadı.</div>'; return; }
+  let html = '', lastLetter = '';
+  items.forEach(ex=>{
+    const letter = ex.name[0].toUpperCase();
+    if(letter!==lastLetter){ html += `<div class="wo-ex-letter">${letter}</div>`; lastLetter = letter; }
+    const gif = findExerciseDbRow(ex.name)?.gif_url;
+    const region = dashMuscleRegion(ex.muscle);
+    html += `<div class="wo-ex-row" onclick="showExerciseDetailModalByIndex(${ex._idx})">
+      ${gif?`<img src="${gif}" alt="" loading="lazy">`:`<div class="wo-ex-thumb-empty">🏋️</div>`}
+      <div class="wo-ex-row-info"><div class="wo-ex-row-name">${ex.name}</div><div class="wo-ex-row-muscle">${region}</div></div>
+      <div class="wo-ex-row-arr">ℹ️</div>
+    </div>`;
+  });
+  listEl.innerHTML = html;
+}
+function showExerciseDetailModalByIndex(idx){
+  const ex = EXERCISE_DB[idx];
+  if(!ex) return;
+  showExerciseDetailModalByName(ex.name);
 }
 
 // ── AUTH LISTENER ──
