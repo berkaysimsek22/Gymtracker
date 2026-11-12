@@ -3298,6 +3298,7 @@ async function renderDayContent(di, skipFetch) {
   let doneSets = 0;
   day.exercises.forEach((ex,ei)=>{for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)doneSets++;}});
   const pct = total>0?Math.round(doneSets/total*100):0;
+  const dayMuscleSets = computeDayMuscleSets(day);
 
   let html = `<div class="day-head-row">
     <div class="day-head-left">
@@ -3308,7 +3309,7 @@ async function renderDayContent(di, skipFetch) {
     <div class="day-head-right">
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
       <button class="btn btn-outline btn-sm" id="woTimerPill" onclick="toggleWorkoutTimer('${uid}',${di})" title="Antrenman süresi — manuel başlat/durdur, ilk set işaretlenince de otomatik başlar">⏱ Başlat</button>
-      <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">🧍</button>
+      <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası" style="padding:4px 8px;line-height:0">${miniBodyIcon(dayMuscleSets)}</button>
       ${canEditHere&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEditHere?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
       ${dayMenuBtn}
@@ -3610,7 +3611,12 @@ function buildExCard(ex, di, ei, prevSets) {
   const gifHtml = gifUrl ? `<div class="ex-gif"><img src="${gifUrl}" alt="${ex.name}" loading="lazy" style="width:100%;max-width:280px;border-radius:8px;margin:0 auto 10px;display:block"></div>` : '';
   card.innerHTML = `<div class="ex-header" onclick="toggleEC('ec_${di}_${ei}')">
     <div class="ex-num-badge">${ei+1}</div>
-    <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display"><span style="color:#ef4444;font-weight:500">${ex.muscle.split('·')[0].split('+')[0].trim()}</span>${ex.muscle.includes('·')||ex.muscle.includes('+')?'<span style="color:var(--muted)"> · '+ex.muscle.split(/[·+]/)[1].trim()+'</span>':''}</div></div>
+    <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display">${(()=>{
+      const isolate = ex.muscle.split('·')[0].split('+')[0].trim();
+      const region = dashMuscleRegion(ex.muscle);
+      const showIsolate = isolate && region.toLowerCase()!==isolate.toLowerCase();
+      return '<span style="color:#ef4444;font-weight:500">'+region+'</span>'+(showIsolate?'<span style="color:var(--muted)"> · '+isolate+'</span>':'');
+    })()}</div></div>
     <div class="ex-meta">
       <div class="meta-pill${comp?' done-pill':''}" id="mp_${di}_${ei}">${done}/${ex.sets}</div>
       <div class="meta-pill">${ex.reps}×${ex.sets}</div>
@@ -6827,24 +6833,20 @@ function selectExercise(ex){
   showMuscleVisual(ex.muscles||[]);
 }
 
-function showMuscleVisual(activeMuscles, muscleSets){
-  muscleSets = muscleSets || {};
-  const existing=document.getElementById('muscleVisualModal');
-  if(existing)existing.remove();
-  const modal=document.createElement('div');
-  modal.id='muscleVisualModal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
-  const muscleColors={
-    glute_max:'#d4f53c',glute_med:'#a8d400',
-    quad:'#38b6ff',hamstring:'#1a8fd1',
-    chest:'#ff5c38',lat:'#ff8c69',mid_back:'#ff6b4a',
-    front_delt:'#f7c948',side_delt:'#f7a800',rear_delt:'#c47d00',
-    biceps:'#c084fc',triceps:'#9333ea',
-    abs:'#34d399',calves:'#10b981'
-  };
-  const getC=(m)=>muscleColors[m]||'#d4f53c';
-  // SVG body front
-  const front=`<svg viewBox="0 0 120 260" width="110" xmlns="http://www.w3.org/2000/svg">
+// Kas haritasi onizlemesinde ve kucuk "yogunluk adami" ikonunda (bkz.
+// miniBodyIcon) AYNI on-vucut SVG'si, sadece farkli genislikte - renk ve
+// yapi tek yerde tutulsun diye.
+const MUSCLE_ICON_COLORS={
+  glute_max:'#d4f53c',glute_med:'#a8d400',
+  quad:'#38b6ff',hamstring:'#1a8fd1',
+  chest:'#ff5c38',lat:'#ff8c69',mid_back:'#ff6b4a',
+  front_delt:'#f7c948',side_delt:'#f7a800',rear_delt:'#c47d00',
+  biceps:'#c084fc',triceps:'#9333ea',
+  abs:'#34d399',calves:'#10b981'
+};
+function bodyFrontSvg(width, activeMuscles){
+  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#d4f53c';
+  return `<svg viewBox="0 0 120 260" width="${width}" xmlns="http://www.w3.org/2000/svg">
     <!-- Head -->
     <ellipse cx="60" cy="22" rx="16" ry="18" fill="#2a2a2a" stroke="#444" stroke-width="1"/>
     <!-- Neck -->
@@ -6876,6 +6878,24 @@ function showMuscleVisual(activeMuscles, muscleSets){
     <rect x="33" y="200" width="20" height="38" rx="6" fill="${activeMuscles.includes('calves')?getC('calves'):'#1a1a1a'}" stroke="#333" stroke-width="1"/>
     <rect x="67" y="200" width="20" height="38" rx="6" fill="${activeMuscles.includes('calves')?getC('calves'):'#1a1a1a'}" stroke="#333" stroke-width="1"/>
   </svg>`;
+}
+// Gun basligindaki "Kas Haritası" butonu icin - emoji yerine, o gun
+// calisilacak kaslari onizleyen KUCUK bir vucut ikonu (ayni on-vucut SVG'si,
+// kucultulmus).
+function miniBodyIcon(muscleSets){
+  return bodyFrontSvg(18, Object.keys(muscleSets||{}));
+}
+
+function showMuscleVisual(activeMuscles, muscleSets){
+  muscleSets = muscleSets || {};
+  const existing=document.getElementById('muscleVisualModal');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='muscleVisualModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
+  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#d4f53c';
+  // SVG body front
+  const front=bodyFrontSvg(110, activeMuscles);
   // SVG body back
   const back=`<svg viewBox="0 0 120 260" width="110" xmlns="http://www.w3.org/2000/svg">
     <!-- Head -->
@@ -6960,16 +6980,15 @@ function showMuscleVisual(activeMuscles, muscleSets){
 }
 
 // Daily muscle map - show which muscles worked today
-function showDayMuscleMap(di){
-  const prog=activeProgram()[di];
-  if(!prog||prog.type==='rest')return;
-  // Artik SADECE hangi kaslarin calistigini degil, NE KADAR (toplam set)
-  // calistigini da biriktiriyoruz - showMuscleVisual bunu, once genel kas
-  // bolgesini, sonra o bolgede en cok calisan izole kasi gostermek icin
-  // kullaniyor.
+// Bir gunun egzersiz listesinden kas-id basina toplam set sayisini cikarir -
+// hem "Kas Haritası" penceresi (showDayMuscleMap) hem de gun basligindaki
+// kucuk "yogunluk adami" ikonu (miniBodyIcon cagrilari) AYNI hesaplamayi
+// kullansin diye tek yerde toplandi.
+function computeDayMuscleSets(day){
   const muscleSets={};
+  if(!day || !day.exercises) return muscleSets;
   const addSets=(m, sets)=>{ muscleSets[m]=(muscleSets[m]||0)+sets; };
-  prog.exercises.forEach(ex=>{
+  day.exercises.forEach(ex=>{
     const exName=(ex.name||'').toLowerCase().trim();
     const sets=parseInt(ex.sets)||0;
     const found=EXERCISE_DB.find(e=>
@@ -6997,6 +7016,13 @@ function showDayMuscleMap(di){
       if(m.includes('calf')||m.includes('baldır')||m.includes('soleus')) addSets('calves', sets);
     }
   });
+  return muscleSets;
+}
+
+function showDayMuscleMap(di){
+  const prog=activeProgram()[di];
+  if(!prog||prog.type==='rest')return;
+  const muscleSets = computeDayMuscleSets(prog);
   showMuscleVisual(Object.keys(muscleSets), muscleSets);
 }
 
