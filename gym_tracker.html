@@ -338,7 +338,7 @@ button:active{transform:scale(.97)}
 .day-head-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .day-head-title{background:none;border:none;color:var(--text);font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;flex:1;min-width:0;padding:0}
 .day-type-pill{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:10px;white-space:nowrap}
-.day-head-right{display:flex;gap:6px;align-items:center}
+.day-head-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 
 /* EXERCISE CARD */
 .ex-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:8px;overflow:hidden;transition:border-color .2s,background .2s;box-shadow:var(--card-shadow)}
@@ -2054,6 +2054,26 @@ function dashMuscleRegion(muscleStr){
   return reportPrimaryMuscle(muscleStr);
 }
 
+// Antrenman gunu basligindaki pill icin - 'full' tipi (tum normal antrenman
+// gunlerinde kullanilan TEK data tipi) hem gercek full-body gunlerde hem de
+// split (push/pull/bacak vb.) gunlerde ayni "FULL" etiketini gosteriyordu.
+// Artik gunun egzersizleri KAC FARKLI genel bolgeye (dashMuscleRegion ile)
+// yayiliyor ona bakiyoruz: coğu bolgeye yayilmissa gercekten "FULL BODY",
+// degilse en cok set yapilan TEK bolge (split'in "focus"u) gosteriliyor.
+function computeDayFocusLabel(day){
+  if(!day.exercises || !day.exercises.length) return 'FULL BODY';
+  const setTotals = {};
+  day.exercises.forEach(ex=>{
+    const region = dashMuscleRegion(ex.muscle);
+    if(region==='Diğer') return;
+    setTotals[region] = (setTotals[region]||0) + (parseInt(ex.sets)||0);
+  });
+  const regions = Object.keys(setTotals);
+  if(regions.length===0 || regions.length>=4) return 'FULL BODY';
+  const top = Object.entries(setTotals).sort((a,b)=>b[1]-a[1])[0][0];
+  return top.toLocaleUpperCase('tr-TR');
+}
+
 // "Günlük antrenman karatahtasi" (BERQ Dark Gym Heritage) - normal (tip
 // 'full') günlerde gercek egzersiz listesini numarali, set×tekrarli olarak
 // gösterir; her egzersizin TÜM setleri isaretlenmisse (setCache'ten, aynen
@@ -3278,17 +3298,18 @@ async function renderDayContent(di, skipFetch) {
   let doneSets = 0;
   day.exercises.forEach((ex,ei)=>{for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)doneSets++;}});
   const pct = total>0?Math.round(doneSets/total*100):0;
+  const dayMuscleSets = computeDayMuscleSets(day);
 
   let html = `<div class="day-head-row">
     <div class="day-head-left">
       <input class="day-head-title" value="${day.name}" ${canEditHere?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
-      ${editMode&&canEditHere?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">'+day.type.toUpperCase()+'</span>'}
+      ${editMode&&canEditHere?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">'+computeDayFocusLabel(day)+'</span>'}
       ${overrideBadge}
     </div>
     <div class="day-head-right">
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
       <button class="btn btn-outline btn-sm" id="woTimerPill" onclick="toggleWorkoutTimer('${uid}',${di})" title="Antrenman süresi — manuel başlat/durdur, ilk set işaretlenince de otomatik başlar">⏱ Başlat</button>
-      <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası">💪</button>
+      <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası" style="padding:4px 8px;line-height:0">${miniBodyIcon(dayMuscleSets)}</button>
       ${canEditHere&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
       ${canEditHere?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
       ${dayMenuBtn}
@@ -3338,7 +3359,8 @@ async function renderDayContent(di, skipFetch) {
     console.warn(`renderDayContent: gün ${di} (${day.name}) için exercises dizisi boş/tanımsız`, day);
     exList.innerHTML = '<div class="empty-state">Egzersiz bulunamadı.'+(canEditHere?' Düzenle moduna geçip egzersiz ekleyebilirsin.':'')+'</div>';
   } else {
-    day.exercises.forEach((ex,ei) => exList.appendChild(buildExCard(ex,di,ei)));
+    const prevSetsMap = await loadPreviousSetsMap(uid, day.exercises.map(e=>e.name));
+    day.exercises.forEach((ex,ei) => exList.appendChild(buildExCard(ex,di,ei,prevSetsMap[ex.name])));
   }
   setupWorkoutTimerDisplay(uid, di);
 }
@@ -3524,7 +3546,7 @@ async function saveDayOverrideFromModal(){
   renderWeekGrid();
 }
 
-function buildExCard(ex, di, ei) {
+function buildExCard(ex, di, ei, prevSets) {
   const uid = activeProfile()?.id;
   let done = 0;
   for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)done++;}
@@ -3548,11 +3570,18 @@ function buildExCard(ex, di, ei) {
     const hasRir = rirVal!==undefined && rirVal!==null;
     const rirBucket = hasRir ? (rirVal>=3?3:rirVal) : null;
     const rirBadgeHtml = hasRir ? `<span class="rir-badge rir-badge-${rirBucket}">${rirVal>=3?'3+':rirVal}</span>` : '';
+    // Onceki antrenmanda bu setin degeri (set_history'den, loadPreviousSetsMap
+    // ile onceden cekildi) - hem bosken placeholder yerine gecsin, hem de
+    // ayri bir "Önceki:" satiriyla her zaman gorunur kalsin.
+    const prev = prevSets && prevSets[s];
+    const prevWeightTxt = prev ? String(prev.weight) : '';
+    const prevHintHtml = prev ? `<div class="prev-hint" style="grid-column:2/4;font-size:10px;color:var(--text-muted);margin-top:-2px">Önceki: ${prev.weight}kg${prev.reps?` × ${prev.reps}`:''}</div>` : '';
     setRows += `<div class="set-row${isDone?' sdone':''}${isWarmup?' warmup-row':''}" id="sr_${k}">
       <div class="snum">${s+1}${rirBadgeHtml}</div>
-      <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="${sd.weight||'kg'}" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
-      <input class="sinput" type="text" placeholder="${sd.reps||repTarget}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
-      <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?"✓":"O"}</button>
+      <input class="sinput" type="number" step="0.5" min="0" inputmode="decimal" placeholder="${sd.weight||prevWeightTxt||'kg'}" value="${sd.weight||''}" id="sw_${k}" oninput="qSave('${uid}',${di},${ei},${s},'weight',this.value)">
+      <input class="sinput" type="text" placeholder="${sd.reps||(prev?prev.reps:'')||repTarget}" value="${sd.reps||''}" id="sr2_${k}" oninput="qSave('${uid}',${di},${ei},${s},'reps',this.value)">
+      <button class="chk-btn${isDone?' chk':''}" id="cb_${k}" onclick="toggleSet('${uid}',${di},${ei},${s},${ex.restSec})">${isDone?"✓":"☐"}</button>
+      ${prevHintHtml}
     </div>
     <div class="rir-popup" id="rirpop_${k}">
       <div class="rir-popup-inner">
@@ -3582,7 +3611,12 @@ function buildExCard(ex, di, ei) {
   const gifHtml = gifUrl ? `<div class="ex-gif"><img src="${gifUrl}" alt="${ex.name}" loading="lazy" style="width:100%;max-width:280px;border-radius:8px;margin:0 auto 10px;display:block"></div>` : '';
   card.innerHTML = `<div class="ex-header" onclick="toggleEC('ec_${di}_${ei}')">
     <div class="ex-num-badge">${ei+1}</div>
-    <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display"><span style="color:#ef4444;font-weight:500">${ex.muscle.split('·')[0].split('+')[0].trim()}</span>${ex.muscle.includes('·')||ex.muscle.includes('+')?'<span style="color:var(--muted)"> · '+ex.muscle.split(/[·+]/)[1].trim()+'</span>':''}</div></div>
+    <div class="ex-info"><div class="ex-name-display">${ex.name}</div><div class="ex-muscle-display">${(()=>{
+      const isolate = ex.muscle.split('·')[0].split('+')[0].trim();
+      const region = dashMuscleRegion(ex.muscle);
+      const showIsolate = isolate && region.toLowerCase()!==isolate.toLowerCase();
+      return '<span style="color:#ef4444;font-weight:500">'+region+'</span>'+(showIsolate?'<span style="color:var(--muted)"> · '+isolate+'</span>':'');
+    })()}</div></div>
     <div class="ex-meta">
       <div class="meta-pill${comp?' done-pill':''}" id="mp_${di}_${ei}">${done}/${ex.sets}</div>
       <div class="meta-pill">${ex.reps}×${ex.sets}</div>
@@ -3642,6 +3676,35 @@ function qSave(uid,di,ei,si,field,val){
   saveSet(uid,di,ei,si,{[field]:val});
 }
 
+// "Önceki" set degerleri - workout_sets'teki ayni slot zaten hafta hafta
+// AYNI satiri kullanip agirlik/tekrari koruyor, ama bu TEK deger "o an
+// ekranda olan" ile "gecen seferki" arasinda ayrim yapmiyor (kullanici
+// ayirt edemiyor). set_history (append-only, her tamamlanan sette ayri
+// satir) kullanilarak EN SON GUNUN set sirasina gore ayri bir "Önceki:"
+// referansi cikariliyor - gun basina birden fazla egzersiz icin TEK
+// sorguda (in()) batch cekilir, buildExCard'in kendisi senkron kalir.
+async function loadPreviousSetsMap(uid, exerciseNames){
+  if(!uid || !exerciseNames || !exerciseNames.length) return {};
+  const {data, error} = await sb.from('set_history')
+    .select('exercise_name,weight,reps,logged_at')
+    .eq('user_id', uid)
+    .in('exercise_name', exerciseNames)
+    .order('logged_at', {ascending:false})
+    .limit(400);
+  if(error || !data || !data.length) return {};
+  const byExercise = {};
+  data.forEach(r=>{ (byExercise[r.exercise_name] = byExercise[r.exercise_name]||[]).push(r); });
+  const result = {};
+  Object.entries(byExercise).forEach(([name, rows])=>{
+    // rows zaten logged_at'e gore azalan - ilk satirin GUNU "en son seans" kabul edilir.
+    const latestDate = new Date(rows[0].logged_at); latestDate.setHours(0,0,0,0);
+    const nextDate = new Date(latestDate); nextDate.setDate(latestDate.getDate()+1);
+    const sameDay = rows.filter(r=>{ const d=new Date(r.logged_at); return d>=latestDate && d<nextDate; });
+    result[name] = sameDay.reverse(); // set 1, set 2, ... sirasina donduruldu
+  });
+  return result;
+}
+
 // PR bildirimi (dashboard) icin append-only gecmis log'u - bkz. scripts/set-history-table.sql
 async function logSetHistory(uid, exerciseName, weight, reps){
   try{
@@ -3674,7 +3737,7 @@ async function toggleSet(uid,di,ei,si,rs){
   Object.assign(setCache[k], fields);
   const row=document.getElementById('sr_'+k),btn=document.getElementById('cb_'+k);
   if(newDone){row?.classList.add('sdone');if(btn){btn.classList.add('chk');btn.textContent='✓';}openRIRPopup(k);}
-  else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='O';}closeRIRPopup(k);}
+  else{row?.classList.remove('sdone');if(btn){btn.classList.remove('chk');btn.textContent='☐';}closeRIRPopup(k);}
   const ex=activeProgram()[di].exercises[ei];let done=0;
   for(let s=0;s<ex.sets;s++){if(setCache[`${uid}_${di}_${ei}_${s}`]?.done)done++;}
   const mp=document.getElementById(`mp_${di}_${ei}`);if(mp){mp.textContent=`${done}/${ex.sets}`;mp.className=`meta-pill${done===ex.sets?' done-pill':''}`;}
@@ -3689,7 +3752,7 @@ async function toggleSet(uid,di,ei,si,rs){
     // devam etmesin.
     alert('⚠️ Bu set kaydedilemedi.\n\nSebep: '+(lastSetSaveError||'bilinmeyen hata')+'\n\nBu mesajın ekran görüntüsünü gönderirsen sorunu kesin olarak bulabilirim.');
     Object.assign(setCache[k], {done: !newDone});
-    if(newDone){ row?.classList.remove('sdone'); if(btn){btn.classList.remove('chk');btn.textContent='O';} closeRIRPopup(k); }
+    if(newDone){ row?.classList.remove('sdone'); if(btn){btn.classList.remove('chk');btn.textContent='☐';} closeRIRPopup(k); }
     else { row?.classList.add('sdone'); if(btn){btn.classList.add('chk');btn.textContent='✓';} }
     let doneAfterRevert=0;
     for(let s=0;s<ex.sets;s++){ if(setCache[`${uid}_${di}_${ei}_${s}`]?.done) doneAfterRevert++; }
@@ -6770,23 +6833,20 @@ function selectExercise(ex){
   showMuscleVisual(ex.muscles||[]);
 }
 
-function showMuscleVisual(activeMuscles){
-  const existing=document.getElementById('muscleVisualModal');
-  if(existing)existing.remove();
-  const modal=document.createElement('div');
-  modal.id='muscleVisualModal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
-  const muscleColors={
-    glute_max:'#d4f53c',glute_med:'#a8d400',
-    quad:'#38b6ff',hamstring:'#1a8fd1',
-    chest:'#ff5c38',lat:'#ff8c69',mid_back:'#ff6b4a',
-    front_delt:'#f7c948',side_delt:'#f7a800',rear_delt:'#c47d00',
-    biceps:'#c084fc',triceps:'#9333ea',
-    abs:'#34d399',calves:'#10b981'
-  };
-  const getC=(m)=>muscleColors[m]||'#d4f53c';
-  // SVG body front
-  const front=`<svg viewBox="0 0 120 260" width="110" xmlns="http://www.w3.org/2000/svg">
+// Kas haritasi onizlemesinde ve kucuk "yogunluk adami" ikonunda (bkz.
+// miniBodyIcon) AYNI on-vucut SVG'si, sadece farkli genislikte - renk ve
+// yapi tek yerde tutulsun diye.
+const MUSCLE_ICON_COLORS={
+  glute_max:'#d4f53c',glute_med:'#a8d400',
+  quad:'#38b6ff',hamstring:'#1a8fd1',
+  chest:'#ff5c38',lat:'#ff8c69',mid_back:'#ff6b4a',
+  front_delt:'#f7c948',side_delt:'#f7a800',rear_delt:'#c47d00',
+  biceps:'#c084fc',triceps:'#9333ea',
+  abs:'#34d399',calves:'#10b981'
+};
+function bodyFrontSvg(width, activeMuscles){
+  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#d4f53c';
+  return `<svg viewBox="0 0 120 260" width="${width}" xmlns="http://www.w3.org/2000/svg">
     <!-- Head -->
     <ellipse cx="60" cy="22" rx="16" ry="18" fill="#2a2a2a" stroke="#444" stroke-width="1"/>
     <!-- Neck -->
@@ -6818,6 +6878,24 @@ function showMuscleVisual(activeMuscles){
     <rect x="33" y="200" width="20" height="38" rx="6" fill="${activeMuscles.includes('calves')?getC('calves'):'#1a1a1a'}" stroke="#333" stroke-width="1"/>
     <rect x="67" y="200" width="20" height="38" rx="6" fill="${activeMuscles.includes('calves')?getC('calves'):'#1a1a1a'}" stroke="#333" stroke-width="1"/>
   </svg>`;
+}
+// Gun basligindaki "Kas Haritası" butonu icin - emoji yerine, o gun
+// calisilacak kaslari onizleyen KUCUK bir vucut ikonu (ayni on-vucut SVG'si,
+// kucultulmus).
+function miniBodyIcon(muscleSets){
+  return bodyFrontSvg(18, Object.keys(muscleSets||{}));
+}
+
+function showMuscleVisual(activeMuscles, muscleSets){
+  muscleSets = muscleSets || {};
+  const existing=document.getElementById('muscleVisualModal');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='muscleVisualModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
+  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#d4f53c';
+  // SVG body front
+  const front=bodyFrontSvg(110, activeMuscles);
   // SVG body back
   const back=`<svg viewBox="0 0 120 260" width="110" xmlns="http://www.w3.org/2000/svg">
     <!-- Head -->
@@ -6851,13 +6929,41 @@ function showMuscleVisual(activeMuscles){
     <rect x="33" y="200" width="20" height="38" rx="6" fill="${activeMuscles.includes('calves')?getC('calves'):'#1a1a1a'}" stroke="#333" stroke-width="1"/>
     <rect x="67" y="200" width="20" height="38" rx="6" fill="${activeMuscles.includes('calves')?getC('calves'):'#1a1a1a'}" stroke="#333" stroke-width="1"/>
   </svg>`;
-  const muscleNames=activeMuscles.map(m=>({
+  const ISOLATE_LABEL={
     glute_max:'Glute Maximus',glute_med:'Glute Medius',quad:'Quadriceps',
     hamstring:'Hamstring',chest:'Pectoral',lat:'Latissimus Dorsi',
     mid_back:'Mid Back · Traps',front_delt:'Ön Deltoid',side_delt:'Yan Deltoid',
     rear_delt:'Arka Deltoid',biceps:'Biceps',triceps:'Triceps',abs:'Core · Abs',calves:'Baldır'
-  }[m]||m)).filter(Boolean);
-  const muscleChips = muscleNames.map(m=>'<span style="font-size:10px;padding:3px 10px;border-radius:10px;background:rgba(212,245,60,.1);color:#d4f53c;border:1px solid rgba(212,245,60,.2)">'+m+'</span>').join('');
+  };
+  // Once genel bolge (chest/leg/glute/arm...), sonra o bolgede EN COK
+  // calisan (set sayisina gore) izole kas - "izole kas tek basina liste
+  // basinda olmasin, once genel bolge sonra onun en cok calisan alt kasi"
+  // isteniyordu. Bolgeler kendi aralarinda da toplam set sayisina gore
+  // (en cok calisandan en aza) siralaniyor.
+  const REGION_MAP={
+    chest:'Göğüs',
+    lat:'Sırt', mid_back:'Sırt',
+    front_delt:'Omuz', side_delt:'Omuz', rear_delt:'Omuz',
+    biceps:'Kol', triceps:'Kol',
+    quad:'Bacak', hamstring:'Bacak', calves:'Bacak',
+    glute_max:'Kalça', glute_med:'Kalça',
+    abs:'Karın',
+  };
+  const regionAgg={};
+  activeMuscles.forEach(m=>{
+    const region=REGION_MAP[m]||'Diğer';
+    const amt=muscleSets[m]||0;
+    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1};
+    regionAgg[region].total+=amt;
+    if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
+  });
+  const regionRows = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total).map(([region,info])=>{
+    const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(212,245,60,.08);border:1px solid rgba(212,245,60,.2);border-radius:10px;margin-bottom:6px">'
+      + '<span style="font-size:12px;font-weight:700;color:#d4f53c">'+region+'</span>'
+      + '<span style="font-size:11px;color:var(--text-muted)">'+isolateLabel+'</span>'
+      + '</div>';
+  }).join('') || '<div class="empty-state" style="padding:8px 0">Bu güne egzersiz bulunamadı.</div>';
   modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
     + '<h3 style="font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:.5px">Çalışan Kaslar</h3>'
@@ -6867,45 +6973,57 @@ function showMuscleVisual(activeMuscles){
     + '<div style="text-align:center"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Ön</div>' + front + '</div>'
     + '<div style="text-align:center"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Arka</div>' + back + '</div>'
     + '</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">' + muscleChips + '</div>'
+    + '<div>' + regionRows + '</div>'
     + '<button onclick="document.getElementById(\'muscleVisualModal\').remove()" style="width:100%;margin-top:16px;padding:10px;border-radius:8px;background:#d4f53c;border:none;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:12px">Kapat & Ekle</button>'
     + '</div>';
   document.body.appendChild(modal);
 }
 
 // Daily muscle map - show which muscles worked today
-function showDayMuscleMap(di){
-  const prog=activeProgram()[di];
-  if(!prog||prog.type==='rest')return;
-  const allMuscles=new Set();
-  prog.exercises.forEach(ex=>{
+// Bir gunun egzersiz listesinden kas-id basina toplam set sayisini cikarir -
+// hem "Kas Haritası" penceresi (showDayMuscleMap) hem de gun basligindaki
+// kucuk "yogunluk adami" ikonu (miniBodyIcon cagrilari) AYNI hesaplamayi
+// kullansin diye tek yerde toplandi.
+function computeDayMuscleSets(day){
+  const muscleSets={};
+  if(!day || !day.exercises) return muscleSets;
+  const addSets=(m, sets)=>{ muscleSets[m]=(muscleSets[m]||0)+sets; };
+  day.exercises.forEach(ex=>{
     const exName=(ex.name||'').toLowerCase().trim();
+    const sets=parseInt(ex.sets)||0;
     const found=EXERCISE_DB.find(e=>
       e.name.toLowerCase()===exName ||
       e.name.toLowerCase().includes(exName) ||
       exName.includes(e.name.toLowerCase())
     );
-    if(found) found.muscles.forEach(m=>allMuscles.add(m));
+    if(found) found.muscles.forEach(m=>addSets(m, sets));
     else if(ex.muscle){
       // Fallback: map muscle text to muscle IDs
       const m=ex.muscle.toLowerCase();
-      if(m.includes('glute max')) allMuscles.add('glute_max');
-      if(m.includes('glute med')) allMuscles.add('glute_med');
-      if(m.includes('quad')) allMuscles.add('quad');
-      if(m.includes('hamstring')) allMuscles.add('hamstring');
-      if(m.includes('chest')||m.includes('pectoral')) allMuscles.add('chest');
-      if(m.includes('lat')) allMuscles.add('lat');
-      if(m.includes('mid back')||m.includes('rhomboid')||m.includes('trap')) allMuscles.add('mid_back');
-      if(m.includes('front delt')||m.includes('anterior')) allMuscles.add('front_delt');
-      if(m.includes('side delt')||m.includes('lateral delt')) allMuscles.add('side_delt');
-      if(m.includes('rear delt')||m.includes('posterior')) allMuscles.add('rear_delt');
-      if(m.includes('bicep')) allMuscles.add('biceps');
-      if(m.includes('tricep')) allMuscles.add('triceps');
-      if(m.includes('abs')||m.includes('core')||m.includes('karın')) allMuscles.add('abs');
-      if(m.includes('calf')||m.includes('baldır')||m.includes('soleus')) allMuscles.add('calves');
+      if(m.includes('glute max')) addSets('glute_max', sets);
+      if(m.includes('glute med')) addSets('glute_med', sets);
+      if(m.includes('quad')) addSets('quad', sets);
+      if(m.includes('hamstring')) addSets('hamstring', sets);
+      if(m.includes('chest')||m.includes('pectoral')) addSets('chest', sets);
+      if(m.includes('lat')) addSets('lat', sets);
+      if(m.includes('mid back')||m.includes('rhomboid')||m.includes('trap')) addSets('mid_back', sets);
+      if(m.includes('front delt')||m.includes('anterior')) addSets('front_delt', sets);
+      if(m.includes('side delt')||m.includes('lateral delt')) addSets('side_delt', sets);
+      if(m.includes('rear delt')||m.includes('posterior')) addSets('rear_delt', sets);
+      if(m.includes('bicep')) addSets('biceps', sets);
+      if(m.includes('tricep')) addSets('triceps', sets);
+      if(m.includes('abs')||m.includes('core')||m.includes('karın')) addSets('abs', sets);
+      if(m.includes('calf')||m.includes('baldır')||m.includes('soleus')) addSets('calves', sets);
     }
   });
-  showMuscleVisual([...allMuscles]);
+  return muscleSets;
+}
+
+function showDayMuscleMap(di){
+  const prog=activeProgram()[di];
+  if(!prog||prog.type==='rest')return;
+  const muscleSets = computeDayMuscleSets(prog);
+  showMuscleVisual(Object.keys(muscleSets), muscleSets);
 }
 
 
