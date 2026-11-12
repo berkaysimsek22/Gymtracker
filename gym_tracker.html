@@ -17,6 +17,7 @@
 <title>GYM TRACKER</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 // Tema <style> bloğundan ÖNCE, mümkün olan en erken anda uygulanır - yoksa
 // sayfa önce koyu temayla boyanıp bir an sonra açığa döner (flash of wrong theme).
@@ -1098,10 +1099,13 @@ async function loadProgramForUser(userId) {
   if(fixed) saveProgram(userId);
 }
 
-// ExerciseDB GIF'leri icin basit, normalize-isim bazli onbellek. Tablo bos/yoksa
-// (henuz import script'i calistirilmamissa) sessizce bos kalir, egzersiz
-// kartlarinda GIF gorunmez ama hicbir sey bozulmaz.
-let exerciseGifCache = null; // normalizedName -> gifUrl
+// ExerciseDB satirlari icin basit, normalize-isim bazli onbellek. Tablo bos/yoksa
+// (henuz import Edge Function'i calismamissa/bitmemisse) sessizce bos kalir,
+// egzersiz kartlarinda GIF gorunmez ama hicbir sey bozulmaz. Eskiden sadece
+// gif_url tutuluyordu (findExerciseGif) - artik egzersiz detay modali icin
+// TUM satir (body_part/target/equipment/secondary_muscles/instructions)
+// onbellekte tutuluyor.
+let exerciseGifCache = null; // normalizedName -> exercises tablosu satiri
 function normalizeExName(s){
   return (s||'').toLowerCase()
     .replace(/[-_]/g,' ')
@@ -1110,11 +1114,11 @@ function normalizeExName(s){
     .trim();
 }
 async function loadExerciseGifCache(){
-  const {data, error} = await sb.from('exercises').select('name,gif_url');
+  const {data, error} = await sb.from('exercises').select('*');
   if(error){ console.error('loadExerciseGifCache error:', error); return; }
   exerciseGifCache = new Map();
   (data||[]).forEach(row=>{
-    if(row.gif_url) exerciseGifCache.set(normalizeExName(row.name), row.gif_url);
+    if(row.name) exerciseGifCache.set(normalizeExName(row.name), row);
   });
   // Cache arka planda, sayfa ilk acildiktan SONRA (zayif internette birkac
   // saniye surebilir) dolar - o an GERCEKTEN Antrenman ekranindaysa GIF'ler
@@ -1128,15 +1132,19 @@ async function loadExerciseGifCache(){
     renderDayContent(curDay);
   }
 }
-function findExerciseGif(name){
+// Isme gore en-yakin ExerciseDB satirini bulur (tam eslesme yoksa, biri
+// digerini iceriyorsa esler - orn. "Weighted Pull Up" ~ "Pull Up").
+function findExerciseDbRow(name){
   if(!exerciseGifCache || !name) return null;
   const n = normalizeExName(name);
   if(exerciseGifCache.has(n)) return exerciseGifCache.get(n);
-  // Tam eslesme yoksa: biri digerini iceriyorsa esle (orn. "Weighted Pull Up" ~ "Pull Up")
-  for(const [key, url] of exerciseGifCache){
-    if(key.includes(n) || n.includes(key)) return url;
+  for(const [key, row] of exerciseGifCache){
+    if(key.includes(n) || n.includes(key)) return row;
   }
   return null;
+}
+function findExerciseGif(name){
+  return findExerciseDbRow(name)?.gif_url || null;
 }
 
 async function loadSessionLogs(userId) {
@@ -3628,6 +3636,7 @@ function buildExCard(ex, di, ei, prevSets) {
       <div class="meta-pill${comp?' done-pill':''}" id="mp_${di}_${ei}">${done}/${ex.sets}</div>
       <div class="meta-pill">${ex.reps}×${ex.sets}</div>
     </div>
+    <button onclick="event.stopPropagation();showExerciseDetailModal(${di},${ei})" title="Hareket detayı (GIF, geçmiş, grafik, rekorlar)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);padding:5px 6px;cursor:pointer;flex-shrink:0;line-height:0;display:flex;align-items:center;font-size:12px">ℹ️</button>
     <button onclick="event.stopPropagation();copyExerciseInfo(${di},${ei},this)" title="Hareket adını kopyala" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);padding:5px 6px;cursor:pointer;flex-shrink:0;line-height:0;display:flex;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
     <div class="expand-arr">⌄</div>
   </div>
@@ -3717,6 +3726,170 @@ async function logSetHistory(uid, exerciseName, weight, reps){
   try{
     await sb.from('set_history').insert({user_id:uid, exercise_name:exerciseName, weight:parseFloat(weight), reps: reps?String(reps):null});
   }catch(e){ console.error('logSetHistory error:', e); }
+}
+
+// ── EGZERSİZ DETAY MODALI (Hakkında / Geçmiş / Grafik / Rekorlar) ──
+// set_history (append-only, her set_history satiri = tamamlanan TEK bir set)
+// takvim gunune gore gruplanip her seans icin max agirlik/toplam hacim/max
+// tekrar/tahmini 1RM onceden hesaplaniyor - Gecmis, Grafik ve Rekorlar
+// sekmelerinin UCU de AYNI bu diziyi kullaniyor, tekrar sorgu atilmiyor.
+function fmtShortDate(d){
+  return d.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][d.getMonth()];
+}
+function groupSetHistoryByDay(rows){
+  const byDay = new Map();
+  rows.forEach(r=>{
+    const d = localDateStr(new Date(r.logged_at));
+    if(!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push({weight:parseFloat(r.weight)||0, reps:parseInt(r.reps)||0});
+  });
+  const sessions = [...byDay.entries()].map(([date,sets])=>{
+    const maxWeight = Math.max(...sets.map(x=>x.weight));
+    const maxReps = Math.max(...sets.map(x=>x.reps));
+    const volume = sets.reduce((sum,x)=>sum+x.weight*x.reps,0);
+    const best1RM = Math.max(...sets.map(x=>x.weight*(1+x.reps/30)));
+    return {date, setCount:sets.length, maxWeight, maxReps, volume, best1RM};
+  });
+  sessions.sort((a,b)=> a.date<b.date?1:-1); // en yeni ilk
+  return sessions;
+}
+
+let _exDetail = null; // {di, ei, name, dbRow, localRow, sessions, tab, chart}
+async function showExerciseDetailModal(di, ei){
+  const ex = activeProgram()[di]?.exercises?.[ei];
+  if(!ex) return;
+  closeExerciseDetailModal();
+  const name = ex.name;
+  const uid = activeProfile()?.id;
+  const dbRow = findExerciseDbRow(name);
+  const localRow = EXERCISE_DB.find(e=>normalizeExName(e.name)===normalizeExName(name)) || null;
+  let sessions = [];
+  if(uid){
+    const {data, error} = await sb.from('set_history').select('weight,reps,logged_at').eq('user_id',uid).eq('exercise_name',name).order('logged_at',{ascending:false}).limit(500);
+    if(error) console.error('showExerciseDetailModal set_history error:', error);
+    else sessions = groupSetHistoryByDay(data||[]);
+  }
+  _exDetail = {di, ei, name, dbRow, localRow, sessions, tab:'about', chart:null};
+  const modal=document.createElement('div');
+  modal.id='exDetailModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:700;display:flex;align-items:flex-end;justify-content:center';
+  modal.onclick=(e)=>{ if(e.target===modal) closeExerciseDetailModal(); };
+  modal.innerHTML = `<div style="background:var(--surface);width:100%;max-width:480px;max-height:88vh;border-radius:20px 20px 0 0;overflow:hidden;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px">${name}</h3>
+      <button onclick="closeExerciseDetailModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;flex-shrink:0;line-height:1">✕</button>
+    </div>
+    <div id="exDetailTabs" style="display:flex;gap:4px;padding:10px 16px 0;flex-shrink:0"></div>
+    <div id="exDetailBody" style="flex:1;overflow-y:auto;padding:16px"></div>
+  </div>`;
+  document.body.appendChild(modal);
+  renderExDetailTabs();
+  renderExDetailBody();
+}
+function closeExerciseDetailModal(){
+  _exDetail?.chart?.destroy();
+  document.getElementById('exDetailModal')?.remove();
+  _exDetail = null;
+}
+function switchExDetailTab(tab){
+  if(!_exDetail) return;
+  _exDetail.tab = tab;
+  renderExDetailTabs();
+  renderExDetailBody();
+}
+function renderExDetailTabs(){
+  const el = document.getElementById('exDetailTabs');
+  if(!el || !_exDetail) return;
+  const tabs = [['about','Hakkında'],['history','Geçmiş'],['charts','Grafik'],['records','Rekorlar']];
+  el.innerHTML = tabs.map(([id,label])=>`<button onclick="switchExDetailTab('${id}')" style="flex:1;padding:9px 4px;border-radius:8px;border:none;background:${_exDetail.tab===id?'var(--acc)':'var(--surface2)'};color:${_exDetail.tab===id?'#0c0c0c':'var(--text-muted)'};font-size:11px;font-weight:700;cursor:pointer">${label}</button>`).join('');
+}
+function renderExDetailBody(){
+  const body = document.getElementById('exDetailBody');
+  if(!body || !_exDetail) return;
+  _exDetail.chart?.destroy(); _exDetail.chart = null;
+  if(_exDetail.tab==='about') body.innerHTML = renderExDetailAbout();
+  else if(_exDetail.tab==='history') body.innerHTML = renderExDetailHistory();
+  else if(_exDetail.tab==='charts'){ body.innerHTML = renderExDetailCharts(); mountExDetailChart(); }
+  else if(_exDetail.tab==='records') body.innerHTML = renderExDetailRecords();
+}
+function renderExDetailAbout(){
+  const {dbRow, localRow, name} = _exDetail;
+  const gifHtml = dbRow?.gif_url
+    ? `<img src="${dbRow.gif_url}" alt="${name}" style="width:100%;max-width:260px;border-radius:12px;display:block;margin:0 auto 14px;background:#fff">`
+    : `<div style="width:100%;max-width:260px;aspect-ratio:1;margin:0 auto 14px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;text-align:center;padding:20px">GIF henüz eklenmedi<br>(içe aktarma devam ediyor)</div>`;
+  const target = dbRow?.target || reportPrimaryMuscle(localRow?.muscle) || '';
+  const equipment = dbRow?.equipment || '';
+  const secondary = Array.isArray(dbRow?.secondary_muscles) ? dbRow.secondary_muscles : [];
+  const rawInstructions = Array.isArray(dbRow?.instructions) && dbRow.instructions.length ? dbRow.instructions : (localRow?.tip ? [localRow.tip] : []);
+  const instructions = rawInstructions.map(s=>String(s).replace(/^step:?\s*\d+\s*/i,''));
+  return `
+    ${gifHtml}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      ${target?`<span style="background:var(--acc-dim);color:var(--acc);border:1px solid var(--acc-border);padding:4px 12px;border-radius:12px;font-size:11px;font-weight:700;text-transform:capitalize">🎯 ${target}</span>`:''}
+      ${equipment?`<span style="background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);padding:4px 12px;border-radius:12px;font-size:11px;text-transform:capitalize">🏋️ ${equipment}</span>`:''}
+    </div>
+    ${secondary.length?`<div style="margin-bottom:14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:6px">İkincil Kaslar</div><div style="display:flex;flex-wrap:wrap;gap:6px">${secondary.map(m=>`<span style="background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:10px;font-size:10px;color:var(--text);text-transform:capitalize">${m}</span>`).join('')}</div></div>`:''}
+    ${instructions.length?`<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:8px">Talimatlar</div><ol style="padding-left:18px;display:flex;flex-direction:column;gap:8px;margin:0">${instructions.map(s=>`<li style="font-size:13px;line-height:1.5">${s}</li>`).join('')}</ol></div>`:'<div class="empty-state">Bu hareket için henüz talimat eklenmedi.</div>'}
+  `;
+}
+function renderExDetailHistory(){
+  const {sessions} = _exDetail;
+  if(!sessions.length) return '<div class="empty-state">Bu hareket için henüz kayıtlı set yok.</div>';
+  return '<div style="display:flex;flex-direction:column;gap:8px">' + sessions.map(s=>
+    `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span style="font-size:12px;color:var(--text-muted)">${fmtShortDate(new Date(s.date+'T00:00:00'))}</span>
+      <span style="font-size:12px;color:var(--text-muted)">${s.setCount} set</span>
+      <span style="font-size:13px;font-weight:700;color:var(--acc)">${s.maxWeight} kg</span>
+    </div>`
+  ).join('') + '</div>';
+}
+function renderExDetailCharts(){
+  const {sessions} = _exDetail;
+  if(sessions.length<2) return '<div class="empty-state">Grafik için en az 2 farklı günde kayıt gerekiyor.</div>';
+  return '<canvas id="exDetailChartCanvas" height="220"></canvas>';
+}
+function mountExDetailChart(){
+  const canvas = document.getElementById('exDetailChartCanvas');
+  if(!canvas || typeof Chart==='undefined' || !_exDetail) return;
+  const asc = [...(_exDetail.sessions)].reverse(); // kronolojik (eski->yeni)
+  _exDetail.chart = new Chart(canvas, {
+    type:'line',
+    data:{
+      labels: asc.map(s=>fmtShortDate(new Date(s.date+'T00:00:00'))),
+      datasets:[{
+        label:'Max Ağırlık (kg)',
+        data: asc.map(s=>s.maxWeight),
+        borderColor:'#d4f53c', backgroundColor:'rgba(212,245,60,.15)',
+        tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#d4f53c',
+      }]
+    },
+    options:{
+      responsive:true,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{color:'#888', font:{size:10}}, grid:{color:'rgba(255,255,255,.06)'} },
+        y:{ ticks:{color:'#888', font:{size:10}}, grid:{color:'rgba(255,255,255,.06)'} },
+      }
+    }
+  });
+}
+function renderExDetailRecords(){
+  const {sessions} = _exDetail;
+  if(!sessions.length) return '<div class="empty-state">Bu hareket için henüz kayıt yok.</div>';
+  let best1RM=-1, best1RMDate=null, bestVol=-1, bestVolDate=null, bestReps=-1, bestRepsDate=null;
+  sessions.forEach(s=>{
+    if(s.best1RM>best1RM){ best1RM=s.best1RM; best1RMDate=s.date; }
+    if(s.volume>bestVol){ bestVol=s.volume; bestVolDate=s.date; }
+    if(s.maxReps>bestReps){ bestReps=s.maxReps; bestRepsDate=s.date; }
+  });
+  const row=(label,value,date)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:4px">${label}</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc)">${value}</div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${fmtShortDate(new Date(date+'T00:00:00'))}</div>
+  </div>`;
+  return row('🏆 En Yüksek Tahmini 1RM', Math.round(best1RM)+' kg', best1RMDate)
+    + row('📦 En Fazla Hacim (tek seans)', Math.round(bestVol)+' kg', bestVolDate)
+    + row('🔁 En Fazla Tekrar (tek sette)', bestReps+' tekrar', bestRepsDate);
 }
 
 async function toggleSet(uid,di,ei,si,rs){

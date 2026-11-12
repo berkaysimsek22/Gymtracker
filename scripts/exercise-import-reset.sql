@@ -1,0 +1,12 @@
+-- supabase/functions/import-exercisedb/index.ts dosyasindaki TARGET_NAMES
+-- listesi genisletildi (32 -> 72 hareket, uygulamadaki yerel EXERCISE_DB
+-- listesinin tamami eklendi). Bu dosyayi SADECE Edge Function'i Supabase
+-- Dashboard'dan YENIDEN DEPLOY ettikten SONRA, bir kere calistir.
+--
+-- Nicin gerekli: fonksiyon, TUM hedef isimler tarandiginda
+-- exercise_import_progress.done'u true yapiyor. Liste eskiden 32 isimdeyken
+-- bu alan zaten true olmus olabilir - fonksiyon done=true gorunce hicbir sey
+-- yapmadan "zaten tamamlanmis" mesaji donup yeni eklenen ~40 hareketi hic
+-- taramaz. offset_val'a DOKUNMUYORUZ (ilk 32 isim listede AYNI sirada
+-- durduğu icin onlar tekrar taranmayacak, kalan ~40 isim icin devam edecek).
+update public.exercise_import_progress set done = false, updated_at = now() where id = 1;
