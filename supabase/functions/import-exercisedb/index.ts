@@ -7,9 +7,10 @@
 // erisim vermiyor - "tumunu cek" denemesinde API sadece 10 ornek kayit
 // dondurup "bu kadar" dedi. Bu yuzden fonksiyon artik TUM kataloğu cekmeye
 // calismiyor; sadece asagidaki TARGET_NAMES listesindeki (Ece'nin programi +
-// Berkay's Split - toplam 32 benzersiz hareket) isimleri tek tek arayip
-// Supabase'e yaziyor. Yeni bir split/kullanici icin yeni hareketler
-// gerekirse bu listeye eklenip fonksiyon tekrar deploy edilebilir.
+// Berkay's Split + uygulamadaki yerel EXERCISE_DB listesinin tamami - toplam
+// 72 benzersiz hareket) isimleri tek tek arayip Supabase'e yaziyor. Yeni bir
+// split/kullanici icin yeni hareketler gerekirse bu listeye eklenip fonksiyon
+// tekrar deploy edilebilir.
 //
 // Gerekli TEK secret: RAPIDAPI_KEY
 //   Dashboard > Edge Functions > Secrets'tan ekle (isim TAM OLARAK boyle,
@@ -26,7 +27,8 @@
 // limiti nedeniyle her cagri en fazla 9 isim arar, ilerlemeyi
 // 'exercise_import_progress' tablosuna (hangi isme kadar geldigi) kaydeder -
 // limit dolarsa ertesi gun ayni URL'i tekrar cagirinca kaldigi yerden devam
-// eder. 32 hareket icin toplam ~4 gun/cagri yeterli.
+// eder. 72 hareket icin toplam ~8 gun/cagri yeterli (ilk 32'si zaten
+// cekilmisse sadece kalan ~40 hareket icin ~5 gun).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -68,6 +70,51 @@ const TARGET_NAMES: string[] = [
   "DB Lateral Raise",
   "Bayesian Cable Curl",
   "Reverse Curl",
+  // Uygulamadaki yerel EXERCISE_DB listesinin geri kalani (Ana Sayfa/Workouts
+  // kutuphanesindeki tum hareketlerin GIF'i gorunsun diye eklendi, 11 Kasim
+  // 2026) - MEVCUT 32 isim SIRASI DEGISTIRILMEDEN sonuna eklendi, boylece
+  // exercise_import_progress.offset_val hala dogru yerden devam eder (sadece
+  // done=false'a cekilmesi yeterli - bkz. dosyanin basindaki not).
+  "Cable Kickback",
+  "Step Up",
+  "Smith Machine Lunge",
+  "Roman Chair Back Ext",
+  "Back Squat",
+  "Front Squat",
+  "Smith Machine Squat",
+  "Leg Extension",
+  "Hack Squat",
+  "Lying Leg Curl",
+  "Nordic Curl",
+  "Good Morning",
+  "Incline Bench Press",
+  "Flat Bench Press",
+  "Dumbbell Fly",
+  "Cable Fly",
+  "Dip",
+  "Pec Deck",
+  "Pull-Up",
+  "Chin-Up",
+  "Cable Row",
+  "Barbell Row",
+  "Straight Arm Pushdown",
+  "Overhead Press",
+  "Cable Lateral Raise",
+  "Reverse Pec Deck",
+  "Preacher Curl",
+  "Cable Curl",
+  "Overhead Triceps Extension",
+  "Close Grip Bench",
+  "JM Press",
+  "Tricep Pushdown",
+  "Wrist Curl",
+  "Calf Raise",
+  "Seated Calf Raise",
+  "Plank",
+  "Cable Crunch",
+  "Hanging Leg Raise",
+  "Ab Wheel Rollout",
+  "Leg Curl",
 ];
 
 const MAX_REQUESTS_PER_RUN = 9; // 10/gun limitinin altinda guvenli pay birak
