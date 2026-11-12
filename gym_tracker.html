@@ -3310,13 +3310,11 @@ async function renderDayContent(di, skipFetch) {
       <span style="font-size:11px;color:${pct===100?'var(--acc)':'var(--muted)'}">${pct}%</span>
       <button class="btn btn-outline btn-sm" id="woTimerPill" onclick="toggleWorkoutTimer('${uid}',${di})" title="Antrenman süresi — manuel başlat/durdur, ilk set işaretlenince de otomatik başlar">⏱ Başlat</button>
       <button class="btn btn-outline btn-sm" onclick="showDayMuscleMap(${di})" title="Kas Haritası" style="padding:4px 8px;line-height:0">${miniBodyIcon(dayMuscleSets)}</button>
-      ${canEditHere&&!editMode?`<button class="btn btn-outline btn-sm" onclick="clearDayConfirm(${di})" style="border-color:rgba(255,92,56,.3);color:#ff5c38;font-size:10px">🗑 Temizle</button>`:''}
-      ${canEditHere?`<button class="btn btn-outline btn-sm" onclick="toggleEdit()" style="${editMode?'border-color:var(--acc4);color:var(--acc4)':''}">${editMode?'✓ Bitti':'✏️ Düzenle'}</button>`:''}
-      ${dayMenuBtn}
       ${isDayDoneThisWeek(day.name, di)?
         '<button class="finish-day-btn" onclick="confirmUnfinishDay('+di+')" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#34d399" title="Tamamlanmayı kaldır">✓ Tamamlandı</button>':
         '<button class="finish-day-btn" onclick="confirmFinishDay('+di+')">🏁 Günü Tamamla</button>'
       }
+      ${dayMenuBtn}
     </div>
   </div>`;
 
@@ -3406,10 +3404,14 @@ async function deleteDayOverride(dateStr){
   return true;
 }
 
-// "⋯" menüsü
+// "⋯" menüsü - "Temizle" (set kayıtlarını sıfırla) ve "Düzenle" (egzersiz
+// ekle/sil modu) artık ayrı buton olarak satırda yer kaplamıyor, bu menünün
+// içine taşındı (gün başlığı satırının sığması için).
 function showDayMenu(di, btnEl){
   closeDayMenu();
   const override = getDayOverride(di);
+  const isOverride = !!override;
+  const canEditHere = canEdit() && !isOverride;
   const sheet=document.createElement('div');
   sheet.id='dayMenuSheet';
   sheet.style.cssText='position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.3)';
@@ -3417,10 +3419,15 @@ function showDayMenu(di, btnEl){
   const rect = btnEl.getBoundingClientRect();
   const top = Math.min(rect.bottom + 6, window.innerHeight-160);
   const left = Math.min(rect.left, window.innerWidth-210);
-  sheet.innerHTML = `<div style="position:absolute;top:${top}px;left:${Math.max(8,left)}px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
-    <div onclick="openDayOverrideModal(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06)">📝 Bu Günü Düzenle</div>
-    <div onclick="deleteDayWorkoutConfirm(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);color:#ff5c38">🗑 Bu Günün Antrenmanını Sil</div>
-    ${override?`<div onclick="restoreDayToProgram(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;color:var(--acc)">🔄 Programdaki Haline Döndür</div>`:''}
+  const items = [];
+  if(canEditHere) items.push(`<div onclick="closeDayMenu();toggleEdit()" style="padding:12px 16px;font-size:13px;cursor:pointer">${editMode?'✓ Düzenlemeyi Bitir':'✏️ Egzersizleri Düzenle'}</div>`);
+  if(canEditHere && !editMode) items.push(`<div onclick="closeDayMenu();clearDayConfirm(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;color:#ff5c38">🧹 Bu Günün Setlerini Temizle</div>`);
+  items.push(`<div onclick="openDayOverrideModal(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer">📝 Bu Günü Düzenle</div>`);
+  items.push(`<div onclick="deleteDayWorkoutConfirm(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;color:#ff5c38">🗑 Bu Günün Antrenmanını Sil</div>`);
+  if(override) items.push(`<div onclick="restoreDayToProgram(${di})" style="padding:12px 16px;font-size:13px;cursor:pointer;color:var(--acc)">🔄 Programdaki Haline Döndür</div>`);
+  const itemsHtml = items.map((it,i)=> i<items.length-1 ? it.replace('style="', 'style="border-bottom:1px solid rgba(255,255,255,.06);') : it).join('');
+  sheet.innerHTML = `<div style="position:absolute;top:${top}px;left:${Math.max(8,left)}px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.6)">
+    ${itemsHtml}
   </div>`;
   document.body.appendChild(sheet);
 }
@@ -6957,11 +6964,21 @@ function showMuscleVisual(activeMuscles, muscleSets){
     regionAgg[region].total+=amt;
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
   });
-  const regionRows = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total).map(([region,info])=>{
+  // Bolgeler arasi COK/AZ calisma farkini RENKLE gosteren yogunluk cubugu -
+  // en cok set yapilan bolgeye gore orantili (parlak lime = cok, sari = orta,
+  // soluk gri = az calisiyor).
+  const regionEntries = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total);
+  const maxTotal = Math.max(1, ...regionEntries.map(([,info])=>info.total));
+  const regionRows = regionEntries.map(([region,info])=>{
     const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(212,245,60,.08);border:1px solid rgba(212,245,60,.2);border-radius:10px;margin-bottom:6px">'
-      + '<span style="font-size:12px;font-weight:700;color:#d4f53c">'+region+'</span>'
+    const ratio = info.total/maxTotal;
+    const intensityColor = ratio>=0.8 ? '#d4f53c' : ratio>=0.4 ? '#f7c948' : '#8a8a8a';
+    return '<div style="padding:8px 12px;background:rgba(212,245,60,.06);border:1px solid rgba(212,245,60,.18);border-radius:10px;margin-bottom:6px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between">'
+      + '<span style="font-size:12px;font-weight:700;color:'+intensityColor+'">'+region+'</span>'
       + '<span style="font-size:11px;color:var(--text-muted)">'+isolateLabel+'</span>'
+      + '</div>'
+      + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(ratio*100)+'%;background:'+intensityColor+'"></div></div>'
       + '</div>';
   }).join('') || '<div class="empty-state" style="padding:8px 0">Bu güne egzersiz bulunamadı.</div>';
   modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
