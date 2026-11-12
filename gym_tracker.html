@@ -100,9 +100,11 @@ try{
 #screen-profile .bq-frame-sm{ padding:14px; }
 #screen-profile .bq-frame-sm .prof-section{ background:transparent; border:none; box-shadow:none; padding:0; }
 #screen-dashboard .bq-notes{
-  font-family:'Caveat',cursive; font-size:19px; color:var(--chalk3); font-style:italic;
-  text-align:center; padding:6px 0 2px;
+  font-family:'Caveat',cursive; font-size:19px; color:var(--chalk); font-style:italic;
+  text-align:left; padding:6px 4px 2px; width:100%; min-height:44px; resize:vertical;
+  background:none; border:none; outline:none;
 }
+#screen-dashboard .bq-notes::placeholder{ color:var(--chalk3); text-align:center; }
 /* "Bu Ay" rozeti - SADECE bu kucuk kutu icin bilincli olarak geri getirilen
    vintage ahsap plaket gorunumu (brief'in acik istegi), temanin geri kalani
    (duz kara tahta) etkilenmiyor. */
@@ -720,14 +722,13 @@ button:active{transform:scale(.97)}
 
         <div class="bq-divider"></div>
 
-        <div class="bq-notes">📝 Notların için bu alan yakında açılacak...</div>
+        <textarea class="bq-notes" id="dashNoteInp" placeholder="📝 Bugün için not al..." oninput="saveDashNote(this.value)"></textarea>
 
     </div>
 
     <div id="dashPRCard" class="bq-frame-sm"></div>
-    <div id="dashWeightTrend" class="bq-frame-sm"></div>
-    <div id="dashWeekDots" class="bq-frame-sm"></div>
     <div id="dashCalCard" class="bq-frame-sm"></div>
+    <div id="dashWeightTrend" class="bq-frame-sm"></div>
     <div id="dashWaterCard" class="bq-frame-sm"></div>
     <div id="dashLastWorkout" class="bq-frame-sm"></div>
     <div id="dashRestSuggestion" class="bq-frame-sm" style="margin-bottom:20px"></div>
@@ -1898,7 +1899,6 @@ async function renderDashboard(){
   renderDashMotivation();
   renderDashTodayCard();
   renderDashMonthBadge();
-  renderDashWeekDots();
   renderDashLastWorkout();
   renderDashRestSuggestion();
   await Promise.all([
@@ -1906,6 +1906,7 @@ async function renderDashboard(){
     renderDashWater(),
     renderDashPRCard(),
     renderDashWeightTrend(),
+    renderDashNote(p.id),
     computeHeaderStats(p).then(renderDashSummaryLine),
   ]);
 }
@@ -2019,6 +2020,23 @@ async function renderDashPRCard(){
 }
 
 // "Kilo Trendi" - weight_logs'tan son 7 kaydi kucuk bir SVG cizgi grafikle gosterir.
+// Ana Sayfa'daki "Notların..." alani - ayri bir tablo/migration gerekmesin
+// diye AYNI gunun nutrition_logs satirina, Beslenme'nin "Günlük Not"
+// alanindan (nd.note) FARKLI, ayri bir JSON alaninda (nd.homeNote) tutuluyor.
+async function renderDashNote(uid){
+  const el = document.getElementById('dashNoteInp');
+  if(!el || !uid) return;
+  const nd = await loadNutrition(uid, todayStr());
+  el.value = nd.homeNote || '';
+}
+async function saveDashNote(v){
+  const uid = activeProfile()?.id;
+  if(!uid) return;
+  const nd = await loadNutrition(uid, todayStr());
+  nd.homeNote = v;
+  saveNutrition(uid, todayStr());
+}
+
 async function renderDashWeightTrend(){
   const el = document.getElementById('dashWeightTrend');
   if(!el) return;
@@ -2165,35 +2183,6 @@ function renderDashTodayCard(){
   </div>`;
 }
 
-function renderDashWeekDots(){
-  const el = document.getElementById('dashWeekDots');
-  if(!el) return;
-  const prog = activeProgram();
-  const now = new Date();
-  const todayIdx = now.getDay()===0?6:now.getDay()-1;
-  const monday = new Date(now);
-  monday.setDate(now.getDate()-todayIdx);
-  const completedDates = new Set(sessionCache.map(s=>localDateStr(new Date(s.logged_at))));
-  const labels = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
-  const dots = (prog.length?prog:Array(7).fill({type:'rest'})).map((day,i)=>{
-    const d = new Date(monday);
-    d.setDate(monday.getDate()+i);
-    const key = localDateStr(d);
-    const isRest = day.type==='rest';
-    const isToday = i===todayIdx;
-    const isDone = completedDates.has(key);
-    let bg='rgba(255,255,255,.08)', txt='var(--muted)', content=isRest?'·':'';
-    if(isDone){ bg='#34d399'; txt='#0c0c0c'; content='✓'; }
-    else if(isToday){ bg='#d4f53c'; txt='#0c0c0c'; content=labels[i][0]; }
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-      <div style="width:28px;height:28px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${txt}">${content}</div>
-      <div style="font-size:8px;color:var(--muted)">${labels[i]}</div>
-    </div>`;
-  }).join('');
-  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
-    <div style="display:flex;justify-content:space-between">${dots}</div>
-  </div>`;
-}
 
 async function loadTodayActivityLogs(uid){
   if(!uid) return [];
