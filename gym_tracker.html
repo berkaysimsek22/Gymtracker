@@ -6964,11 +6964,21 @@ function showMuscleVisual(activeMuscles, muscleSets){
     regionAgg[region].total+=amt;
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
   });
-  const regionRows = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total).map(([region,info])=>{
+  // Bolgeler arasi COK/AZ calisma farkini RENKLE gosteren yogunluk cubugu -
+  // en cok set yapilan bolgeye gore orantili (parlak lime = cok, sari = orta,
+  // soluk gri = az calisiyor).
+  const regionEntries = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total);
+  const maxTotal = Math.max(1, ...regionEntries.map(([,info])=>info.total));
+  const regionRows = regionEntries.map(([region,info])=>{
     const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(212,245,60,.08);border:1px solid rgba(212,245,60,.2);border-radius:10px;margin-bottom:6px">'
-      + '<span style="font-size:12px;font-weight:700;color:#d4f53c">'+region+'</span>'
+    const ratio = info.total/maxTotal;
+    const intensityColor = ratio>=0.8 ? '#d4f53c' : ratio>=0.4 ? '#f7c948' : '#8a8a8a';
+    return '<div style="padding:8px 12px;background:rgba(212,245,60,.06);border:1px solid rgba(212,245,60,.18);border-radius:10px;margin-bottom:6px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between">'
+      + '<span style="font-size:12px;font-weight:700;color:'+intensityColor+'">'+region+'</span>'
       + '<span style="font-size:11px;color:var(--text-muted)">'+isolateLabel+'</span>'
+      + '</div>'
+      + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(ratio*100)+'%;background:'+intensityColor+'"></div></div>'
       + '</div>';
   }).join('') || '<div class="empty-state" style="padding:8px 0">Bu güne egzersiz bulunamadı.</div>';
   modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
