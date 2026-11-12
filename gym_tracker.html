@@ -206,7 +206,9 @@ button:active{transform:scale(.97)}
 /* AUTH SCREEN */
 .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .auth-box{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:32px 24px;box-shadow:var(--card-shadow)}
-.auth-logo{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:.5px;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,var(--text),var(--acc));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.auth-logo{text-align:center;margin-bottom:4px}
+.auth-logo img{width:84px;height:84px;border-radius:20px;display:block;margin:0 auto 10px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.auth-logo-text{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:.5px;background:linear-gradient(135deg,var(--text),var(--acc));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .auth-sub{text-align:center;font-size:12px;color:var(--text-sub);margin-bottom:28px;font-style:italic}
 .auth-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:var(--r-sm);padding:4px;margin-bottom:24px}
 .auth-tab{flex:1;padding:8px;min-height:44px;border-radius:8px;border:none;background:none;color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
@@ -625,7 +627,7 @@ button:active{transform:scale(.97)}
 <div id="authScreen" style="display:none">
   <div class="auth-screen">
     <div class="auth-box">
-      <div class="auth-logo">GYM TRACKER</div>
+      <div class="auth-logo"><img src="icon-512.png" alt="Gym Tracker"><div class="auth-logo-text">GYM TRACKER</div></div>
       <div class="auth-sub">Kişisel fitness & beslenme takibi</div>
       <div class="auth-tabs">
         <button class="auth-tab active" onclick="switchAuthTab('login')">Giriş Yap</button>
