@@ -6,7 +6,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- PWA -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#d4f53c">
+  <meta name="theme-color" content="#e85d04">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -27,20 +27,24 @@ try{
 }catch(e){}
 </script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Caveat:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;outline:none;-webkit-tap-highlight-color:transparent}
 *{scrollbar-width:none}
 *::-webkit-scrollbar{display:none}
 :root{
-  --bg:#080808;--bg-elev:#0f0f0f;--surface:#161616;--surface2:#1e1e1e;--surface3:#252525;
-  --border:rgba(255,255,255,0.06);--border-strong:rgba(255,255,255,0.12);
-  --acc:#c8f53c;--acc-dim:rgba(200,245,60,0.12);--acc-border:rgba(200,245,60,0.25);
+  /* "Performance Identity" tasarim sistemi - eski degisken ISIMLERI
+     korunuyor (render fonksiyonlarinin ezici cogunlugu zaten var(--surface)/
+     var(--acc)/var(--border) kullaniyor), sadece DEGERLER yeni palete
+     tasindi - boylece tum ekranlar otomatik yeni temaya geciyor. */
+  --bg:#0a0a0a;--bg-elev:#0d0d0d;--surface:#141414;--surface2:#1e1e1e;--surface3:#252525;
+  --border:#2a2a2a;--border-strong:#3a3a3a;
+  --acc:#e85d04;--acc-dim:rgba(232,93,4,.15);--acc-border:rgba(232,93,4,.35);
   --acc2:#ff5c38;--acc3:#38b6ff;--acc4:#f7c948;
-  --text:#f0f0f0;--text-sub:#888888;--text-muted:#555555;--muted:var(--text-muted);
+  --text:#ffffff;--text-sub:#a0a0a0;--text-muted:#505050;--muted:var(--text-muted);
   --success:#34d399;--warning:#f59e0b;--danger:#ef4444;
   --r:16px;--r-sm:10px;--r-lg:24px;
   --sp-xs:4px;--sp-sm:8px;--sp-md:16px;--sp-lg:24px;--sp-xl:32px;
-  --card-shadow:0 2px 12px rgba(0,0,0,.4);
+  --card-shadow:0 4px 24px rgba(0,0,0,.4);
 }
 /* Acik tema - elle secilince data-theme="light" olarak isaretlenir ve
    localStorage'a yazilir (bkz. toggleTheme()); hic secim yapilmamissa
@@ -61,110 +65,65 @@ try{
     --card-shadow:0 2px 12px rgba(0,0,0,.08);
   }
 }
-/* ── GYM TRACKER — "OLD SCHOOL IRON GYM" (ahşap çerçeveli kara tahta) ──
-   Sadece Ana Sayfa + Profil ekranlarına özel (alt navigasyon hariç - o tüm
-   ekranlarda görünen TEK paylaşılan eleman olduğu için global renklendi).
-   Aynı kapsamlama stratejisi: #screen-dashboard/#screen-profile içinde
-   paylaşılan CSS değişkenlerini (var(--surface), var(--border)...) yeniden
-   tanımlayarak render fonksiyonlarının çoğuna dokunmadan tüm kartlar/
-   butonlar otomatik yeni temaya geçiyor. Bu kez marka limeti de BİLİNÇLİ
-   OLARAK değişti (#b8f443) - kullanıcı bu değeri özellikle verdi. */
-#screen-dashboard, #screen-profile{
-  background-color:#090c08;
-  --board:#090c08;
-  --chalk:#e8e4d8; --chalk2:rgba(232,228,216,.65); --chalk3:rgba(232,228,216,.38);
-  --lime:#b8f443;
-  --surface:var(--board); --surface2:#140f09; --surface3:#1d160c;
-  --border:rgba(232,228,216,.16); --border-strong:rgba(232,228,216,.3);
-  --text:var(--chalk); --text-sub:var(--chalk2); --text-muted:var(--chalk2); --muted:var(--chalk2);
-  --acc:var(--lime); --acc-dim:rgba(184,244,67,.14); --acc-border:rgba(184,244,67,.3);
-  --card-shadow:0 4px 20px rgba(0,0,0,.6);
+/* ── "PERFORMANCE IDENTITY" tasarim sistemi ──
+   Eskiden Ana Sayfa/Profil'e ozel ("Old School Iron Gym" ahsap/karatahta)
+   kapsamli bir tema vardi - artik TUM uygulama ayni duz, koyu sisteme
+   (yukardaki :root degerleri) geciyor, bu yuzden o kapsamli override tamamen
+   kaldirildi. Asagidaki birkac sinif (.bq-divider/.bq-board/.bq-frame-sm/
+   .bq-notes/.bq-chalk-*) render fonksiyonlarinda HALA kullanildigi icin JS'e
+   dokunmadan burada sade/duz stillerle yeniden tanimlandi - "bq-" onekleri
+   sadece tarihsel, artik ozel bir anlamlari yok. */
+.bq-divider{ height:1px; background:var(--border); margin:14px 0; }
+.bq-board, .bq-frame-sm{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+  box-shadow:var(--card-shadow);
 }
-#screen-dashboard .bq-script, #screen-profile .bq-script{ font-family:'Caveat',cursive; }
-/* Bölüm ayırıcı - brief'teki tarif birebir. */
-#screen-dashboard .bq-divider, #screen-profile .bq-divider{
-  height:1px; background:rgba(232,228,216,.28); box-shadow:0 1px 0 rgba(0,0,0,.4); margin:14px 0;
-}
-/* Çerçevesiz düz kara tahta - tek yüzey, dekoratif ahşap katmanları yok. */
-#screen-dashboard .bq-board, #screen-profile .bq-board{
-  background:var(--board); padding:16px; border-radius:10px;
-  box-shadow:0 4px 20px rgba(0,0,0,.5);
-}
-/* Ikincil kartlar (PR, kilo trendi, su takibi vb.) - duz kara tahta paneli,
-   cerceve halkasi yok. */
-#screen-dashboard .bq-frame-sm, #screen-profile .bq-frame-sm{
-  background:var(--board); border-radius:10px; margin:14px 2px; position:relative;
-  box-shadow:0 3px 14px rgba(0,0,0,.45);
-}
-#screen-dashboard .bq-frame-sm:empty, #screen-profile .bq-frame-sm:empty{ display:none; box-shadow:none; margin:0; }
-#screen-profile .bq-frame-sm{ padding:14px; }
+.bq-board{ padding:16px; }
+.bq-frame-sm{ margin:14px 2px; padding:14px; }
+.bq-frame-sm:empty{ display:none; box-shadow:none; margin:0; border:none; }
 #screen-profile .bq-frame-sm .prof-section{ background:transparent; border:none; box-shadow:none; padding:0; }
-#screen-dashboard .bq-notes{
-  font-family:'Caveat',cursive; font-size:19px; color:var(--chalk); font-style:italic;
-  text-align:left; padding:6px 4px 2px; width:100%; min-height:44px; resize:vertical;
-  background:none; border:none; outline:none;
+.bq-notes{
+  font-size:14px; color:var(--text); font-style:italic;
+  padding:6px 4px 2px; width:100%; min-height:44px; resize:vertical;
+  background:none; border:none; outline:none; font-family:'Inter',sans-serif;
 }
-#screen-dashboard .bq-notes::placeholder{ color:var(--chalk3); text-align:center; }
-/* "Bu Ay" rozeti - SADECE bu kucuk kutu icin bilincli olarak geri getirilen
-   vintage ahsap plaket gorunumu (brief'in acik istegi), temanin geri kalani
-   (duz kara tahta) etkilenmiyor. */
-#screen-dashboard .bq-wood-badge{
-  position:relative; min-width:64px; text-align:center; padding:8px 10px 7px;
-  border-radius:7px; overflow:hidden;
-  background:linear-gradient(135deg,#8a5a2e,#6b3c14 45%,#4a280d);
-  box-shadow:inset 0 2px 3px rgba(255,255,255,.18), inset 0 -3px 6px rgba(0,0,0,.5), 0 3px 8px rgba(0,0,0,.5);
+.bq-notes::placeholder{ color:var(--text-muted); }
+/* "Bu Ay" rozeti - artik duz chip/badge (brief'teki "Badge/chip:
+   background rgba(accent,.15), color accent" kurali). */
+.bq-wood-badge{
+  min-width:64px; text-align:center; padding:8px 10px 7px;
+  border-radius:var(--r-sm); background:var(--acc-dim);
 }
-#screen-dashboard .bq-wood-badge::before{
-  content:''; position:absolute; inset:0; pointer-events:none; opacity:.18; mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.06' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-}
-#screen-dashboard .bq-wood-label{ font-size:8px; text-transform:uppercase; letter-spacing:.8px; color:rgba(255,255,255,.75); position:relative; }
-#screen-dashboard .bq-wood-value{ font-family:'Caveat',cursive; font-weight:700; font-size:21px; line-height:1.15; margin-top:1px; position:relative; }
-/* Alıntı - tahtaya raptiyeyle tutturulmuş kağıt gibi: ustte kucuk bir
-   raptiye basi, hafif egik not karti. */
-#screen-dashboard .bq-quote-pinned{
-  position:relative; margin:22px 16px 14px; padding:16px 12px 10px;
-  background:rgba(232,228,216,.045); border-radius:3px;
-  box-shadow:0 8px 16px rgba(0,0,0,.45);
-  transform:rotate(-0.7deg);
-}
-#screen-dashboard .bq-quote-pinned::before{
-  content:''; position:absolute; top:-9px; left:50%; transform:translateX(-50%);
-  width:15px; height:15px; border-radius:50%;
-  background:radial-gradient(circle at 32% 30%, #8a5a2e 0%, #6b3c14 55%, #3a1f09 100%);
-  box-shadow:0 2px 4px rgba(0,0,0,.6), inset 1px 1px 2px rgba(255,255,255,.25);
-  z-index:1;
-}
+.bq-wood-label{ font-size:10px; text-transform:uppercase; letter-spacing:.08em; font-weight:500; color:var(--text-sub); }
+.bq-wood-value{ font-weight:700; font-size:20px; line-height:1.15; margin-top:1px; font-family:'Inter',sans-serif; }
 /* "Bu Hafta" takvimi - SADECE #weekGrid (Ana Sayfa); #weekGridWO (Workout
    ekranı, aynı .wday sınıfını paylaşıyor) kapsam dışı bırakıldı. */
 #weekGrid.week-grid .wday{ background:var(--surface2); border-color:var(--border); }
-#weekGrid.week-grid .wday.today{ background:var(--acc-dim); border-color:var(--lime); }
-#weekGrid.week-grid .wday-dot.rest-d{ background:#1d160c; }
-/* Günlük antrenman "karatahtası" (renderDashTodayCard) - artık büyük
-   tahtanın kendi İÇİNDE (ayrı bir çerçeveye ihtiyacı yok, var(--board) zaten
-   kara tahta zemini). */
+#weekGrid.week-grid .wday.today{ background:var(--acc-dim); border-color:var(--acc); }
+#weekGrid.week-grid .wday-dot.rest-d{ background:var(--surface3); }
+/* Günün egzersiz/kas-grubu listesi (renderDashTodayCard). */
 #dashTodayCard .bq-chalk-row{
   position:relative; overflow:hidden;
   display:flex; align-items:baseline; gap:10px;
-  padding:9px 2px; border-bottom:1px dashed rgba(232,228,216,.14);
+  padding:9px 2px; border-bottom:1px solid var(--border);
 }
 #dashTodayCard .bq-chalk-row:last-child{ border-bottom:none; }
-#dashTodayCard .bq-chalk-num{ color:var(--chalk2); font-size:12px; font-weight:700; flex:0 0 auto; width:16px; }
+#dashTodayCard .bq-chalk-num{ color:var(--text-muted); font-size:12px; font-weight:700; flex:0 0 auto; width:16px; }
 #dashTodayCard .bq-chalk-name{
-  flex:1; min-width:0; color:var(--chalk); font-size:14px; font-weight:600;
+  flex:1; min-width:0; color:var(--text); font-size:14px; font-weight:600;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   transition:opacity .6s ease;
 }
-#dashTodayCard .bq-chalk-sr{ color:var(--chalk2); font-size:12px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
+#dashTodayCard .bq-chalk-sr{ color:var(--text-muted); font-size:12px; flex:0 0 auto; font-variant-numeric:tabular-nums; }
 #dashTodayCard .bq-chalk-check{
-  flex:0 0 auto; width:16px; text-align:center; color:var(--lime); font-size:13px; font-weight:700;
+  flex:0 0 auto; width:16px; text-align:center; color:var(--acc); font-size:13px; font-weight:700;
   opacity:0; transform:scale(.4); transition:all .4s cubic-bezier(.34,1.56,.64,1);
 }
-#dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-name{ opacity:.4; text-decoration:line-through; text-decoration-color:var(--lime); text-decoration-thickness:2px; }
+#dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-name{ opacity:.4; text-decoration:line-through; text-decoration-color:var(--acc); text-decoration-thickness:2px; }
 #dashTodayCard .bq-chalk-row.bq-erased .bq-chalk-check{ opacity:1; transform:scale(1); }
 #dashTodayCard .bq-chalk-row.bq-erased::before{
   content:''; position:absolute; inset:0;
-  background:linear-gradient(90deg, transparent, rgba(232,228,216,.18), transparent);
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
   transform:translateX(-120%); animation:bq-erase-sweep .7s ease forwards; pointer-events:none;
 }
 @keyframes bq-erase-sweep{ to{ transform:translateX(120%); } }
@@ -172,32 +131,11 @@ try{
   #dashTodayCard .bq-chalk-name, #dashTodayCard .bq-chalk-check{ transition:none!important; }
   #dashTodayCard .bq-chalk-row.bq-erased::before{ animation:none!important; display:none; }
 }
-/* Açık tema seçilmişse bu iki ekran da mevcut açık palete döner - ahşap/
-   karatahta kimliği bilinçli olarak koyu bir kimlik, açık modda zorlanmıyor. */
-:root[data-theme="light"] #screen-dashboard, :root[data-theme="light"] #screen-profile{
-  background-color:var(--bg); background-image:none;
-  --surface:#ffffff; --surface2:#f0f0f0; --surface3:#e4e4e4;
-  --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
-  --text:#111111; --text-sub:#555555; --text-muted:#888888; --muted:#888888;
-  --acc:#5a9e00; --acc-dim:rgba(90,158,0,.12); --acc-border:rgba(90,158,0,.3);
-  --card-shadow:0 2px 12px rgba(0,0,0,.08);
-}
-@media (prefers-color-scheme: light){
-  :root:not([data-theme="dark"]) #screen-dashboard, :root:not([data-theme="dark"]) #screen-profile{
-    background-color:var(--bg); background-image:none;
-    --surface:#ffffff; --surface2:#f0f0f0; --surface3:#e4e4e4;
-    --border:rgba(0,0,0,.08); --border-strong:rgba(0,0,0,.14);
-    --text:#111111; --text-sub:#555555; --text-muted:#888888; --muted:#888888;
-    --acc:#5a9e00; --acc-dim:rgba(90,158,0,.12); --acc-border:rgba(90,158,0,.3);
-    --card-shadow:0 2px 12px rgba(0,0,0,.08);
-  }
-}
-/* Alt navigasyon - TÜM ekranlarda görünen tek paylaşılan eleman, bu yüzden
-   global olarak yeniden renklendi (brief'in açık isteği). */
-.bottom-nav{ background:#0a0a08; border-top:3px solid rgba(232,228,216,.15); }
-.nav-btn{ color:rgba(232,228,216,.28); }
-.nav-btn:hover, .nav-btn.active{ color:#b8f443; }
-.nav-btn.active::after{ background:#b8f443; }
+/* Alt navigasyon - yeni sisteme gore (brief'in acik istegi). */
+.bottom-nav{ background:var(--bg-elev); border-top:1px solid var(--surface2); }
+.nav-btn{ color:var(--text-muted); }
+.nav-btn:hover, .nav-btn.active{ color:var(--acc); }
+.nav-btn.active::after{ background:var(--acc); }
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden;padding-bottom:80px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;transition:background-color .2s,color .2s}
 input,textarea,select,button{font-family:'Inter',sans-serif}
 button{user-select:none;cursor:pointer}
@@ -208,7 +146,7 @@ button:active{transform:scale(.97)}
 .auth-box{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:32px 24px;box-shadow:var(--card-shadow)}
 .auth-logo{text-align:center;margin-bottom:4px}
 .auth-logo img{width:84px;height:84px;border-radius:20px;display:block;margin:0 auto 10px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
-.auth-logo-text{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:.5px;background:linear-gradient(135deg,var(--text),var(--acc));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.auth-logo-text{font-family:'Inter',sans-serif;font-weight:700;font-size:34px;letter-spacing:-.02em;color:var(--acc)}
 .auth-sub{text-align:center;font-size:12px;color:var(--text-sub);margin-bottom:28px;font-style:italic}
 .auth-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:var(--r-sm);padding:4px;margin-bottom:24px}
 .auth-tab{flex:1;padding:8px;min-height:44px;border-radius:8px;border:none;background:none;color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
@@ -217,7 +155,7 @@ button:active{transform:scale(.97)}
 .auth-field label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);display:block;margin-bottom:5px}
 .auth-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:14px;color:var(--text);font-size:16px;min-height:48px;transition:border-color .2s}
 .auth-input:focus{border-color:var(--acc-border)}
-.auth-btn{width:100%;min-height:48px;padding:12px 24px;border-radius:var(--r-sm);background:var(--acc);border:none;color:#080808;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s,transform .1s;letter-spacing:.3px}
+.auth-btn{width:100%;min-height:48px;padding:12px 24px;border-radius:12px;background:var(--acc);border:none;color:#080808;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;transition:opacity .2s,transform .1s;letter-spacing:.3px}
 .auth-btn:hover{opacity:.85}
 .auth-btn:disabled{opacity:.5;cursor:not-allowed}
 .auth-err{font-size:11px;color:var(--danger);margin-top:8px;text-align:center;padding:8px;background:rgba(239,68,68,.1);border-radius:var(--r-sm);display:none}
@@ -255,14 +193,14 @@ button:active{transform:scale(.97)}
 .wday.today{border:2px solid var(--acc);background:var(--acc-dim);opacity:1}
 .wday-name{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;font-family:'Inter',sans-serif}
 .wday-dot{width:8px;height:8px;border-radius:50%;margin:5px auto 3px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700}
-.wday-dot.gym{background:var(--acc)}.wday-dot.rest-d{background:#2a2a2a}.wday-dot.hiit-d{background:var(--acc2)}.wday-dot.amrap-d{background:var(--acc3)}.wday-dot.today-d{box-shadow:0 0 8px rgba(200,245,60,.5);background:var(--acc)}
+.wday-dot.gym{background:var(--acc)}.wday-dot.rest-d{background:#2a2a2a}.wday-dot.hiit-d{background:var(--acc2)}.wday-dot.amrap-d{background:var(--acc3)}.wday-dot.today-d{box-shadow:0 0 8px rgba(232,93,4,.5);background:var(--acc)}
 .wday-lbl{font-size:8px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:clip;padding:0 1px}
 
 /* PROFILE */
 .profile-card{margin:12px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;gap:12px;align-items:center;box-shadow:var(--card-shadow)}
 .goal-tag{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-size:10px;padding:3px 8px;border-radius:10px}
 .p-stats{margin-left:auto;display:flex;gap:10px}
-.pstat .val{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;color:var(--acc)}
+.pstat .val{font-family:'Inter',sans-serif;font-weight:700;font-size:20px;line-height:1;color:var(--acc)}
 .pstat .lbl{font-size:8px;color:var(--text-muted);text-transform:uppercase;margin-top:1px;letter-spacing:.5px}
 
 /* DAY TABS */
@@ -291,7 +229,7 @@ button:active{transform:scale(.97)}
 .wo-ex-row-arr{color:var(--text-muted);font-size:13px;flex-shrink:0}
 .wo-section{margin-top:16px}
 .wo-day-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--card-shadow)}
-.wo-day-card h4{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.wo-day-card h4{font-family:'Inter',sans-serif;font-weight:700;font-size:18px;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
 .wo-day-card h4 span{font-size:10px;color:var(--text-muted);font-family:'Inter',sans-serif;font-weight:400}
 .wo-ex-item{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border)}
 .wo-ex-item:first-child{border-top:none}
@@ -299,7 +237,7 @@ button:active{transform:scale(.97)}
 .wo-ex-item .m{font-size:10px;color:var(--danger);margin-top:1px}
 .wo-ex-item .sr{font-size:11px;color:var(--text-muted);font-family:'Inter',monospace;flex-shrink:0}
 .wo-challenge-card{background:rgba(56,182,255,.04);border:1px solid rgba(56,182,255,.15);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--card-shadow)}
-.wo-challenge-card h3{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc3);letter-spacing:.5px}
+.wo-challenge-card h3{font-family:'Inter',sans-serif;font-weight:700;font-size:24px;color:var(--acc3);letter-spacing:.5px}
 .wo-challenge-meta{display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap}
 .wo-challenge-pill{font-size:10px;padding:3px 10px;border-radius:10px;background:rgba(56,182,255,.1);color:var(--acc3);border:1px solid rgba(56,182,255,.2)}
 .wo-challenge-note{font-size:11px;color:var(--text-muted);line-height:1.6;margin-top:10px;font-style:italic}
@@ -307,7 +245,7 @@ button:active{transform:scale(.97)}
 .wo-muscle-btn{padding:14px 10px;min-height:48px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s}
 .wo-muscle-btn:hover,.wo-muscle-btn.active{border-color:var(--acc-border);color:var(--acc);background:var(--acc-dim)}
 .wo-rank-item{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:6px}
-.wo-rank-num{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text-muted);width:22px;flex-shrink:0;text-align:center}
+.wo-rank-num{font-family:'Inter',sans-serif;font-weight:700;font-size:20px;color:var(--text-muted);width:22px;flex-shrink:0;text-align:center}
 .wo-rank-item:nth-child(1) .wo-rank-num{color:#f7c948}
 .wo-rank-item:nth-child(2) .wo-rank-num{color:#c9c9c9}
 .wo-rank-item:nth-child(3) .wo-rank-num{color:#cd7f32}
@@ -338,13 +276,13 @@ button:active{transform:scale(.97)}
 .edit-banner p{font-size:11px;color:var(--acc4);line-height:1.5}
 
 /* BUTTONS */
-.btn{padding:12px 24px;min-height:44px;border-radius:var(--r-sm);font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .2s,transform .1s;letter-spacing:.2px}
-.btn-acc{background:var(--acc);color:#080808;font-weight:700;min-height:48px}
+.btn{padding:12px 24px;min-height:44px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .2s,transform .1s;letter-spacing:.2px}
+.btn-acc{background:var(--acc);color:#080808;font-weight:600;min-height:48px}
 .btn-acc:hover{opacity:.85}
-.btn-outline{background:transparent;border:1.5px solid var(--border-strong);color:var(--text)}
+.btn-outline{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
 .btn-outline:hover{border-color:var(--acc-border);color:var(--acc)}
 .btn-danger{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--danger)}
-.btn-sm{padding:8px 14px;font-size:11px;border-radius:var(--r-sm);min-height:36px}
+.btn-sm{padding:8px 14px;font-size:11px;border-radius:12px;min-height:36px}
 
 /* WARMUP (eski genel ipucu kutusu - set bazli .warmup-row/.warmup-hint ile karismasin) */
 .warmup-row{background:var(--acc-dim);border:1px solid var(--acc-border);border-radius:var(--r-sm);padding:8px 12px;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--acc);margin-bottom:8px}
@@ -353,7 +291,7 @@ button:active{transform:scale(.97)}
 /* DAY HEADER */
 .day-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;padding:2px 0}
 .day-head-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
-.day-head-title{background:none;border:none;color:var(--text);font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;flex:1;min-width:0;padding:0}
+.day-head-title{background:none;border:none;color:var(--text);font-family:'Inter',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px;flex:1;min-width:0;padding:0}
 .day-type-pill{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:3px 9px;border-radius:10px;white-space:nowrap}
 .day-head-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 
@@ -380,7 +318,7 @@ button:active{transform:scale(.97)}
 .set-row.sdone{background:rgba(52,211,153,.06);border-left:3px solid var(--success)}
 .set-row.warmup-row{background:rgba(247,201,72,.07)}
 .set-row.warmup-row.sdone{background:rgba(247,201,72,.14);border-left:3px solid var(--warning)}
-.snum{font-family:'Bebas Neue',sans-serif;font-size:14px;color:var(--text-muted);line-height:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+.snum{font-family:'Inter',sans-serif;font-weight:700;font-size:14px;color:var(--text-muted);line-height:1;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
 .sdone .snum{color:var(--success)}
 .warmup-row .snum{color:var(--warning)}
 .rir-badge{font-family:'Inter',sans-serif;display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:13px;padding:0 3px;border-radius:5px;font-size:8px;font-weight:700;line-height:1}
@@ -438,45 +376,45 @@ button:active{transform:scale(.97)}
 .rest-timer{position:fixed;bottom:90px;right:16px;background:var(--surface);border:1px solid var(--acc-border);border-radius:var(--r-sm);padding:12px 15px;display:none;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.6);min-width:150px}
 .rest-timer.show{display:block}
 .rt-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:3px}
-.rt-time{font-family:'Bebas Neue',sans-serif;font-size:38px;color:var(--acc);line-height:1}
+.rt-time{font-family:'Inter',sans-serif;font-weight:700;font-size:38px;color:var(--acc);line-height:1}
 .rt-btns{display:flex;gap:5px;margin-top:7px}
 .rt-btn{flex:1;padding:4px;min-height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:10px;cursor:pointer}
 
 /* HIIT */
 .hiit-card{background:rgba(255,92,56,.04);border:1px solid rgba(255,92,56,.15);border-radius:var(--r);overflow:hidden;box-shadow:var(--card-shadow)}
 .hiit-head{padding:14px 15px;border-bottom:1px solid rgba(255,92,56,.1);display:flex;align-items:center;justify-content:space-between}
-.hiit-head h3{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--acc2);letter-spacing:.5px}
+.hiit-head h3{font-family:'Inter',sans-serif;font-weight:700;font-size:22px;color:var(--acc2);letter-spacing:.5px}
 .hiit-body{padding:14px 15px}
 .hiit-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 .hg{background:var(--surface);border:1px solid rgba(255,92,56,.1);border-radius:var(--r-sm);padding:10px;text-align:center}
-.hg .v{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--acc2);line-height:1}
+.hg .v{font-family:'Inter',sans-serif;font-weight:700;font-size:26px;color:var(--acc2);line-height:1}
 .hg .l{font-size:9px;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
-.hiit-start-btn{width:100%;padding:11px;min-height:48px;border-radius:var(--r-sm);background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.25);color:var(--acc2);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;cursor:pointer;transition:all .2s}
+.hiit-start-btn{width:100%;padding:11px;min-height:48px;border-radius:var(--r-sm);background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.25);color:var(--acc2);font-family:'Inter',sans-serif;font-weight:700;font-size:18px;letter-spacing:.5px;cursor:pointer;transition:all .2s}
 .hiit-start-btn:hover{background:var(--acc2);color:#fff}
 .hiit-live{display:none;text-align:center;padding:12px 0}
 .hiit-live.show{display:block}
 .hiit-phase{font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-bottom:3px}
-.hiit-cd{font-family:'Bebas Neue',sans-serif;font-size:60px;line-height:1}
+.hiit-cd{font-family:'Inter',sans-serif;font-weight:700;font-size:60px;line-height:1}
 .hiit-round{font-size:11px;color:var(--text-muted);margin-top:3px}
 
 /* AMRAP / CHALLENGE */
 .amrap-card{background:rgba(56,182,255,.04);border:1px solid rgba(56,182,255,.15);border-radius:var(--r);overflow:hidden;box-shadow:var(--card-shadow)}
 .amrap-head{padding:14px 15px;border-bottom:1px solid rgba(56,182,255,.1);display:flex;align-items:center;justify-content:space-between}
-.amrap-head h3{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--acc3);letter-spacing:.5px}
+.amrap-head h3{font-family:'Inter',sans-serif;font-weight:700;font-size:22px;color:var(--acc3);letter-spacing:.5px}
 .amrap-body{padding:14px 15px}
 .amrap-cap-row{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;font-size:11px;color:var(--text-muted)}
 .amrap-cap-row input{width:48px;background:var(--surface2);border:1px solid rgba(56,182,255,.2);border-radius:8px;padding:4px 6px;color:var(--acc3);font-size:12px;text-align:center}
 .amrap-timer-wrap{text-align:center;padding:6px 0 14px}
-.amrap-cd{font-family:'Bebas Neue',sans-serif;font-size:56px;line-height:1;color:var(--acc3)}
+.amrap-cd{font-family:'Inter',sans-serif;font-weight:700;font-size:56px;line-height:1;color:var(--acc3)}
 .amrap-controls{display:flex;gap:8px;margin-bottom:14px}
-.amrap-start-btn{flex:1;padding:11px;min-height:48px;border-radius:var(--r-sm);background:rgba(56,182,255,.1);border:1px solid rgba(56,182,255,.25);color:var(--acc3);font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px;cursor:pointer;transition:all .2s}
+.amrap-start-btn{flex:1;padding:11px;min-height:48px;border-radius:var(--r-sm);background:rgba(56,182,255,.1);border:1px solid rgba(56,182,255,.25);color:var(--acc3);font-family:'Inter',sans-serif;font-weight:700;font-size:18px;letter-spacing:.5px;cursor:pointer;transition:all .2s}
 .amrap-start-btn:hover{background:var(--acc3);color:#080808}
 .amrap-reset-btn{padding:11px 16px;min-height:48px;border-radius:var(--r-sm);background:none;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-size:16px}
 .amrap-score{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .amrap-sc{background:var(--surface);border:1px solid rgba(56,182,255,.1);border-radius:var(--r-sm);padding:12px;text-align:center}
-.amrap-sc .v{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--acc3);line-height:1}
+.amrap-sc .v{font-family:'Inter',sans-serif;font-weight:700;font-size:34px;color:var(--acc3);line-height:1}
 .amrap-sc .l{font-size:9px;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
-.amrap-round-btn{width:100%;padding:16px;min-height:48px;border-radius:var(--r-sm);background:var(--acc3);border:none;color:#080808;font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.5px;cursor:pointer;transition:all .2s;margin-bottom:8px}
+.amrap-round-btn{width:100%;padding:16px;min-height:48px;border-radius:var(--r-sm);background:var(--acc3);border:none;color:#080808;font-family:'Inter',sans-serif;font-weight:700;font-size:20px;letter-spacing:.5px;cursor:pointer;transition:all .2s;margin-bottom:8px}
 .amrap-round-btn:hover{opacity:.85}
 .amrap-ex-row{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--surface);border:1px solid rgba(56,182,255,.08);border-radius:var(--r-sm);margin-bottom:6px}
 .amrap-ex-row .n{flex:1;font-size:13px;font-weight:500}
@@ -485,7 +423,7 @@ button:active{transform:scale(.97)}
 /* REST DAY */
 .rest-card{text-align:center;padding:30px 20px}
 .rest-card .emoji{font-size:44px;margin-bottom:10px}
-.rest-card h3{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--text-muted);letter-spacing:.5px}
+.rest-card h3{font-family:'Inter',sans-serif;font-weight:700;font-size:26px;color:var(--text-muted);letter-spacing:.5px}
 .rest-card p{font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.6}
 
 /* FINISH BTN */
@@ -494,23 +432,23 @@ button:active{transform:scale(.97)}
 
 /* NUTRITION */
 .nut-header{padding:18px 16px 0;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.nut-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px}
+.nut-header h2{font-family:'Inter',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px}
 .macro-circle-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px 16px 0}
 .macro-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;text-align:center;box-shadow:var(--card-shadow)}
-.macro-box .mv{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1}
+.macro-box .mv{font-family:'Inter',sans-serif;font-weight:700;font-size:36px;line-height:1}
 .macro-box .ml{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin-top:4px}
 .macro-box .mp{font-size:10px;color:var(--text-muted);margin-top:3px}
 .nut-bar{height:4px;border-radius:2px;margin-top:6px;background:var(--surface3);overflow:hidden}
 .nut-bar-fill{height:100%;border-radius:2px;transition:width .4s}
 .cal-total{margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--card-shadow)}
-.cal-total .cv{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1}
+.cal-total .cv{font-family:'Inter',sans-serif;font-weight:700;font-size:36px;line-height:1}
 .nut-targets{margin:10px 16px 0}
 .nt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .nt-head h3{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted)}
 .target-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
 .target-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;text-align:center}
 .target-box label{font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px}
-.target-box input{background:none;border:none;color:var(--text);font-family:'Bebas Neue',sans-serif;font-size:20px;text-align:center;width:100%}
+.target-box input{background:none;border:none;color:var(--text);font-family:'Inter',sans-serif;font-weight:700;font-size:20px;text-align:center;width:100%}
 .target-box .tu{font-size:9px;color:var(--text-muted)}
 .meals-section{margin:10px 16px 0}
 .ms-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -553,20 +491,20 @@ button:active{transform:scale(.97)}
 
 /* STATS */
 .stats-header{padding:18px 16px 0}
-.stats-header h2{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;margin-bottom:10px}
+.stats-header h2{font-family:'Inter',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px;margin-bottom:10px}
 .empty-state{text-align:center;padding:36px 20px;color:var(--text-muted);font-size:12px;font-style:italic}
 .hcs strong{color:var(--text);font-weight:500}
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px;margin-bottom:14px}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--card-shadow)}
 .sc-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:8px}
-.sc-val{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;color:var(--acc)}
+.sc-val{font-family:'Inter',sans-serif;font-weight:700;font-size:36px;line-height:1;color:var(--acc)}
 .sc-sub{font-size:11px;color:var(--text-muted);margin-top:4px}
 .pr-section{padding:0 16px}
-.pr-section h3{font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.5px;margin-bottom:8px}
+.pr-section h3{font-family:'Inter',sans-serif;font-weight:700;font-size:19px;letter-spacing:.5px;margin-bottom:8px}
 .pr-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
 .pr-item:last-child{border-bottom:none}
 .pr-ex{font-size:13px;font-weight:500;flex:1}
-.pr-v{font-family:'Bebas Neue',sans-serif;font-size:17px;color:var(--acc2)}
+.pr-v{font-family:'Inter',sans-serif;font-weight:700;font-size:17px;color:var(--acc2)}
 .pr-d{font-size:10px;color:var(--text-muted)}
 
 /* LOADING */
@@ -699,14 +637,14 @@ button:active{transform:scale(.97)}
     <div class="bq-board" style="margin:10px 12px 0">
 
         <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px">
-          <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--chalk2);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
-          <div id="weekLabel" class="bq-eyebrow">Bu Hafta</div>
-          <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--chalk2);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
+          <button onclick="changeWeek(-1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">‹</button>
+          <div id="weekLabel" style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:500;color:var(--text-sub)">Bu Hafta</div>
+          <button onclick="changeWeek(1)" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:4px 12px;cursor:pointer;font-size:16px;line-height:1">›</button>
         </div>
         <div class="week-grid" id="weekGrid"></div>
 
-        <div class="quote-banner bq-quote-pinned">
-          <div class="quote-text bq-script" id="quoteText" style="font-size:20px;min-height:2.4em"></div>
+        <div class="quote-banner">
+          <div class="quote-text" id="quoteText" style="font-size:14px;min-height:2.4em"></div>
           <div class="quote-author" id="quoteAuthor"></div>
         </div>
 
@@ -714,11 +652,11 @@ button:active{transform:scale(.97)}
 
         <div>
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
-            <h2 id="dashGreeting" class="bq-chalk-heading bq-script" style="font-size:30px;margin:0">Merhaba 👋</h2>
+            <h2 id="dashGreeting" style="font-size:28px;margin:0;font-weight:700;letter-spacing:-.02em;font-family:'Inter',sans-serif">Merhaba 👋</h2>
             <div id="dashMonthBadge" style="flex-shrink:0"></div>
           </div>
-          <div id="dashSummaryLine" style="font-size:12px;color:var(--chalk2);margin-top:2px"></div>
-          <div id="dashMotivation" style="font-size:11px;color:var(--chalk3);margin-top:6px;font-style:italic"></div>
+          <div id="dashSummaryLine" style="font-size:12px;color:var(--text-sub);margin-top:2px"></div>
+          <div id="dashMotivation" style="font-size:11px;color:var(--text-muted);margin-top:6px;font-style:italic"></div>
           <div id="dashTodayCard" style="margin-top:12px"></div>
         </div>
 
@@ -806,8 +744,8 @@ button:active{transform:scale(.97)}
 
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
           <div>
-            <div class="bq-eyebrow">Profil</div>
-            <h2 id="profNameHeading" class="bq-chalk-heading bq-script" style="font-size:34px;margin:2px 0 0">Sporcu</h2>
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:500;color:var(--text-sub)">Profil</div>
+            <h2 id="profNameHeading" style="font-size:30px;margin:2px 0 0;font-weight:700;letter-spacing:-.02em;font-family:'Inter',sans-serif">Sporcu</h2>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
             <button class="btn btn-acc btn-sm" onclick="saveProfileAll()">💾 Kaydet</button>
@@ -817,14 +755,14 @@ button:active{transform:scale(.97)}
 
         <div class="bq-divider"></div>
 
-        <div id="profGoalsLine" style="font-size:12px;color:var(--chalk2);line-height:1.7"></div>
+        <div id="profGoalsLine" style="font-size:12px;color:var(--text-sub);line-height:1.7"></div>
 
         <div class="bq-divider"></div>
 
         <div class="prof-section" style="background:transparent;border:none;box-shadow:none;padding:0">
           <h3>Ayarlar</h3>
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-            <span style="font-size:12px;color:var(--chalk2)">Koyu / Açık tema</span>
+            <span style="font-size:12px;color:var(--text-sub)">Koyu / Açık tema</span>
             <div style="display:flex;gap:6px">
               <button class="btn btn-outline btn-sm" id="themeToggleBtn" onclick="toggleTheme()">🌙 Koyu</button>
               <button class="btn btn-outline btn-sm" onclick="hardRefresh()" title="Önbelleği temizle ve sayfayı yenile">↻ Yenile</button>
@@ -834,7 +772,7 @@ button:active{transform:scale(.97)}
 
         <div class="bq-divider"></div>
 
-        <div id="profStatsLine" style="font-size:12px;color:var(--chalk2);line-height:1.7"></div>
+        <div id="profStatsLine" style="font-size:12px;color:var(--text-sub);line-height:1.7"></div>
 
     </div>
 
@@ -849,7 +787,7 @@ button:active{transform:scale(.97)}
 
   <div class="screen" id="screen-workouts">
     <div style="padding:18px 16px 0">
-      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px">Workouts</h2>
+      <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px">Workouts</h2>
     </div>
     <div class="wo-subtabs" id="woSubtabs">
       <button class="wo-subtab active" onclick="switchWoTab('split',this)">📋 Split</button>
@@ -874,7 +812,7 @@ button:active{transform:scale(.97)}
 <div id="ptReportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;overflow-y:auto;padding:20px 16px 40px">
   <div style="max-width:480px;margin:0 auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.5px;color:var(--acc)">HAFTALIK RAPOR</h2>
+      <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:26px;letter-spacing:.5px;color:var(--acc)">HAFTALIK RAPOR</h2>
       <button onclick="document.getElementById('ptReportModal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1">✕</button>
     </div>
     <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:18px">
@@ -1640,14 +1578,14 @@ async function renderPtReport(){
     }).join('')}</div>` : '';
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:34px;height:34px;border-radius:50%;background:rgba(212,245,60,.15);color:var(--acc);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${avatarLetter}</div>
+        <div style="width:34px;height:34px;border-radius:50%;background:rgba(232,93,4,.15);color:var(--acc);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0">${avatarLetter}</div>
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name||'—'}</div>
           <div style="font-size:10px;color:var(--muted)">${goalLabel}${p.weight?' · '+p.weight+' kg':''}</div>
         </div>
       </div>
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;line-height:1;color:${workoutColor}">${workoutCount}</div>
+        <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:32px;line-height:1;color:${workoutColor}">${workoutCount}</div>
         <div style="font-size:10px;color:var(--muted)">antrenman</div>
       </div>
       ${tagsHtml?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">${tagsHtml}</div>`:''}
@@ -2065,7 +2003,7 @@ async function renderDashWeightTrend(){
       ${dots}
     </svg>
     <div style="text-align:center;flex:1;min-width:0">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:${deltaColor};line-height:1">${deltaTxt}</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:26px;color:${deltaColor};line-height:1">${deltaTxt}</div>
       <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px">Kilo Trendi (7g)</div>
     </div>
   </div>`;
@@ -2158,9 +2096,9 @@ function renderDashTodayCard(){
         <span class="bq-chalk-check">✓</span>
       </div>`;
     }).join('');
-    el.innerHTML = `<div class="bq-chalkboard bq-grain" onclick="goToTodayWorkout()">
-      <div class="bq-eyebrow">Bugünün Antrenmanı</div>
-      <div class="bq-chalk-heading" style="font-size:22px;margin:2px 0 8px">${day.name||'Antrenman'}</div>
+    el.innerHTML = `<div onclick="goToTodayWorkout()" style="cursor:pointer">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:500;color:var(--text-sub)">Bugünün Antrenmanı</div>
+      <div style="font-size:20px;font-weight:700;letter-spacing:-.02em;margin:2px 0 8px;font-family:'Inter',sans-serif">${day.name||'Antrenman'}</div>
       <div>${rows}</div>
     </div>`;
     // Zaten tamamlanmis satirlari BIR SONRAKI FRAME'de "erased" yapiyoruz ki
@@ -2175,10 +2113,10 @@ function renderDashTodayCard(){
   const isRest = day.type==='rest';
   const exCount = isRest?0:(day.type==='amrap'?((day.amrap&&day.amrap.exercises)||[]).length:(day.type==='hiit'||day.type==='cardio')?0:(day.exercises||[]).length);
   const typeLabel = isRest?'Dinlenme Günü':(day.type==='hiit'||day.type==='cardio')?'HIIT':day.type==='amrap'?'AMRAP':'Antrenman Günü';
-  el.innerHTML = `<div onclick="goToTodayWorkout()" style="background:linear-gradient(135deg,rgba(212,245,60,.1),rgba(212,245,60,.02));border:1px solid rgba(212,245,60,.25);border-radius:14px;padding:18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px">
+  el.innerHTML = `<div onclick="goToTodayWorkout()" style="background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.25);border-radius:14px;padding:18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px">
     <div style="min-width:0">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--acc);margin-bottom:4px">Bugünün Programı</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${day.name||typeLabel}</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:22px;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${day.name||typeLabel}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:2px">${isRest?'Bugün dinlenme günü 😴':`${typeLabel} · ${exCount} egzersiz`}</div>
     </div>
     <div style="font-size:30px;flex-shrink:0">${isRest?'😴':'🏋️'}</div>
@@ -2260,10 +2198,10 @@ async function renderDashCalCard(){
   el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Kalori Dengesi</div>
-      <button onclick="openActivityModal()" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);color:var(--acc);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap">+ Aktivite Ekle</button>
+      <button onclick="openActivityModal()" style="background:rgba(232,93,4,.1);border:1px solid rgba(232,93,4,.3);color:var(--acc);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap">+ Aktivite Ekle</button>
     </div>
     <div style="text-align:center;margin:10px 0 14px">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:44px;line-height:1;color:${color}">${kalan===null?'—':(kalan>0?'+':'')+kalan}</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:44px;line-height:1;color:${color}">${kalan===null?'—':(kalan>0?'+':'')+kalan}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">kalan kcal</div>
       ${caption?`<div style="font-size:11px;color:${color};margin-top:4px;font-weight:600">${caption}</div>`:''}
       ${targetNote}
@@ -2296,8 +2234,8 @@ function openActivityModal(){
   modal.id = 'activityModal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
   modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
-  modal.innerHTML = `<div style="background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:16px;padding:22px;max-width:340px;width:100%">
-    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:.5px;margin-bottom:14px">+ Aktivite Ekle</h3>
+  modal.innerHTML = `<div style="background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:16px;padding:22px;max-width:340px;width:100%">
+    <h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:19px;letter-spacing:.5px;margin-bottom:14px">+ Aktivite Ekle</h3>
     <label style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:5px">Aktivite</label>
     <select id="actTypeSel" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:13px;margin-bottom:12px;outline:none">${options}</select>
     <label style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);display:block;margin-bottom:5px">Süre (dakika)</label>
@@ -2305,7 +2243,7 @@ function openActivityModal(){
     <div id="actKcalPreview" style="font-size:11px;color:var(--acc);margin-bottom:14px">~0 kcal yakılacak</div>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('activityModal').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border-strong);background:none;color:var(--text-muted);cursor:pointer;font-size:12px">İptal</button>
-      <button onclick="saveActivityLog()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#d4f53c;color:#0c0c0c;cursor:pointer;font-size:12px;font-weight:700">Kaydet</button>
+      <button onclick="saveActivityLog()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#e85d04;color:#0c0c0c;cursor:pointer;font-size:12px;font-weight:700">Kaydet</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -2394,7 +2332,7 @@ function maybeCelebrateMonthlyGoal(uid, count){
   setTimeout(()=>t.remove(),4000);
 }
 function showConfetti(){
-  const colors=['#c8f53c','#ff5c38','#38b6ff','#f7c948','#34d399'];
+  const colors=['#e85d04','#ff5c38','#38b6ff','#f7c948','#34d399'];
   const container=document.createElement('div');
   container.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9998;overflow:hidden';
   for(let i=0;i<60;i++){
@@ -2521,14 +2459,14 @@ function renderWeekGrid() {
     if(i===today){dc+=' today-d';if(!isDone)lbl=(day.type==='rest'?'Rest':shortName)}
     const isToday = i===today;
     const dayLabel = editMode && canEdit()
-      ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
+      ? `<input class="wday-edit-inp" value="${day.name||''}" onclick="event.stopPropagation()" onchange="changeDayNameOnly(${pi},this.value)" style="background:rgba(232,93,4,.1);border:1px solid rgba(232,93,4,.3);border-radius:4px;padding:1px 3px;font-size:8px;color:var(--acc);width:52px;outline:none;text-align:center">`
       : `<div class="wday-lbl">${lbl}</div>`;
     const dateStr = dayDate.getDate() + ' ' + ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][dayDate.getMonth()];
     const isSelected = pi === curDay;
     const boxStyle = isDone
       ? `background:${isExtra?'rgba(56,182,255,.2)':'rgba(52,211,153,.25)'};border-color:${doneColor};box-shadow:0 0 8px ${isExtra?'rgba(56,182,255,.2)':'rgba(52,211,153,.2)'}`
       : isSelected
-        ? 'border-color:rgba(212,245,60,.5);background:rgba(212,245,60,.06)'
+        ? 'border-color:rgba(232,93,4,.5);background:rgba(232,93,4,.06)'
         : '';
     return `<div class="wday${isToday?' today':''}${isSelected?' selected':''}" onclick="selDW(${pi})" style="${boxStyle}">
       <div class="wday-name" style="${isDone?'color:'+doneColor:isToday?'color:var(--acc)':''}">${d}</div>
@@ -2566,13 +2504,13 @@ function showExtraWorkoutModal(){
   ];
   modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;color:var(--acc)">EKSTRA ANTRENMAN</h2>
+      <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px;color:var(--acc)">EKSTRA ANTRENMAN</h2>
       <button onclick="closeExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
     </div>
     <p style="font-size:12px;color:var(--muted);margin-bottom:20px">Dinlenme gününde ne yapmak istiyorsun?</p>
     ${cards.map(c=>`<div onclick="${c.action}" style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;cursor:pointer;display:flex;align-items:center;gap:14px">
       <div style="font-size:30px">${c.icon}</div>
-      <div><div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.5px">${c.title}</div><div style="font-size:12px;color:var(--text)">${c.sub}</div><div style="font-size:11px;color:var(--muted)">${c.meta}</div></div>
+      <div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:18px;letter-spacing:.5px">${c.title}</div><div style="font-size:12px;color:var(--text)">${c.sub}</div><div style="font-size:11px;color:var(--muted)">${c.meta}</div></div>
     </div>`).join('')}
   </div>`;
   document.body.appendChild(modal);
@@ -2619,18 +2557,18 @@ function renderNoExcuseSetup(){
   const isHiit=_noExcuseFormat==='hiit';
   modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:.5px;color:var(--acc)">🏠 NO EXCUSE</h2>
+      <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:26px;letter-spacing:.5px;color:var(--acc)">🏠 NO EXCUSE</h2>
       <button onclick="closeExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:16px">
-      <div onclick="setNoExcuseFormat('hiit')" style="flex:1;border-radius:14px;padding:16px;border:2px solid ${isHiit?'var(--acc)':'var(--border)'};background:${isHiit?'rgba(212,245,60,.06)':'var(--surface)'};cursor:pointer;text-align:center">
+      <div onclick="setNoExcuseFormat('hiit')" style="flex:1;border-radius:14px;padding:16px;border:2px solid ${isHiit?'var(--acc)':'var(--border)'};background:${isHiit?'rgba(232,93,4,.06)':'var(--surface)'};cursor:pointer;text-align:center">
         <div style="font-size:26px;margin-bottom:6px">🔥</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px">HIIT</div>
+        <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:16px;letter-spacing:.5px">HIIT</div>
         <div style="font-size:10px;color:var(--muted);margin-top:4px">40sn iş / 20sn dinlenme<br>4 round · ~20 dakika</div>
       </div>
-      <div onclick="setNoExcuseFormat('circuit')" style="flex:1;border-radius:14px;padding:16px;border:2px solid ${!isHiit?'var(--acc)':'var(--border)'};background:${!isHiit?'rgba(212,245,60,.06)':'var(--surface)'};cursor:pointer;text-align:center">
+      <div onclick="setNoExcuseFormat('circuit')" style="flex:1;border-radius:14px;padding:16px;border:2px solid ${!isHiit?'var(--acc)':'var(--border)'};background:${!isHiit?'rgba(232,93,4,.06)':'var(--surface)'};cursor:pointer;text-align:center">
         <div style="font-size:26px;margin-bottom:6px">⚡</div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px">CIRCUIT</div>
+        <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:16px;letter-spacing:.5px">CIRCUIT</div>
         <div style="font-size:10px;color:var(--muted);margin-top:4px">7 hareket · 3 round<br>60sn dinlenme · ~20 dakika</div>
       </div>
     </div>
@@ -2686,10 +2624,10 @@ function renderHiitPlayer(){
   const m=Math.floor(st.secsLeft/60), s=st.secsLeft%60;
   modal.innerHTML = `<div style="max-width:380px;width:100%">
     <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Round ${st.round} / ${st.totalRounds}</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;margin-bottom:20px">${curMove}</div>
-    <div style="border-radius:20px;padding:30px 16px;margin-bottom:20px;background:${isWork?'rgba(212,245,60,.08)':'rgba(255,255,255,.02)'}">
+    <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;margin-bottom:20px">${curMove}</div>
+    <div style="border-radius:20px;padding:30px 16px;margin-bottom:20px;background:${isWork?'rgba(232,93,4,.08)':'rgba(255,255,255,.02)'}">
       <div style="font-size:13px;font-weight:700;letter-spacing:1px;color:${isWork?'var(--acc)':'var(--text-muted)'};margin-bottom:10px">${isWork?'ÇALIŞIYORSUN':'DİNLEN'}</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:80px;line-height:1;color:var(--acc)">${m}:${s.toString().padStart(2,'0')}</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:80px;line-height:1;color:var(--acc)">${m}:${s.toString().padStart(2,'0')}</div>
       ${!isWork?`<div style="font-size:12px;color:var(--muted);margin-top:10px">Sıradaki: ${nextMove}</div>`:''}
     </div>
     <div style="display:flex;gap:10px">
@@ -2723,15 +2661,15 @@ function renderCircuitPlayer(){
     const m=Math.floor(st.restSecsLeft/60), s=st.restSecsLeft%60;
     modal.innerHTML = `<div style="max-width:380px;width:100%">
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Round ${st.round-1} tamamlandı</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--acc);margin-bottom:20px">DİNLEN</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:80px;color:var(--acc);margin-bottom:24px">${m}:${s.toString().padStart(2,'0')}</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:22px;color:var(--acc);margin-bottom:20px">DİNLEN</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:80px;color:var(--acc);margin-bottom:24px">${m}:${s.toString().padStart(2,'0')}</div>
       <button onclick="stopExtraWorkoutPlayer()" style="padding:12px 24px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:13px;cursor:pointer">✕ Bitir</button>
     </div>`;
   } else {
     const mv = st.moves[st.moveIdx];
     modal.innerHTML = `<div style="max-width:380px;width:100%">
       <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Round ${st.round} / ${st.totalRounds} · Hareket ${st.moveIdx+1} / ${st.moves.length}</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:.5px;margin-bottom:6px">${mv.name}</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:30px;letter-spacing:.5px;margin-bottom:6px">${mv.name}</div>
       <div style="font-size:16px;color:var(--acc);margin-bottom:30px">${mv.target}</div>
       <button onclick="completeCircuitMove()" class="btn btn-acc" style="width:100%;padding:18px;font-size:16px;margin-bottom:14px">✓ Tamamlandı</button>
       <button onclick="stopExtraWorkoutPlayer()" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:12px;cursor:pointer">✕ Bitir</button>
@@ -2789,9 +2727,9 @@ function renderCindyPlayer(){
   const m=Math.floor(st.secsLeft/60), s=st.secsLeft%60;
   const mv=st.moves[st.moveIdx];
   modal.innerHTML=`<div style="max-width:380px;width:100%">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:70px;color:var(--acc);margin-bottom:6px">${m}:${s.toString().padStart(2,'0')}</div>
+    <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:70px;color:var(--acc);margin-bottom:6px">${m}:${s.toString().padStart(2,'0')}</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Round ${st.round}</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.5px;margin-bottom:28px">${mv.reps} ${mv.name}</div>
+    <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px;margin-bottom:28px">${mv.reps} ${mv.name}</div>
     <button onclick="completeCindyMove()" class="btn btn-acc" style="width:100%;padding:18px;font-size:16px;margin-bottom:14px">✓</button>
     <button onclick="stopExtraWorkoutPlayer()" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:12px;cursor:pointer">✕ Bitir</button>
   </div>`;
@@ -2815,7 +2753,7 @@ function finishCindyPlayer(timeUp){
     const modal=document.createElement('div');
     modal.id='extraWorkoutModal';
     modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
-    modal.innerHTML=`<div style="max-width:360px"><div style="font-size:40px;margin-bottom:10px">⏱</div><h2 style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc);margin-bottom:10px">Süre Doldu!</h2><p style="font-size:14px;color:var(--text);margin-bottom:24px">${roundsCompleted} round tamamladın</p><button class="btn btn-acc" style="width:100%" onclick="showExtraWorkoutSummary('Cindy', ${st.completedMoves}, 1200)">Devam</button></div>`;
+    modal.innerHTML=`<div style="max-width:360px"><div style="font-size:40px;margin-bottom:10px">⏱</div><h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;color:var(--acc);margin-bottom:10px">Süre Doldu!</h2><p style="font-size:14px;color:var(--text);margin-bottom:24px">${roundsCompleted} round tamamladın</p><button class="btn btn-acc" style="width:100%" onclick="showExtraWorkoutSummary('Cindy', ${st.completedMoves}, 1200)">Devam</button></div>`;
     document.body.appendChild(modal);
   } else {
     showExtraWorkoutSummary('Cindy', st.completedMoves, 1200-st.secsLeft);
@@ -2887,10 +2825,10 @@ function renderSallyPlayer(){
   modal.id='extraWorkoutModal';
   const phase = SALLY_TIMING[st.idx].phase;
   const isUp = phase==='up';
-  modal.style.cssText=`position:fixed;inset:0;background:${isUp?'rgba(212,245,60,.08)':'rgba(255,255,255,.02)'};z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px`;
+  modal.style.cssText=`position:fixed;inset:0;background:${isUp?'rgba(232,93,4,.08)':'rgba(255,255,255,.02)'};z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px`;
   const pct = Math.min(100, Math.round(st.elapsed/st.total*100));
   modal.innerHTML=`<div style="max-width:380px;width:100%">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:80px;letter-spacing:1px;color:${isUp?'var(--acc)':'var(--text)'};margin-bottom:20px">${isUp?'⬆ UP':'⬇ DOWN'}</div>
+    <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:80px;letter-spacing:1px;color:${isUp?'var(--acc)':'var(--text)'};margin-bottom:20px">${isUp?'⬆ UP':'⬇ DOWN'}</div>
     <div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-bottom:10px"><div style="width:${pct}%;height:100%;background:var(--acc)"></div></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:24px">${Math.floor(st.elapsed/60)}:${(st.elapsed%60).toString().padStart(2,'0')} / 3:30</div>
     <button onclick="stopExtraWorkoutPlayer()" style="padding:10px 20px;border-radius:10px;border:1px solid rgba(255,92,56,.3);background:none;color:#ff5c38;font-size:12px;cursor:pointer">✕ Bitir</button>
@@ -2905,7 +2843,7 @@ function finishSallyPlayer(){
   const modal=document.createElement('div');
   modal.id='extraWorkoutModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
-  modal.innerHTML=`<div style="max-width:360px"><div style="font-size:40px;margin-bottom:10px">💪</div><h2 style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc);margin-bottom:20px">Sally tamamlandı!</h2><button class="btn btn-acc" style="width:100%" onclick="showExtraWorkoutSummary('Bring Sally Up', ${st.upCount}, 210)">Devam</button></div>`;
+  modal.innerHTML=`<div style="max-width:360px"><div style="font-size:40px;margin-bottom:10px">💪</div><h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;color:var(--acc);margin-bottom:20px">Sally tamamlandı!</h2><button class="btn btn-acc" style="width:100%" onclick="showExtraWorkoutSummary('Bring Sally Up', ${st.upCount}, 210)">Devam</button></div>`;
   document.body.appendChild(modal);
 }
 
@@ -2947,9 +2885,9 @@ function showExtraWorkoutSummary(name, setsDone, durationSec){
   modal.id='extraWorkoutModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
   const durTxt = durationSec!=null ? fmtDuration(Math.round(durationSec)) : '—';
-  modal.innerHTML=`<div style="max-width:360px;width:100%;background:var(--surface);border:1px solid rgba(212,245,60,.25);border-radius:16px;padding:28px 20px">
+  modal.innerHTML=`<div style="max-width:360px;width:100%;background:var(--surface);border:1px solid rgba(232,93,4,.25);border-radius:16px;padding:28px 20px">
     <div style="font-size:36px;margin-bottom:10px">🏁</div>
-    <h2 style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${name}</h2>
+    <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${name}</h2>
     <p style="font-size:12px;color:var(--muted);margin-bottom:20px">⏱ ${durTxt} · ${setsDone} hareket tamamlandı</p>
     <button class="btn btn-acc" style="width:100%" onclick="saveExtraWorkout(${JSON.stringify(name)},${setsDone})">Kaydet</button>
     <button onclick="closeExtraWorkoutModal()" style="margin-top:10px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">Kaydetmeden kapat</button>
@@ -2988,7 +2926,7 @@ async function deleteExtraWorkoutLog(id, di){
 
 async function renderProfile(p) {
   if(!p) return;
-  const color = p.color||'#d4f53c', bg = `rgba(212,245,60,0.12)`;
+  const color = p.color||'#e85d04', bg = `rgba(232,93,4,0.12)`;
   // mainGoal (yeni sihirbazdan) ile eski goal alani senkron olmayabiliyordu -
   // once mainGoal'a bak, GOALS listesinden etiketini bul, yoksa eski goal'a dus
   const goalId = p.mainGoal || p.goal;
@@ -3315,7 +3253,7 @@ async function renderDayContent(di, skipFetch) {
   let html = `<div class="day-head-row">
     <div class="day-head-left">
       <input class="day-head-title" value="${day.name}" ${canEditHere?'':'readonly'} onchange="prog[${di}].name=this.value;saveProgram(activeProfile().id);renderWeekGrid()">
-      ${editMode&&canEditHere?'<select style="background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(212,245,60,0.1);color:var(--acc)">'+computeDayFocusLabel(day)+'</span>'}
+      ${editMode&&canEditHere?'<select style="background:var(--surface2);border:1px solid rgba(232,93,4,.3);border-radius:6px;padding:4px 8px;color:var(--acc);font-size:11px;outline:none;cursor:pointer" onchange="changeDay('+di+',this.value)"><option value="Pazartesi"'+(day.day==='Pazartesi'?' selected':'')+'>Pazartesi</option><option value="Salı"'+(day.day==='Salı'?' selected':'')+'>Salı</option><option value="Çarşamba"'+(day.day==='Çarşamba'?' selected':'')+'>Çarşamba</option><option value="Perşembe"'+(day.day==='Perşembe'?' selected':'')+'>Perşembe</option><option value="Cuma"'+(day.day==='Cuma'?' selected':'')+'>Cuma</option><option value="Cumartesi"'+(day.day==='Cumartesi'?' selected':'')+'>Cumartesi</option><option value="Pazar"'+(day.day==='Pazar'?' selected':'')+'>Pazar</option></select>':'<span class="day-type-pill" style="background:rgba(232,93,4,0.1);color:var(--acc)">'+computeDayFocusLabel(day)+'</span>'}
       ${overrideBadge}
     </div>
     <div class="day-head-right">
@@ -3346,7 +3284,7 @@ async function renderDayContent(di, skipFetch) {
     ${exerciseRegionPillsHtml()}
     <div style="position:relative;margin-bottom:8px">
       <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="this.select();filterExercises('')" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
-      <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
+      <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(232,93,4,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
     </div>
     <div class="aef-grid">
       <div class="aef-field"><label>Kas Grubu (otomatik)</label><input class="aef-input" id="aef-muscle" placeholder="Egzersiz seçince dolar" readonly style="color:var(--acc)"></div>
@@ -3530,7 +3468,7 @@ function renderDayOverrideModal(){
   }
   modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;color:var(--acc)">BU GÜNÜ DÜZENLE</h2>
+      <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;color:var(--acc)">BU GÜNÜ DÜZENLE</h2>
       <button onclick="closeDayOverrideModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px">${typeHtml}</div>
@@ -3786,7 +3724,7 @@ async function showExerciseDetailModalByName(name){
   modal.onclick=(e)=>{ if(e.target===modal) closeExerciseDetailModal(); };
   modal.innerHTML = `<div style="background:var(--surface);width:100%;max-width:480px;max-height:88vh;border-radius:20px 20px 0 0;overflow:hidden;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px">${name}</h3>
+      <h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:21px;letter-spacing:.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:10px">${name}</h3>
       <button onclick="closeExerciseDetailModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;flex-shrink:0;line-height:1">✕</button>
     </div>
     <div id="exDetailTabs" style="display:flex;gap:4px;padding:10px 16px 0;flex-shrink:0"></div>
@@ -3869,8 +3807,8 @@ function mountExDetailChart(){
       datasets:[{
         label:'Max Ağırlık (kg)',
         data: asc.map(s=>s.maxWeight),
-        borderColor:'#d4f53c', backgroundColor:'rgba(212,245,60,.15)',
-        tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#d4f53c',
+        borderColor:'#e85d04', backgroundColor:'rgba(232,93,4,.15)',
+        tension:.3, fill:true, pointRadius:3, pointBackgroundColor:'#e85d04',
       }]
     },
     options:{
@@ -3894,7 +3832,7 @@ function renderExDetailRecords(){
   });
   const row=(label,value,date)=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px">
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:4px">${label}</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--acc)">${value}</div>
+    <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;color:var(--acc)">${value}</div>
     <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${fmtShortDate(new Date(date+'T00:00:00'))}</div>
   </div>`;
   return row('🏆 En Yüksek Tahmini 1RM', Math.round(best1RM)+' kg', best1RMDate)
@@ -4036,7 +3974,7 @@ function editDayLabel(pi, el){
   if(!prog[pi]) return;
   const inp = document.createElement('input');
   inp.value = prog[pi].name || '';
-  inp.style.cssText = 'background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:4px;padding:2px 4px;font-size:9px;color:var(--acc);width:60px;outline:none;text-align:center';
+  inp.style.cssText = 'background:var(--surface2);border:1px solid rgba(232,93,4,.3);border-radius:4px;padding:2px 4px;font-size:9px;color:var(--acc);width:60px;outline:none;text-align:center';
   el.replaceWith(inp);
   inp.focus();
   inp.select();
@@ -4362,14 +4300,14 @@ function confirmFinishDay(di){
   const modal=document.createElement('div');
   modal.id='finishModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
-  modal.innerHTML=`<div style="background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:16px;padding:24px;max-width:340px;width:100%;text-align:center">
+  modal.innerHTML=`<div style="background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:16px;padding:24px;max-width:340px;width:100%;text-align:center">
     <div style="font-size:36px;margin-bottom:12px">🏁</div>
-    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${prog.name}</h3>
+    <h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${prog.name}</h3>
     <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">${sets} set tamamlandı · ${Math.round(vol)} kg hacim</p>
-    <p style="font-size:11px;color:#d4f53c;margin-bottom:20px">Bu günü tamamlamak istediğine emin misin?</p>
+    <p style="font-size:11px;color:#e85d04;margin-bottom:20px">Bu günü tamamlamak istediğine emin misin?</p>
     <div style="display:flex;gap:8px">
       <button onclick="document.getElementById('finishModal').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border-strong);background:none;color:var(--text-muted);cursor:pointer;font-size:12px">İptal</button>
-      <button onclick="finishDay(${di},${sets},${Math.round(vol)},${JSON.stringify(skipped).replace(/"/g,'&quot;')})" style="flex:1;padding:10px;border-radius:8px;border:none;background:#d4f53c;color:#0c0c0c;cursor:pointer;font-size:12px;font-weight:700">Evet, Tamamla!</button>
+      <button onclick="finishDay(${di},${sets},${Math.round(vol)},${JSON.stringify(skipped).replace(/"/g,'&quot;')})" style="flex:1;padding:10px;border-radius:8px;border:none;background:#e85d04;color:#0c0c0c;cursor:pointer;font-size:12px;font-weight:700">Evet, Tamamla!</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -4405,7 +4343,7 @@ async function finishDay(di,sets,vol,skippedSets){
   // Show success with undo
   const toast=document.createElement('div');
   toast.id='finishToast';
-  toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;display:flex;align-items:center;gap:12px;z-index:500;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+  toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;display:flex;align-items:center;gap:12px;z-index:500;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5)';
   const durTxt = durationSec!=null ? ` · ⏱ ${fmtDuration(durationSec)}` : '';
   toast.innerHTML=`<span style="font-size:13px">💪 <strong>${prog.name}</strong> tamamlandı!${durTxt}</span>
     <button onclick="undoFinish('${data.id}')" style="background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.2);color:#ff5c38;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">Geri Al</button>`;
@@ -4646,7 +4584,7 @@ function confirmFinishAmrap(di){
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
   modal.innerHTML=`<div style="background:var(--surface);border:1px solid var(--acc-border);border-radius:16px;padding:24px;max-width:340px;width:100%;text-align:center">
     <div style="font-size:36px;margin-bottom:12px">🏆</div>
-    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${day.name}</h3>
+    <h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:22px;letter-spacing:.5px;margin-bottom:6px">${day.name}</h3>
     <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">${amrapRounds} round + ${amrapExtra} tekrar · toplam ${totalReps} tekrar</p>
     <p style="font-size:11px;color:var(--acc);margin-bottom:20px">Bu antrenmanı tamamlamak istediğine emin misin?</p>
     <div style="display:flex;gap:8px">
@@ -4780,7 +4718,7 @@ async function renderWeightChart(p){
   ).join('');
   
   // Dots
-  const dots = points.map((p,i) => '<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="'+((p.w===Math.min(...weights))?'#38b6ff':(p.w===Math.max(...weights))?'#ef4444':'#d4f53c')+'" stroke="#0c0c0c" stroke-width="1.5"/>').join('');
+  const dots = points.map((p,i) => '<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="'+((p.w===Math.min(...weights))?'#38b6ff':(p.w===Math.max(...weights))?'#ef4444':'#e85d04')+'" stroke="#0c0c0c" stroke-width="1.5"/>').join('');
   
   // Last value label
   const last = points[points.length-1];
@@ -4796,9 +4734,9 @@ async function renderWeightChart(p){
     +' <span style="color:'+diffColor+'">'+diffSign+diff+' kg</span></div>'
     +'</div>'
     +'<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="overflow:visible">'
-    +'<defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d4f53c" stop-opacity="0.2"/><stop offset="100%" stop-color="#d4f53c" stop-opacity="0"/></linearGradient></defs>'
+    +'<defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e85d04" stop-opacity="0.2"/><stop offset="100%" stop-color="#e85d04" stop-opacity="0"/></linearGradient></defs>'
     +'<path d="'+areaD+'" fill="url(#wg)"/>'
-    +'<path d="'+pathD+'" fill="none" stroke="#d4f53c" stroke-width="2" stroke-linejoin="round"/>'
+    +'<path d="'+pathD+'" fill="none" stroke="#e85d04" stroke-width="2" stroke-linejoin="round"/>'
     +yLabels+xLabels+dots
     +'</svg>'
     +'</div>';
@@ -4931,7 +4869,7 @@ async function renderStats(){
   const tv=sessionCache.reduce((s,l)=>s+(l.volume||0),0);
   const ts=sessionCache.reduce((s,l)=>s+(l.sets_done||0),0);
   const tSkipped=sessionCache.reduce((s,l)=>s+(Array.isArray(l.skipped_sets)?l.skipped_sets.length:0),0);
-  const color=p?.color||'#d4f53c';
+  const color=p?.color||'#e85d04';
   const monthCount=computeMonthlyWorkoutCount();
   const monthColor=monthlyGoalColor(monthCount);
   const monthSub=monthlyGoalSubtitle(monthCount);
@@ -5024,9 +4962,9 @@ function renderNutDatePicker(){
     const isToday = key===todayKey;
     const isSelected = key===curNutDate;
     const style = isSelected
-      ? 'background:#d4f53c;color:#0c0c0c;font-weight:700'
+      ? 'background:#e85d04;color:#0c0c0c;font-weight:700'
       : isToday
-        ? 'border:1px solid rgba(212,245,60,.5);color:#d4f53c'
+        ? 'border:1px solid rgba(232,93,4,.5);color:#e85d04'
         : 'color:#ddd';
     cells.push(`<div onclick="selectNutDate('${key}')" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;font-size:12px;${style}">${d}</div>`);
   }
@@ -5035,17 +4973,17 @@ function renderNutDatePicker(){
   modal.id = 'nutDateModal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
   modal.onclick = (e)=>{ if(e.target===modal) modal.remove(); };
-  modal.innerHTML = `<div style="background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:16px;padding:20px;max-width:320px;width:100%">
+  modal.innerHTML = `<div style="background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:16px;padding:20px;max-width:320px;width:100%">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <button onclick="shiftNutCalMonth(-1)" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px 10px">‹</button>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:.5px">${monthNames[m]} ${y}</div>
+      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:17px;letter-spacing:.5px">${monthNames[m]} ${y}</div>
       <button onclick="shiftNutCalMonth(1)" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:4px 10px">›</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
       ${weekdayHead}
       ${cells.join('')}
     </div>
-    <button onclick="selectNutDate('${todayKey}')" style="width:100%;margin-top:14px;padding:10px;border-radius:8px;border:1px solid rgba(212,245,60,.3);background:none;color:#d4f53c;cursor:pointer;font-size:12px">Bugün</button>
+    <button onclick="selectNutDate('${todayKey}')" style="width:100%;margin-top:14px;padding:10px;border-radius:8px;border:1px solid rgba(232,93,4,.3);background:none;color:#e85d04;cursor:pointer;font-size:12px">Bugün</button>
   </div>`;
   document.body.appendChild(modal);
 }
@@ -5190,7 +5128,7 @@ function filterSuppSuggestions(q){
   }
   if(!items.length){ dd.style.display='none'; return; }
   dd.style.display='block';
-  dd.innerHTML = items.map(s=>`<div onclick="pickSuppSuggestion('${s.replace(/'/g,"\\'")}')" style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid rgba(255,255,255,.05)" onmouseover="this.style.background='rgba(212,245,60,.08)'" onmouseout="this.style.background='none'">${s}</div>`).join('');
+  dd.innerHTML = items.map(s=>`<div onclick="pickSuppSuggestion('${s.replace(/'/g,"\\'")}')" style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid rgba(255,255,255,.05)" onmouseover="this.style.background='rgba(232,93,4,.08)'" onmouseout="this.style.background='none'">${s}</div>`).join('');
 }
 function hideSuppSuggestions(){ const dd=document.getElementById('suppSuggDropdown'); if(dd) dd.style.display='none'; }
 function pickSuppSuggestion(name){
@@ -5244,7 +5182,7 @@ function renderSuppCard(p){
   el.innerHTML = `<div class="prof-section">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${suppFormOpen?'12px':'4px'};padding-bottom:10px;border-bottom:1px solid var(--border)">
       <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);margin:0;padding:0;border:none">💊 Takviyelerim</h3>
-      <button onclick="toggleSuppForm()" style="background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);color:var(--acc);border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;flex-shrink:0">${suppFormOpen?'✕':'+'}</button>
+      <button onclick="toggleSuppForm()" style="background:rgba(232,93,4,.1);border:1px solid rgba(232,93,4,.3);color:var(--acc);border-radius:8px;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:1;flex-shrink:0">${suppFormOpen?'✕':'+'}</button>
     </div>
     ${suppFormOpen?renderSuppForm(p):''}
     ${rows}
@@ -5306,7 +5244,7 @@ async function renderNutrition(){
     <div class="macro-box"><div class="mv" style="color:#8b5cf6">${tf}g</div><div class="ml">Yağ</div><div class="mp">${t.fat}g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:${Math.min(100,Math.round(tf/t.fat*100))}%;background:#8b5cf6"></div></div></div>`;
   const pct=Math.min(100,Math.round(tk/t.kcal*100));
   document.getElementById('calTotal').innerHTML=`<div><div class="cv" style="color:${pct>100?'var(--acc2)':'var(--acc)'}">${tk}</div><div style="font-size:11px;color:var(--muted)">/ ${t.kcal} kcal (${pct}%)</div></div>
-  <div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${t.kcal-tk<0?'var(--acc2)':'var(--muted)'}">${t.kcal-tk}</div></div>`;
+  <div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:22px;color:${t.kcal-tk<0?'var(--acc2)':'var(--muted)'}">${t.kcal-tk}</div></div>`;
   document.getElementById('targetRow').innerHTML=`
     <div class="target-box"><label>Kalori</label><input value="${t.kcal}" type="number" onchange="updateTarget('kcal',this.value)"><div class="tu">kcal</div></div>
     <div class="target-box"><label>Protein</label><input value="${t.protein}" type="number" onchange="updateTarget('protein',this.value)"><div class="tu">gram</div></div>
@@ -5352,7 +5290,7 @@ function renderMeals(nd){
           oninput="filterFoodSugg(this.value,${mi},${fi})"
           onchange="updFood(${mi},${fi},'name',this.value)"
           onblur="setTimeout(()=>{hideFoodSugg(${mi},${fi});autoLookupFood(${mi},${fi},this.value);},250)">
-        <div id="fsugg_${mi}_${fi}" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(212,245,60,.3);border-radius:8px;max-height:200px;overflow-y:auto;z-index:9999;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.8)"></div>
+        <div id="fsugg_${mi}_${fi}" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(232,93,4,.3);border-radius:8px;max-height:200px;overflow-y:auto;z-index:9999;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.8)"></div>
       </div>
       <input class="food-inp num" placeholder="100" type="number" value="${f.amount||''}" id="food_amt_${mi}_${fi}" oninput="updFoodAmount(${mi},${fi},this.value)">
       <select class="food-inp" id="food_unit_${mi}_${fi}" style="font-size:10px;padding:4px 3px" onchange="updFoodUnitOnly(${mi},${fi},this.value,this)">
@@ -5517,7 +5455,7 @@ function updateNutTotals(){
   if(mr){mr.innerHTML='<div class="macro-box"><div class="mv" style="color:#ef4444">'+tp+'g</div><div class="ml">Protein</div><div class="mp">'+t.protein+'g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.min(100,Math.round(tp/t.protein*100))+'%;background:#ef4444"></div></div></div><div class="macro-box"><div class="mv" style="color:#f59e0b">'+tc+'g</div><div class="ml">Karbonhidrat</div><div class="mp">'+t.carb+'g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.min(100,Math.round(tc/t.carb*100))+'%;background:#f59e0b"></div></div></div><div class="macro-box"><div class="mv" style="color:#8b5cf6">'+tf+'g</div><div class="ml">Yağ</div><div class="mp">'+t.fat+'g hedef</div><div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.min(100,Math.round(tf/t.fat*100))+'%;background:#8b5cf6"></div></div></div>';}
   const ct=document.getElementById('calTotal');
   const pct=Math.min(100,Math.round(tk/t.kcal*100));
-  if(ct){ct.innerHTML='<div><div class="cv" style="color:'+(pct>100?'var(--acc2)':'var(--acc)')+'">'+tk+'</div><div style="font-size:11px;color:var(--muted)">/ '+t.kcal+' kcal ('+pct+'%)</div></div><div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:'+(t.kcal-tk<0?'var(--acc2)':'var(--muted)')+'">'+( t.kcal-tk)+'</div></div>';}
+  if(ct){ct.innerHTML='<div><div class="cv" style="color:'+(pct>100?'var(--acc2)':'var(--acc)')+'">'+tk+'</div><div style="font-size:11px;color:var(--muted)">/ '+t.kcal+' kcal ('+pct+'%)</div></div><div style="text-align:right"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Kalan</div><div style="font-family:Inter,sans-serif;font-weight:700;font-size:22px;color:'+(t.kcal-tk<0?'var(--acc2)':'var(--muted)')+'">'+( t.kcal-tk)+'</div></div>';}
   nd.meals&&nd.meals.forEach(function(m,mi){
     let mc=0,mp=0,mcb=0,mf=0;
     m.foods&&m.foods.forEach(function(f){mc+=parseFloat(f.kcal||0);mp+=parseFloat(f.protein||0);mcb+=parseFloat(f.carb||0);mf+=parseFloat(f.fat||0);});
@@ -5694,7 +5632,7 @@ async function analyzeFoodPhoto(input, targetMealIdx){
       saveNutrition(activeProfile().id,curNutDate);
       renderNutrition();
       const t2=document.createElement('div');
-      t2.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+      t2.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#e85d04;white-space:nowrap';
       t2.textContent='Besinler eklendi!';
       document.body.appendChild(t2);
       setTimeout(function(){t2.remove();},3000);
@@ -5710,7 +5648,7 @@ async function analyzeFoodPhoto(input, targetMealIdx){
     saveNutrition(activeProfile().id,curNutDate);
     renderNutrition();
     const t=document.createElement('div');
-    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5)';
+    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#e85d04;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5)';
     t.textContent=(result.meal_name||'Yemek')+' analiz edildi!';
     document.body.appendChild(t);
     setTimeout(function(){t.remove();},4000);
@@ -5965,7 +5903,7 @@ function renderWoSplit(el){
     <div class="d">${s.tagline}</div>
   </button>`).join('');
   el.innerHTML = `<div class="wo-section">
-    <button class="wo-split-pick" style="border-color:rgba(212,245,60,.3)" onclick="renderMyCurrentProgram()">
+    <button class="wo-split-pick" style="border-color:rgba(232,93,4,.3)" onclick="renderMyCurrentProgram()">
       <div class="n">📌 Şu Anki Programım</div>
       <div class="d">Uyguladığın programı buradan görüntüle</div>
     </button>
@@ -6162,7 +6100,7 @@ function renderCustomSplitBuilder(){
   if(!el) return;
   const dayOpts = [3,4,5,6].map(n=>{
     const active = _customBuilderDays===n;
-    return `<button onclick="_customBuilderDays=${n};renderCustomSplitBuilder()" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid ${active?'var(--acc4)':'var(--border)'};background:${active?'rgba(212,245,60,.12)':'var(--surface)'};color:${active?'var(--acc4)':'var(--text)'};font-weight:700;font-size:14px;cursor:pointer">${n}</button>`;
+    return `<button onclick="_customBuilderDays=${n};renderCustomSplitBuilder()" style="flex:1;padding:10px 0;border-radius:10px;border:1px solid ${active?'var(--acc4)':'var(--border)'};background:${active?'rgba(232,93,4,.12)':'var(--surface)'};color:${active?'var(--acc4)':'var(--text)'};font-weight:700;font-size:14px;cursor:pointer">${n}</button>`;
   }).join('');
   const prios = [
     {id:'equal', label:'⚖️ Upper/Lower Eşit', d:'Üst ve alt vücuda dengeli hacim.'},
@@ -6171,13 +6109,13 @@ function renderCustomSplitBuilder(){
   ];
   const prioOpts = prios.map(p=>{
     const active = _customBuilderPriority===p.id;
-    return `<button onclick="_customBuilderPriority='${p.id}';renderCustomSplitBuilder()" style="width:100%;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid ${active?'var(--acc4)':'var(--border)'};background:${active?'rgba(212,245,60,.12)':'var(--surface)'};cursor:pointer">
+    return `<button onclick="_customBuilderPriority='${p.id}';renderCustomSplitBuilder()" style="width:100%;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid ${active?'var(--acc4)':'var(--border)'};background:${active?'rgba(232,93,4,.12)':'var(--surface)'};cursor:pointer">
       <div style="font-weight:700;font-size:13px;color:${active?'var(--acc4)':'var(--text)'}">${p.label}</div>
       <div style="font-size:11px;color:var(--muted);margin-top:2px">${p.d}</div>
     </button>`;
   }).join('');
   el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="renderWoSplit(document.getElementById('woContent'))">← Split Listesi</button>
-    <h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">🛠 Kendi Split'imi Oluştur</h3>
+    <h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px">🛠 Kendi Split'imi Oluştur</h3>
     <p style="font-size:11px;color:var(--muted);margin:4px 0 16px;line-height:1.6">Gün sayısını ve önceliğini seç — en iyi hareketlerden bir başlangıç şablonu oluşturalım. Uyguladıktan sonra hareket ekleyip çıkararak, kas grubu analizine bakarak tamamen kendi programına dönüştür.</p>
     <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px">Haftada Kaç Gün?</div>
     <div style="display:flex;gap:8px;margin-bottom:18px">${dayOpts}</div>
@@ -6206,7 +6144,7 @@ async function applyCustomSplit(){
   showScreen('workout', navBtnFor('workout'));
   renderAll();
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#e85d04;white-space:nowrap';
   t.textContent="🛠 Kendi split'in uygulandı! Hareketleri ekleyip çıkararak sana özel hale getirebilirsin.";
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
@@ -6264,7 +6202,7 @@ function renderWoWeekTable(){
     </div>`;
   }).join('');
   const altToggle = _woSplitMeta?.altSchedule ? `<button class="btn btn-outline btn-sm" style="margin-bottom:10px" onclick="toggleWoAltPreview()">🔁 ${_woShowAlt?'Hafta A\'yı Gör':'Hafta B\'yi Gör'} <span style="color:var(--muted);font-weight:400">(şu an: Hafta ${_woShowAlt?'B':'A'})</span></button>` : '';
-  const header = _woSplitMeta ? `<h3 style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>${altToggle}` : '';
+  const header = _woSplitMeta ? `<h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>${altToggle}` : '';
   const applyBtn = _woSplitMeta && canEdit() ? `<button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="${_woSplitMeta.isCustom?'applyCustomSplit()':`applyPopularSplit('${_woSplitMeta.id}')`}">🚀 Bu Split'i Uygula</button>` : '';
   const analyzeBtn = `<button class="btn btn-outline btn-sm" style="width:100%;margin-top:12px" onclick="showProgramMuscleAnalysis()">📊 Analizi Gör</button>`;
   const backAction = _woSplitMeta?.isCustom ? 'renderCustomSplitBuilder()' : `renderWoSplit(document.getElementById('woContent'))`;
@@ -6302,7 +6240,7 @@ function showWoDayDetail(i){
     ${exerciseRegionPillsHtml()}
     <div style="position:relative;margin-bottom:8px">
       <input class="aef-input" id="aef-name" placeholder="Egzersiz ara... (ör: Hip Thrust)" oninput="filterExercises(this.value)" onfocus="this.select();filterExercises('')" onblur="setTimeout(()=>{const s=document.getElementById('exSuggestions');if(s)s.style.display='none';},200)" autocomplete="off" style="width:100%">
-      <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
+      <div id="exSuggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(232,93,4,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;margin-top:4px"></div>
     </div>
     <div class="aef-grid">
       <div class="aef-field"><label>Kas Grubu (otomatik)</label><input class="aef-input" id="aef-muscle" placeholder="Egzersiz seçince dolar" readonly style="color:var(--acc)"></div>
@@ -6398,7 +6336,7 @@ async function applyPopularSplit(id){
   showScreen('workout', navBtnFor('workout'));
   renderAll();
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#e85d04;white-space:nowrap';
   t.textContent=`🚀 ${split.name} uygulandı!`;
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
@@ -6416,7 +6354,7 @@ const EXTRA_WORKOUT_QUICKSTART = [
 function renderWoChallenge(el){
   const quickStartHtml = EXTRA_WORKOUT_QUICKSTART.map(c=>`<div onclick="${c.action}" style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:14px">
     <div style="font-size:28px">${c.icon}</div>
-    <div style="flex:1"><div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px">${c.title}</div><div style="font-size:11px;color:var(--text)">${c.sub}</div><div style="font-size:10px;color:var(--muted)">${c.meta}</div></div>
+    <div style="flex:1"><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:16px;letter-spacing:.5px">${c.title}</div><div style="font-size:11px;color:var(--text)">${c.sub}</div><div style="font-size:10px;color:var(--muted)">${c.meta}</div></div>
     <div style="font-size:18px;color:var(--acc)">▶</div>
   </div>`).join('');
   const cards = CHALLENGE_LIBRARY.map(c=>{
@@ -6432,7 +6370,7 @@ function renderWoChallenge(el){
     </div>`;
   }).join('');
   el.innerHTML = `<div class="wo-section">
-    <h4 style="font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">⚡ HIZLI BAŞLAT</h4>
+    <h4 style="font-family:'Inter',sans-serif;font-weight:700;font-size:15px;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">⚡ HIZLI BAŞLAT</h4>
     ${quickStartHtml}
     ${cards}
     <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.6">Bir güne uygulamak için o günü ✏️ Düzenle modunda "→ Challenge (WOD) Günü" yap.</div>
@@ -6723,11 +6661,11 @@ async function renderMuscleTrendChart(uid){
       return '<text x="'+(pad-4)+'" y="'+(y+4)+'" fill="rgba(255,255,255,.3)" font-size="8" text-anchor="end">'+v+'</text>';
     }).join('');
     const xLabels=points.map(p=>'<text x="'+p.x+'" y="'+(H-2)+'" fill="rgba(255,255,255,.3)" font-size="8" text-anchor="middle">'+p.d+'</text>').join('');
-    const dots=points.map(p=>'<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="#d4f53c" stroke="#0c0c0c" stroke-width="1.5"/>').join('');
+    const dots=points.map(p=>'<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="#e85d04" stroke="#0c0c0c" stroke-width="1.5"/>').join('');
     chartHtml = '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="overflow:visible">'
-      +'<defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d4f53c" stop-opacity="0.2"/><stop offset="100%" stop-color="#d4f53c" stop-opacity="0"/></linearGradient></defs>'
+      +'<defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e85d04" stop-opacity="0.2"/><stop offset="100%" stop-color="#e85d04" stop-opacity="0"/></linearGradient></defs>'
       +'<path d="'+areaD+'" fill="url(#tg)"/>'
-      +'<path d="'+pathD+'" fill="none" stroke="#d4f53c" stroke-width="2" stroke-linejoin="round"/>'
+      +'<path d="'+pathD+'" fill="none" stroke="#e85d04" stroke-width="2" stroke-linejoin="round"/>'
       +yLabels+xLabels+dots
       +'</svg>';
   }
@@ -6759,7 +6697,7 @@ function renderProgramMuscleAnalysis(){
   const attrsFor = (id) => {
     const v = volumes[id] || {sets:0};
     const isSel = _pmaSelected===id;
-    return `fill="${muscleVolumeColor(v.sets)}" stroke="${isSel?'#d4f53c':'#000'}" stroke-width="${isSel?2.5:1}" style="cursor:pointer" onclick="selectPmaMuscle('${id}')"`;
+    return `fill="${muscleVolumeColor(v.sets)}" stroke="${isSel?'#e85d04':'#000'}" stroke-width="${isSel?2.5:1}" style="cursor:pointer" onclick="selectPmaMuscle('${id}')"`;
   };
   const front = `<svg viewBox="0 0 120 260" width="130" xmlns="http://www.w3.org/2000/svg">
     <ellipse cx="60" cy="22" rx="16" ry="18" fill="#2a2a2a" stroke="#444" stroke-width="1"/>
@@ -6830,9 +6768,9 @@ function renderProgramMuscleAnalysis(){
   const modal=document.createElement('div');
   modal.id='pmaModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:600;padding:16px;overflow-y:auto';
-  modal.innerHTML = `<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:22px;max-width:420px;width:100%;max-height:92vh;overflow-y:auto">
+  modal.innerHTML = `<div style="background:#141414;border:1px solid rgba(232,93,4,.2);border-radius:16px;padding:22px;max-width:420px;width:100%;max-height:92vh;overflow-y:auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <h3 style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:.5px">📊 Kas Grubu Analizi</h3>
+      <h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:20px;letter-spacing:.5px">📊 Kas Grubu Analizi</h3>
       <button onclick="document.getElementById('pmaModal').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:12px">
@@ -6856,7 +6794,7 @@ function renderWoMuscle(el, activeRegion){
   if(activeRegion){
     const region = MUSCLE_REGIONS.find(r=>r.id===activeRegion);
     const list = getExercisesForRegion(region.tags);
-    rankingHtml = `<div class="wo-section"><h4 style="font-family:'Bebas Neue',sans-serif;font-size:18px;margin-bottom:8px">${region.label} — En İyiden Kötüye</h4>`
+    rankingHtml = `<div class="wo-section"><h4 style="font-family:'Inter',sans-serif;font-weight:700;font-size:18px;margin-bottom:8px">${region.label} — En İyiden Kötüye</h4>`
       + (list.length ? list.map((e,i)=>`<div class="wo-rank-item"><div class="wo-rank-num">${i+1}</div><div class="wo-rank-info"><div class="n">${e.name}</div><div class="m">${e.muscle}</div>${e.tip?`<div class="t">💡 ${e.tip}</div>`:''}</div></div>`).join('') : '<div class="empty-state">Bu bölge için egzersiz bulunamadı.</div>')
       + '</div>';
   }
@@ -7057,7 +6995,7 @@ function filterExercises(query){
   // Store matches in global for onclick access
   window._exMatches = matches;
   sugg.innerHTML=(ranked?`<div style="padding:7px 14px;font-size:10px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em">${region.label} · önerilen sıra</div>`:'')+matches.map((e,i)=>`
-    <div onclick="selectExerciseByIndex(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;display:flex;gap:8px;align-items:baseline" onmouseover="this.style.background='rgba(212,245,60,.06)'" onmouseout="this.style.background='none'">
+    <div onclick="selectExerciseByIndex(${i})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;display:flex;gap:8px;align-items:baseline" onmouseover="this.style.background='rgba(232,93,4,.06)'" onmouseout="this.style.background='none'">
       ${ranked?`<span style="font-size:10px;color:var(--acc);font-weight:700;flex:0 0 auto">${i+1}.</span>`:''}
       <div><div style="font-size:12px;font-weight:500;color:var(--text)">${e.name}</div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.muscle}</div></div>
@@ -7085,7 +7023,7 @@ function selectExercise(ex){
 // miniBodyIcon) AYNI on-vucut SVG'si, sadece farkli genislikte - renk ve
 // yapi tek yerde tutulsun diye.
 const MUSCLE_ICON_COLORS={
-  glute_max:'#d4f53c',glute_med:'#a8d400',
+  glute_max:'#e85d04',glute_med:'#a8d400',
   quad:'#38b6ff',hamstring:'#1a8fd1',
   chest:'#ff5c38',lat:'#ff8c69',mid_back:'#ff6b4a',
   front_delt:'#f7c948',side_delt:'#f7a800',rear_delt:'#c47d00',
@@ -7093,7 +7031,7 @@ const MUSCLE_ICON_COLORS={
   abs:'#34d399',calves:'#10b981'
 };
 function bodyFrontSvg(width, activeMuscles){
-  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#d4f53c';
+  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#e85d04';
   return `<svg viewBox="0 0 120 260" width="${width}" xmlns="http://www.w3.org/2000/svg">
     <!-- Head -->
     <ellipse cx="60" cy="22" rx="16" ry="18" fill="#2a2a2a" stroke="#444" stroke-width="1"/>
@@ -7141,7 +7079,7 @@ function showMuscleVisual(activeMuscles, muscleSets){
   const modal=document.createElement('div');
   modal.id='muscleVisualModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px';
-  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#d4f53c';
+  const getC=(m)=>MUSCLE_ICON_COLORS[m]||'#e85d04';
   // SVG body front
   const front=bodyFrontSvg(110, activeMuscles);
   // SVG body back
@@ -7213,8 +7151,8 @@ function showMuscleVisual(activeMuscles, muscleSets){
   const regionRows = regionEntries.map(([region,info])=>{
     const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
     const ratio = info.total/maxTotal;
-    const intensityColor = ratio>=0.8 ? '#d4f53c' : ratio>=0.4 ? '#f7c948' : '#8a8a8a';
-    return '<div style="padding:8px 12px;background:rgba(212,245,60,.06);border:1px solid rgba(212,245,60,.18);border-radius:10px;margin-bottom:6px">'
+    const intensityColor = ratio>=0.8 ? '#e85d04' : ratio>=0.4 ? '#f7c948' : '#8a8a8a';
+    return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between">'
       + '<span style="font-size:12px;font-weight:700;color:'+intensityColor+'">'+region+'</span>'
       + '<span style="font-size:11px;color:var(--text-muted)">'+isolateLabel+'</span>'
@@ -7222,9 +7160,9 @@ function showMuscleVisual(activeMuscles, muscleSets){
       + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(ratio*100)+'%;background:'+intensityColor+'"></div></div>'
       + '</div>';
   }).join('') || '<div class="empty-state" style="padding:8px 0">Bu güne egzersiz bulunamadı.</div>';
-  modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(212,245,60,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
+  modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(232,93,4,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-    + '<h3 style="font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:.5px">Çalışan Kaslar</h3>'
+    + '<h3 style="font-family:Inter,sans-serif;font-weight:700;font-size:20px;letter-spacing:.5px">Çalışan Kaslar</h3>'
     + '<button onclick="document.getElementById(\'muscleVisualModal\').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>'
     + '</div>'
     + '<div style="display:flex;gap:16px;justify-content:center;margin-bottom:16px">'
@@ -7232,7 +7170,7 @@ function showMuscleVisual(activeMuscles, muscleSets){
     + '<div style="text-align:center"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Arka</div>' + back + '</div>'
     + '</div>'
     + '<div>' + regionRows + '</div>'
-    + '<button onclick="document.getElementById(\'muscleVisualModal\').remove()" style="width:100%;margin-top:16px;padding:10px;border-radius:8px;background:#d4f53c;border:none;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:12px">Kapat & Ekle</button>'
+    + '<button onclick="document.getElementById(\'muscleVisualModal\').remove()" style="width:100%;margin-top:16px;padding:10px;border-radius:8px;background:#e85d04;border:none;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:12px">Kapat & Ekle</button>'
     + '</div>';
   document.body.appendChild(modal);
 }
@@ -7630,7 +7568,7 @@ async function autoLookupFood(mi, fi, name) {
   if(existingBtn) existingBtn.remove();
   const saveBtn = document.createElement('button');
   saveBtn.id = 'saveToDb_'+mi+'_'+fi;
-  saveBtn.style.cssText = 'position:absolute;right:0;top:100%;background:rgba(212,245,60,.1);border:1px solid rgba(212,245,60,.3);border-radius:6px;padding:4px 8px;font-size:10px;color:var(--acc);cursor:pointer;z-index:100;white-space:nowrap;margin-top:2px';
+  saveBtn.style.cssText = 'position:absolute;right:0;top:100%;background:rgba(232,93,4,.1);border:1px solid rgba(232,93,4,.3);border-radius:6px;padding:4px 8px;font-size:10px;color:var(--acc);cursor:pointer;z-index:100;white-space:nowrap;margin-top:2px';
   saveBtn.textContent = "DB'ye kaydet +";
   saveBtn.onclick = function(){saveFoodToDB(mi,fi);this.remove();};
   const inp = document.getElementById('finp_'+mi+'_'+fi);
@@ -7683,7 +7621,7 @@ function filterFoodSugg(query, mi, fi){
   sugg.style.display = 'block';
   sugg.innerHTML = matches.map(k => {
     const f = FOOD_DB[k];
-    return '<div onclick="selectFoodSugg(\'' + k + '\',' + mi + ',' + fi + ')" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px" onmouseover="this.style.background=\'rgba(212,245,60,.08)\'" onmouseout="this.style.background=\'none\'">'
+    return '<div onclick="selectFoodSugg(\'' + k + '\',' + mi + ',' + fi + ')" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);font-size:11px" onmouseover="this.style.background=\'rgba(232,93,4,.08)\'" onmouseout="this.style.background=\'none\'">'
       + '<span style="color:var(--text);font-weight:500">' + k + '</span>'
       + '<span style="color:var(--text-muted);font-size:10px;margin-left:6px">' + f.kcal + ' kcal / ' + f.per + ' ' + f.unit + '</span>'
       + '</div>';
@@ -7920,8 +7858,8 @@ async function renderProfileHeader(p){
       if(data && data.length) startWeight = data[0].weight;
     }
     const parts = [];
-    if(p.weight) parts.push(`Mevcut: <b style="color:var(--chalk)">${p.weight} kg</b>`);
-    if(p.target_weight) parts.push(`Hedef: <b style="color:var(--lime)">${p.target_weight} kg</b>`);
+    if(p.weight) parts.push(`Mevcut: <b style="color:var(--text)">${p.weight} kg</b>`);
+    if(p.target_weight) parts.push(`Hedef: <b style="color:var(--acc)">${p.target_weight} kg</b>`);
     if(startWeight) parts.push(`Başlangıç: ${startWeight} kg`);
     goalsEl.innerHTML = parts.length ? parts.join(' &nbsp;·&nbsp; ') : 'Hedeflerini belirlemek için aşağıdaki formu doldur.';
   }
@@ -7930,7 +7868,7 @@ async function renderProfileHeader(p){
   if(statsEl && p.id){
     const monthCount = computeMonthlyWorkoutCount();
     const {count} = await sb.from('session_logs').select('id', {count:'exact', head:true}).eq('user_id', p.id);
-    statsEl.innerHTML = `Bu ay <b style="color:var(--lime)">${monthCount}</b> antrenman &nbsp;·&nbsp; Toplam <b style="color:var(--lime)">${count||0}</b> antrenman`;
+    statsEl.innerHTML = `Bu ay <b style="color:var(--acc)">${monthCount}</b> antrenman &nbsp;·&nbsp; Toplam <b style="color:var(--acc)">${count||0}</b> antrenman`;
   }
 }
 
@@ -8136,7 +8074,7 @@ function filterEditableExSugg(query, di, ei){
   window._epMatches[di+'_'+ei] = matches;
   sugg.style.display = 'block';
   sugg.innerHTML = matches.map((e,i)=>`
-    <div onclick="selectEditableEx(${di},${ei},${i})" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05)" onmouseover="this.style.background='rgba(212,245,60,.06)'" onmouseout="this.style.background='none'">
+    <div onclick="selectEditableEx(${di},${ei},${i})" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05)" onmouseover="this.style.background='rgba(232,93,4,.06)'" onmouseout="this.style.background='none'">
       <div style="font-size:12px;font-weight:500;color:var(--text)">${e.name}</div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.muscle}</div>
     </div>`).join('');
@@ -8180,7 +8118,7 @@ function renderEditableProg(desc){
               onblur="setTimeout(()=>hideEditableExSugg(${di},${ei}),200)"
               autocomplete="off"
               style="background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:500;outline:none;padding:2px 0;width:100%">
-            <div id="epsugg_${di}_${ei}" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(212,245,60,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:200;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.6)"></div>
+            <div id="epsugg_${di}_${ei}" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid rgba(232,93,4,.2);border-radius:8px;max-height:200px;overflow-y:auto;z-index:200;margin-top:4px;box-shadow:0 8px 32px rgba(0,0,0,.6)"></div>
           </div>
           <div style="text-align:center">
             <div style="font-size:8px;color:var(--muted);margin-bottom:2px">SET</div>
@@ -8203,7 +8141,7 @@ function renderEditableProg(desc){
         <input value="${day.name}" onchange="editableProg[${di}].name=this.value"
           style="flex:1;background:none;border:none;border-bottom:1px solid rgba(255,255,255,.1);color:var(--text);font-size:12px;font-weight:600;outline:none;padding:2px 0">
         ${!isRest?`<button onclick="editableProg[${di}].exercises.push({name:'Yeni Egzersiz',muscle:'',sets:3,reps:'12',restSec:90,tip:null});renderEditableProg()" 
-          style="background:rgba(212,245,60,.08);border:1px solid rgba(212,245,60,.2);border-radius:6px;color:var(--acc);font-size:10px;padding:3px 8px;cursor:pointer">+ Ekle</button>`:''}
+          style="background:rgba(232,93,4,.08);border:1px solid rgba(232,93,4,.2);border-radius:6px;color:var(--acc);font-size:10px;padding:3px 8px;cursor:pointer">+ Ekle</button>`:''}
       </div>
       ${exList}
     </div>`;
@@ -8228,7 +8166,7 @@ async function applyEditableProgram(){
   showScreen('workout', navBtnFor('workout'));
   renderAll();
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c';
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#e85d04';
   t.textContent='🚀 Program uygulandı!';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
@@ -8415,7 +8353,7 @@ async function saveProfileAll(){
     t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(255,92,56,.4);border-radius:12px;padding:12px 20px;z-index:500;font-size:12px;color:#ff5c38;max-width:90vw;white-space:normal;text-align:center';
     t.textContent='⚠️ Kaydedilemedi: ' + (profErr?.message || weightErr?.message || 'bilinmeyen hata');
   } else {
-    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#d4f53c;white-space:nowrap';
+    t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#e85d04;white-space:nowrap';
     t.textContent='✅ Profil kaydedildi!';
   }
   document.body.appendChild(t);
@@ -8678,7 +8616,7 @@ async function saveFoodToDB(mi, fi){
   if(!kcal){alert('Önce kalori değerini gir!');return;}
   rememberFood(activeProfile()?.id, name, {kcal, protein, carb, fat, per:amount, unit:food.unit||'gram'});
   const t=document.createElement('div');
-  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:12px;padding:10px 18px;z-index:500;font-size:12px;color:#d4f53c';
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:10px 18px;z-index:500;font-size:12px;color:#e85d04';
   t.textContent='✅ '+food.name+' veritabanına eklendi!';
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
@@ -8800,10 +8738,10 @@ function showChangePasswordModal(){
   const modal = document.createElement('div');
   modal.id = 'pwdModal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
-  modal.innerHTML = '<div style="background:var(--surface);border:1px solid rgba(212,245,60,.3);border-radius:16px;padding:24px;max-width:360px;width:100%">'
+  modal.innerHTML = '<div style="background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:16px;padding:24px;max-width:360px;width:100%">'
     +'<div style="text-align:center;margin-bottom:20px">'
     +'<div style="font-size:36px;margin-bottom:8px">🔑</div>'
-    +'<h3 style="font-family:Bebas Neue,sans-serif;font-size:24px;letter-spacing:.5px;margin-bottom:6px">Yeni Şifre Belirle</h3>'
+    +'<h3 style="font-family:Inter,sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;margin-bottom:6px">Yeni Şifre Belirle</h3>'
     +'<p style="font-size:12px;color:var(--muted)">Şifreni güvenli bir şeyle değiştir</p>'
     +'</div>'
     +'<div style="margin-bottom:12px"><label style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Yeni Şifre</label>'
