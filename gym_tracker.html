@@ -7071,10 +7071,12 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
   activeMuscles.forEach(m=>{
     const region=REGION_MAP[m]||'Diğer';
     const amt=muscleSets[m]||0;
-    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1, exercises:new Set()};
+    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1, exercises:new Map()};
     regionAgg[region].total+=amt;
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
-    (muscleExercises[m]||[]).forEach(n=>regionAgg[region].exercises.add(n));
+    if(muscleExercises[m]) muscleExercises[m].forEach((sets,n)=>{
+      regionAgg[region].exercises.set(n, (regionAgg[region].exercises.get(n)||0)+sets);
+    });
   });
   // Bolgeler arasi COK/AZ calisma farkini - gune/bolgeye gore ORANTILI degil,
   // MUTLAK set esikleriyle gosteriyoruz (bolgeler birbirine yakin oldugunda
@@ -7091,8 +7093,8 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
     const color = volColor(info.total);
     const label = volLabel(info.total);
     const pct = Math.min(info.total/20*100, 100);
-    const exList = [...info.exercises];
-    const exHtml = exList.length ? exList.map(n=>'<div style="font-size:11px;color:var(--text-sub);padding:3px 0">• '+n+'</div>').join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
+    const exList = [...info.exercises.entries()].sort((a,b)=>b[1]-a[1]);
+    const exHtml = exList.length ? exList.map(([n,s])=>'<div style="font-size:11px;color:var(--text-sub);padding:3px 0;display:flex;justify-content:space-between;gap:8px"><span>• '+n+'</span><span style="color:var(--text-muted);white-space:nowrap">'+s+' set</span></div>').join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
     return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="const d=document.getElementById(\'muscleRegionEx'+i+'\');d.style.display=d.style.display===\'block\'?\'none\':\'block\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between">'
       + '<span style="font-size:12px;font-weight:700;color:var(--acc)">'+region+'</span>'
@@ -7129,16 +7131,17 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
 // kucuk "yogunluk adami" ikonu (miniBodyIcon cagrilari) AYNI hesaplamayi
 // kullansin diye tek yerde toplandi.
 // Bir gunun egzersizlerinden kas-id basina hem TOPLAM SET hem de HANGI
-// EGZERSIZLERIN katkida bulundugunu cikarir - "Çalışan Kaslar" modalinda
-// bolgeye tiklayinca hangi hareketler oldugunu gostermek icin
-// muscleExercises (muscleId -> Set(egzersiz adi)) kullaniliyor.
+// EGZERSIZLERIN KACAR SET katkida bulundugunu cikarir - "Çalışan Kaslar"
+// modalinda bolgeye tiklayinca hangi hareketin kac set oldugunu gostermek
+// icin muscleExercises (muscleId -> Map(egzersiz adi -> set sayisi))
+// kullaniliyor.
 function computeDayMuscleBreakdown(day){
   const muscleSets={}, muscleExercises={};
   if(!day || !day.exercises) return {muscleSets, muscleExercises};
   const add=(m, sets, name)=>{
     muscleSets[m]=(muscleSets[m]||0)+sets;
-    if(!muscleExercises[m]) muscleExercises[m]=new Set();
-    if(name) muscleExercises[m].add(name);
+    if(!muscleExercises[m]) muscleExercises[m]=new Map();
+    if(name) muscleExercises[m].set(name, (muscleExercises[m].get(name)||0)+sets);
   };
   day.exercises.forEach(ex=>{
     const exName=(ex.name||'').toLowerCase().trim();
@@ -7185,9 +7188,9 @@ function computeWeekMuscleBreakdown(prog){
     if(!day || day.type!=='full' || !day.exercises) return;
     const b = computeDayMuscleBreakdown(day);
     Object.entries(b.muscleSets).forEach(([m,s])=>{ muscleSets[m]=(muscleSets[m]||0)+s; });
-    Object.entries(b.muscleExercises).forEach(([m,set])=>{
-      if(!muscleExercises[m]) muscleExercises[m]=new Set();
-      set.forEach(n=>muscleExercises[m].add(n));
+    Object.entries(b.muscleExercises).forEach(([m,map])=>{
+      if(!muscleExercises[m]) muscleExercises[m]=new Map();
+      map.forEach((sets,n)=>muscleExercises[m].set(n, (muscleExercises[m].get(n)||0)+sets));
     });
   });
   return {muscleSets, muscleExercises};
