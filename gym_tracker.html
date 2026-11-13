@@ -7003,8 +7003,9 @@ function miniBodyIcon(muscleSets){
   return bodyFrontSvg(18, Object.keys(muscleSets||{}));
 }
 
-function showMuscleVisual(activeMuscles, muscleSets){
+function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
   muscleSets = muscleSets || {};
+  muscleExercises = muscleExercises || {};
   const existing=document.getElementById('muscleVisualModal');
   if(existing)existing.remove();
   const modal=document.createElement('div');
@@ -7070,36 +7071,48 @@ function showMuscleVisual(activeMuscles, muscleSets){
   activeMuscles.forEach(m=>{
     const region=REGION_MAP[m]||'Diğer';
     const amt=muscleSets[m]||0;
-    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1};
+    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1, exercises:new Set()};
     regionAgg[region].total+=amt;
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
+    (muscleExercises[m]||[]).forEach(n=>regionAgg[region].exercises.add(n));
   });
   // Bolgeler arasi COK/AZ calisma farkini - gune/bolgeye gore ORANTILI degil,
-  // zaten programin baska yerinde (Analizi Gör) kullanilan AYNI MUTLAK set
-  // esikleriyle (muscleVolumeColor/muscleVolumeLabel: Az/Orta/Yoğun/Çok Yoğun)
-  // gosteriyoruz - boylece "neredeyse tum bolgeler ayni gun icinde birbirine
-  // yakin oldugu icin hepsi dolu gorunuyor" sorunu cozuluyor, her bolge kendi
-  // mutlak set sayisina gore degerlendiriliyor.
+  // MUTLAK set esikleriyle gosteriyoruz (bolgeler birbirine yakin oldugunda
+  // hepsi dolu gorunme sorununu cozuyor). GUNLUK ve HAFTALIK gorunumler
+  // FARKLI olcekler kullanir - tek seansta 9-10 set zaten hedeflenen/yeterli
+  // sayi oldugu icin (kullanicinin kriteri) gunluk skalada "İyi", haftalik
+  // skalada (Analizi Gör ile ayni, muscleVolumeColor/Label) ise "Orta" -
+  // ikisi farkli olcek oldugu icin bu CELISKI degil.
+  const volColor = mode==='week' ? muscleVolumeColor : dailyMuscleVolumeColor;
+  const volLabel = mode==='week' ? muscleVolumeLabel : dailyMuscleVolumeLabel;
   const regionEntries = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total);
-  const regionRows = regionEntries.map(([region,info])=>{
+  const regionRows = regionEntries.map(([region,info],i)=>{
     const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
-    const color = muscleVolumeColor(info.total);
-    const label = muscleVolumeLabel(info.total);
+    const color = volColor(info.total);
+    const label = volLabel(info.total);
     const pct = Math.min(info.total/20*100, 100);
-    return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px">'
+    const exList = [...info.exercises];
+    const exHtml = exList.length ? exList.map(n=>'<div style="font-size:11px;color:var(--text-sub);padding:3px 0">• '+n+'</div>').join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
+    return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="const d=document.getElementById(\'muscleRegionEx'+i+'\');d.style.display=d.style.display===\'block\'?\'none\':\'block\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between">'
       + '<span style="font-size:12px;font-weight:700;color:var(--acc)">'+region+'</span>'
       + '<span style="font-size:11px;color:var(--text-muted)">'+isolateLabel+'</span>'
       + '</div>'
       + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(pct)+'%;background:'+color+'"></div></div>'
       + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-top:3px">'+label+' · '+info.total+' set</div>'
+      + '<div id="muscleRegionEx'+i+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)">'+exHtml+'</div>'
       + '</div>';
-  }).join('') || '<div class="empty-state" style="padding:8px 0">Bu güne egzersiz bulunamadı.</div>';
-  modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(232,93,4,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
+  }).join('') || '<div class="empty-state" style="padding:8px 0">Egzersiz bulunamadı.</div>';
+  const tabsHtml = mode ? '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    + '<button onclick="switchMuscleModalMode(\'day\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid '+(mode==='day'?'#e85d04':'#2a2a2a')+';background:'+(mode==='day'?'rgba(232,93,4,.15)':'#1e1e1e')+';color:'+(mode==='day'?'#e85d04':'#a0a0a0')+';font-size:12px;font-weight:600;cursor:pointer">Günlük</button>'
+    + '<button onclick="switchMuscleModalMode(\'week\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid '+(mode==='week'?'#e85d04':'#2a2a2a')+';background:'+(mode==='week'?'rgba(232,93,4,.15)':'#1e1e1e')+';color:'+(mode==='week'?'#e85d04':'#a0a0a0')+';font-size:12px;font-weight:600;cursor:pointer">Haftalık</button>'
+    + '</div>' : '';
+  modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(232,93,4,.2);border-radius:16px;padding:24px;max-width:380px;width:100%;max-height:88vh;overflow-y:auto">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
     + '<h3 style="font-family:Inter,sans-serif;font-weight:700;font-size:20px;letter-spacing:.5px">Çalışan Kaslar</h3>'
     + '<button onclick="document.getElementById(\'muscleVisualModal\').remove()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>'
     + '</div>'
+    + tabsHtml
     + '<div style="display:flex;gap:16px;justify-content:center;margin-bottom:16px">'
     + '<div style="text-align:center"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Ön</div>' + front + '</div>'
     + '<div style="text-align:center"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Arka</div>' + back + '</div>'
@@ -7115,13 +7128,22 @@ function showMuscleVisual(activeMuscles, muscleSets){
 // hem "Kas Haritası" penceresi (showDayMuscleMap) hem de gun basligindaki
 // kucuk "yogunluk adami" ikonu (miniBodyIcon cagrilari) AYNI hesaplamayi
 // kullansin diye tek yerde toplandi.
-function computeDayMuscleSets(day){
-  const muscleSets={};
-  if(!day || !day.exercises) return muscleSets;
-  const addSets=(m, sets)=>{ muscleSets[m]=(muscleSets[m]||0)+sets; };
+// Bir gunun egzersizlerinden kas-id basina hem TOPLAM SET hem de HANGI
+// EGZERSIZLERIN katkida bulundugunu cikarir - "Çalışan Kaslar" modalinda
+// bolgeye tiklayinca hangi hareketler oldugunu gostermek icin
+// muscleExercises (muscleId -> Set(egzersiz adi)) kullaniliyor.
+function computeDayMuscleBreakdown(day){
+  const muscleSets={}, muscleExercises={};
+  if(!day || !day.exercises) return {muscleSets, muscleExercises};
+  const add=(m, sets, name)=>{
+    muscleSets[m]=(muscleSets[m]||0)+sets;
+    if(!muscleExercises[m]) muscleExercises[m]=new Set();
+    if(name) muscleExercises[m].add(name);
+  };
   day.exercises.forEach(ex=>{
     const exName=(ex.name||'').toLowerCase().trim();
     const sets=parseInt(ex.sets)||0;
+    const displayName=ex.name||'';
     // Tam isim eslesmesi HER ZAMAN once denenir - tek gecişli bir find()
     // (hepsi tek OR kosulu) array'de daha ONCE duran kisa/genel bir ismin
     // ("Dip") substring eslesmesi, SONRA gelen tam eslesen bir girisi
@@ -7129,34 +7151,85 @@ function computeDayMuscleSets(day){
     // uymayan kaslarin "calisiyor" gorunmesinin sebebi buydu.
     const found = EXERCISE_DB.find(e=>e.name.toLowerCase()===exName)
       || EXERCISE_DB.find(e=>e.name.toLowerCase().includes(exName) || exName.includes(e.name.toLowerCase()));
-    if(found) found.muscles.forEach(m=>addSets(m, sets));
+    if(found) found.muscles.forEach(m=>add(m, sets, displayName));
     else if(ex.muscle){
       // Fallback: map muscle text to muscle IDs
       const m=ex.muscle.toLowerCase();
-      if(m.includes('glute max')) addSets('glute_max', sets);
-      if(m.includes('glute med')) addSets('glute_med', sets);
-      if(m.includes('quad')) addSets('quad', sets);
-      if(m.includes('hamstring')) addSets('hamstring', sets);
-      if(m.includes('chest')||m.includes('pectoral')) addSets('chest', sets);
-      if(m.includes('lat')) addSets('lat', sets);
-      if(m.includes('mid back')||m.includes('rhomboid')||m.includes('trap')) addSets('mid_back', sets);
-      if(m.includes('front delt')||m.includes('anterior')) addSets('front_delt', sets);
-      if(m.includes('side delt')||m.includes('lateral delt')) addSets('side_delt', sets);
-      if(m.includes('rear delt')||m.includes('posterior')) addSets('rear_delt', sets);
-      if(m.includes('bicep')) addSets('biceps', sets);
-      if(m.includes('tricep')) addSets('triceps', sets);
-      if(m.includes('abs')||m.includes('core')||m.includes('karın')) addSets('abs', sets);
-      if(m.includes('calf')||m.includes('baldır')||m.includes('soleus')) addSets('calves', sets);
+      if(m.includes('glute max')) add('glute_max', sets, displayName);
+      if(m.includes('glute med')) add('glute_med', sets, displayName);
+      if(m.includes('quad')) add('quad', sets, displayName);
+      if(m.includes('hamstring')) add('hamstring', sets, displayName);
+      if(m.includes('chest')||m.includes('pectoral')) add('chest', sets, displayName);
+      if(m.includes('lat')) add('lat', sets, displayName);
+      if(m.includes('mid back')||m.includes('rhomboid')||m.includes('trap')) add('mid_back', sets, displayName);
+      if(m.includes('front delt')||m.includes('anterior')) add('front_delt', sets, displayName);
+      if(m.includes('side delt')||m.includes('lateral delt')) add('side_delt', sets, displayName);
+      if(m.includes('rear delt')||m.includes('posterior')) add('rear_delt', sets, displayName);
+      if(m.includes('bicep')) add('biceps', sets, displayName);
+      if(m.includes('tricep')) add('triceps', sets, displayName);
+      if(m.includes('abs')||m.includes('core')||m.includes('karın')) add('abs', sets, displayName);
+      if(m.includes('calf')||m.includes('baldır')||m.includes('soleus')) add('calves', sets, displayName);
     }
   });
-  return muscleSets;
+  return {muscleSets, muscleExercises};
+}
+// Gun basligindaki kucuk vucut ikonu (miniBodyIcon) sadece hangi kaslarin
+// calistigini (presence) bilmesi yeterli oldugu icin geriye donuk basit saric.
+function computeDayMuscleSets(day){ return computeDayMuscleBreakdown(day).muscleSets; }
+
+// Haftalik gorunum icin - programdaki TUM normal ('full') antrenman
+// gunlerinin kas dokumlerini (set + egzersiz) birlestirir.
+function computeWeekMuscleBreakdown(prog){
+  const muscleSets={}, muscleExercises={};
+  (prog||[]).forEach(day=>{
+    if(!day || day.type!=='full' || !day.exercises) return;
+    const b = computeDayMuscleBreakdown(day);
+    Object.entries(b.muscleSets).forEach(([m,s])=>{ muscleSets[m]=(muscleSets[m]||0)+s; });
+    Object.entries(b.muscleExercises).forEach(([m,set])=>{
+      if(!muscleExercises[m]) muscleExercises[m]=new Set();
+      set.forEach(n=>muscleExercises[m].add(n));
+    });
+  });
+  return {muscleSets, muscleExercises};
 }
 
+// "Çalışan Kaslar" modalinin GUNLUK gorunumu icin - haftalik analizde
+// (muscleVolumeColor/Label, "Analizi Gör") kullanilan olcek HAFTALIK
+// TOPLAMA gore kalibre edilmis, tek bir seansin set sayisina uygulanamaz.
+// Kullanicinin kendi kriterine gore tek seansta 9-10 set zaten hedeflenen/
+// yeterli sayi oldugu icin bu "Orta" degil "İyi" tier'ina giriyor.
+function dailyMuscleVolumeColor(sets){
+  if(!sets) return '#3a3a3a';
+  if(sets<=4) return '#eab308';
+  if(sets<=8) return '#f97316';
+  if(sets<=14) return '#22c55e';
+  return '#ef4444';
+}
+function dailyMuscleVolumeLabel(sets){
+  if(!sets) return 'Çalışmıyor';
+  if(sets<=4) return 'Az';
+  if(sets<=8) return 'Orta';
+  if(sets<=14) return 'İyi';
+  return 'Çok Yüksek';
+}
+
+let _muscleModalState = null; // {prog, di, mode:'day'|'week'}
 function showDayMuscleMap(di){
-  const prog=activeProgram()[di];
-  if(!prog||prog.type==='rest')return;
-  const muscleSets = computeDayMuscleSets(prog);
-  showMuscleVisual(Object.keys(muscleSets), muscleSets);
+  const prog = activeProgram();
+  const day = prog[di];
+  if(!day || day.type==='rest') return;
+  _muscleModalState = {prog, di, mode:'day'};
+  renderMuscleModalForState();
+}
+function switchMuscleModalMode(mode){
+  if(!_muscleModalState || _muscleModalState.mode===mode) return;
+  _muscleModalState.mode = mode;
+  renderMuscleModalForState();
+}
+function renderMuscleModalForState(){
+  const {prog, di, mode} = _muscleModalState;
+  const {muscleSets, muscleExercises} = mode==='day' ? computeDayMuscleBreakdown(prog[di]) : computeWeekMuscleBreakdown(prog);
+  showMuscleVisual(Object.keys(muscleSets), muscleSets, muscleExercises, mode);
 }
 
 
