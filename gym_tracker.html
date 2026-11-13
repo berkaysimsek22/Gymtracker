@@ -278,7 +278,7 @@ button:active{transform:scale(.97)}
 
 /* DAY HEADER */
 .day-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;padding:2px 0}
-.day-head-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.day-head-left{display:flex;align-items:center;gap:8px;flex:1 1 100%;min-width:0}
 .day-head-title{background:none;border:none;color:var(--text);font-family:'Inter',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px;flex:1;min-width:0;padding:0}
 .day-head-right{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 
@@ -1939,10 +1939,12 @@ async function renderDashPRCard(){
     .filter(name=>lastWeek[name]!==undefined && thisWeek[name]>lastWeek[name])
     .map(name=>({name, weight:thisWeek[name]}));
   if(!prs.length){ el.innerHTML=''; return; }
-  const cards = prs.map(pr=>`<div style="flex-shrink:0;background:rgba(247,201,72,.08);border:1px solid rgba(247,201,72,.25);border-radius:var(--r-sm);padding:10px 14px;white-space:nowrap">
-    <span style="font-size:12px;font-weight:600;color:var(--acc4)">🏆 ${pr.name} — ${pr.weight} kg yeni rekor!</span>
+  const cards = prs.map(pr=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(247,201,72,.08);border:1px solid rgba(247,201,72,.25);border-radius:var(--r-sm);padding:10px 14px">
+    <span style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🏆 ${pr.name}</span>
+    <span style="font-size:13px;font-weight:700;color:var(--acc4);flex-shrink:0">${pr.weight} kg</span>
   </div>`).join('');
-  el.innerHTML = `<div style="display:flex;gap:8px;overflow-x:auto">${cards}</div>`;
+  el.innerHTML = `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:500;color:var(--text-sub);margin-bottom:10px">🏆 Bu Haftanın Rekorları</div>
+  <div style="display:flex;flex-direction:column;gap:8px">${cards}</div>`;
 }
 
 // "Kilo Trendi" - weight_logs'tan son 7 kaydi kucuk bir SVG cizgi grafikle gosterir.
@@ -7072,21 +7074,25 @@ function showMuscleVisual(activeMuscles, muscleSets){
     regionAgg[region].total+=amt;
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
   });
-  // Bolgeler arasi COK/AZ calisma farkini RENKLE gosteren yogunluk cubugu -
-  // en cok set yapilan bolgeye gore orantili (parlak lime = cok, sari = orta,
-  // soluk gri = az calisiyor).
+  // Bolgeler arasi COK/AZ calisma farkini - gune/bolgeye gore ORANTILI degil,
+  // zaten programin baska yerinde (Analizi Gör) kullanilan AYNI MUTLAK set
+  // esikleriyle (muscleVolumeColor/muscleVolumeLabel: Az/Orta/Yoğun/Çok Yoğun)
+  // gosteriyoruz - boylece "neredeyse tum bolgeler ayni gun icinde birbirine
+  // yakin oldugu icin hepsi dolu gorunuyor" sorunu cozuluyor, her bolge kendi
+  // mutlak set sayisina gore degerlendiriliyor.
   const regionEntries = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total);
-  const maxTotal = Math.max(1, ...regionEntries.map(([,info])=>info.total));
   const regionRows = regionEntries.map(([region,info])=>{
     const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
-    const ratio = info.total/maxTotal;
-    const intensityColor = ratio>=0.8 ? '#e85d04' : ratio>=0.4 ? '#f7c948' : '#8a8a8a';
+    const color = muscleVolumeColor(info.total);
+    const label = muscleVolumeLabel(info.total);
+    const pct = Math.min(info.total/20*100, 100);
     return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between">'
-      + '<span style="font-size:12px;font-weight:700;color:'+intensityColor+'">'+region+'</span>'
+      + '<span style="font-size:12px;font-weight:700;color:var(--acc)">'+region+'</span>'
       + '<span style="font-size:11px;color:var(--text-muted)">'+isolateLabel+'</span>'
       + '</div>'
-      + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(ratio*100)+'%;background:'+intensityColor+'"></div></div>'
+      + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(pct)+'%;background:'+color+'"></div></div>'
+      + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-top:3px">'+label+' · '+info.total+' set</div>'
       + '</div>';
   }).join('') || '<div class="empty-state" style="padding:8px 0">Bu güne egzersiz bulunamadı.</div>';
   modal.innerHTML = '<div style="background:#141414;border:1px solid rgba(232,93,4,.2);border-radius:16px;padding:24px;max-width:380px;width:100%">'
