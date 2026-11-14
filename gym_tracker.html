@@ -168,6 +168,14 @@ button:active{transform:scale(.97)}
    cunku admin olmayan kullanicilarda ekranin en tepesindeki eleman artik
    admin-banner degil (o admin-only), dogrudan her ekranin kendi icerigi. */
 #mainApp{padding-top:max(0px,env(safe-area-inset-top))}
+/* EKSTRA ANTRENMAN akisindaki tam ekran modaller (#extraWorkoutModal,
+   her acilista yeniden olusturulup inline stille konumlandiriliyor)
+   #mainApp'in disinda document.body'e eklendigi icin yukaridaki safe-area
+   padding'ini miras almiyordu - baslik/X butonu telefonun durum cubugunun
+   (saat/pil) ALTINDA kalip tiklanamaz/okunamaz hale geliyordu. !important
+   burada BILINCLI: inline style.cssText her acilista "padding:24px..." gibi
+   kisayolla ustune yaziyor, sadece padding-top'u override etmemiz gerekiyor. */
+#extraWorkoutModal{padding-top:max(24px, calc(env(safe-area-inset-top) + 14px)) !important}
 .logout-btn{font-size:10px;color:var(--danger);background:none;border:1px solid var(--border);border-radius:20px;cursor:pointer;padding:5px 12px}
 
 /* ADMIN BANNER - sadece admin gorur, kompakt */
@@ -2469,6 +2477,7 @@ function showExtraWorkoutModal(){
   modal.id='extraWorkoutModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px';
   const cards=[
+    {icon:'📋', title:'PROGRAMDAN SEÇ', sub:'Tanımlı antrenman günlerinden biri', meta:'Önizle & başlat', action:'showProgramDayPicker()'},
     {icon:'🏠', title:'NO EXCUSE', sub:'Ev antrenmanı', meta:'Ekipmansız · 20 dk', action:'showNoExcuseSetup()'},
     {icon:'🏃', title:'CİNDY', sub:'Classic CrossFit', meta:'20 dk AMRAP', action:'startCindyPlayer()'},
     {icon:'🎵', title:'BRING SALLY UP', sub:'Push-up Challenge', meta:'3 dk 30 sn · Müzikle sync', action:'showSallyIntro()'},
@@ -2487,6 +2496,50 @@ function showExtraWorkoutModal(){
   document.body.appendChild(modal);
 }
 function closeExtraWorkoutModal(){ document.getElementById('extraWorkoutModal')?.remove(); }
+
+// ── PROGRAMDAN SEÇ (dinlenme gününde, zaten tanımlı bir antrenman gününü
+// seçip o günün kendi ekranına gidiliyor - programin yapisina/gunun
+// type'ina DOKUNMUYOR, sadece Workout ekraninda o gune atliyor; aynen gun
+// sekmesine elle tiklamis gibi, bkz. selDay). ──
+function showProgramDayPicker(){
+  const prog=activeProgram()||[];
+  const days=prog.map((day,di)=>({day,di})).filter(({day})=>day && day.type==='full' && day.exercises && day.exercises.length);
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px';
+  const rows = days.length ? days.map(({day,di})=>{
+    const exList = day.exercises.map(ex=>'<div style="font-size:11px;color:var(--text-sub);padding:2px 0">• '+(ex.sets||'?')+' x '+ex.name+'</div>').join('');
+    return `<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:16px">${day.name||('Gün '+(di+1))}</div><div style="font-size:11px;color:var(--text-muted)">${day.exercises.length} egzersiz</div></div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button onclick="const d=document.getElementById('pdPrev${di}');d.style.display=d.style.display==='block'?'none':'block'" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border-strong);background:none;color:var(--text-sub);cursor:pointer;font-size:11px">👁 Önizle</button>
+          <button onclick="startProgramDay(${di})" style="padding:8px 14px;border-radius:8px;border:none;background:var(--acc);color:#0c0c0c;cursor:pointer;font-size:11px;font-weight:700">▶ Başlat</button>
+        </div>
+      </div>
+      <div id="pdPrev${di}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">${exList}</div>
+    </div>`;
+  }).join('') : '<div class="empty-state" style="padding:20px 0">Tanımlı antrenman günü bulunamadı.</div>';
+  modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <button onclick="showExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">←</button>
+      <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;color:var(--acc);flex:1">PROGRAMDAN SEÇ</h2>
+      <button onclick="closeExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:20px">Hangi günü yapmak istersin?</p>
+    ${rows}
+  </div>`;
+  document.body.appendChild(modal);
+}
+function startProgramDay(di){
+  closeExtraWorkoutModal();
+  curDay=di;
+  persistCurDay();
+  showScreen('workout', navBtnFor('workout'));
+  renderWeekGrid();
+  renderDayContent(di);
+}
 
 // ── NO EXCUSE (HIIT/Circuit, 3 seviye) ──
 const NO_EXCUSE_HIIT = {
