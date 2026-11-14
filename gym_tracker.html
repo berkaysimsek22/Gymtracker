@@ -168,6 +168,14 @@ button:active{transform:scale(.97)}
    cunku admin olmayan kullanicilarda ekranin en tepesindeki eleman artik
    admin-banner degil (o admin-only), dogrudan her ekranin kendi icerigi. */
 #mainApp{padding-top:max(0px,env(safe-area-inset-top))}
+/* EKSTRA ANTRENMAN akisindaki tam ekran modaller (#extraWorkoutModal,
+   her acilista yeniden olusturulup inline stille konumlandiriliyor)
+   #mainApp'in disinda document.body'e eklendigi icin yukaridaki safe-area
+   padding'ini miras almiyordu - baslik/X butonu telefonun durum cubugunun
+   (saat/pil) ALTINDA kalip tiklanamaz/okunamaz hale geliyordu. !important
+   burada BILINCLI: inline style.cssText her acilista "padding:24px..." gibi
+   kisayolla ustune yaziyor, sadece padding-top'u override etmemiz gerekiyor. */
+#extraWorkoutModal{padding-top:max(24px, calc(env(safe-area-inset-top) + 14px)) !important}
 .logout-btn{font-size:10px;color:var(--danger);background:none;border:1px solid var(--border);border-radius:20px;cursor:pointer;padding:5px 12px}
 
 /* ADMIN BANNER - sadece admin gorur, kompakt */
@@ -506,6 +514,9 @@ button:active{transform:scale(.97)}
 
 /* AYLIK HEDEF KUTLAMASI (12/12 konfeti) */
 @keyframes confettiFall{to{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
+/* GUN TAMAMLAMA KUTLAMA EKRANI - yildiz "pop" animasyonu */
+@keyframes starPop{0%{transform:scale(0) rotate(-25deg);opacity:0}60%{transform:scale(1.2) rotate(6deg);opacity:1}100%{transform:scale(1) rotate(0)}}
 
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(8,8,8,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 16px env(safe-area-inset-bottom, 16px);gap:4px;z-index:100}
@@ -2466,6 +2477,7 @@ function showExtraWorkoutModal(){
   modal.id='extraWorkoutModal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px';
   const cards=[
+    {icon:'📋', title:'PROGRAMDAN SEÇ', sub:'Tanımlı antrenman günlerinden biri', meta:'Önizle & başlat', action:'showProgramDayPicker()'},
     {icon:'🏠', title:'NO EXCUSE', sub:'Ev antrenmanı', meta:'Ekipmansız · 20 dk', action:'showNoExcuseSetup()'},
     {icon:'🏃', title:'CİNDY', sub:'Classic CrossFit', meta:'20 dk AMRAP', action:'startCindyPlayer()'},
     {icon:'🎵', title:'BRING SALLY UP', sub:'Push-up Challenge', meta:'3 dk 30 sn · Müzikle sync', action:'showSallyIntro()'},
@@ -2484,6 +2496,50 @@ function showExtraWorkoutModal(){
   document.body.appendChild(modal);
 }
 function closeExtraWorkoutModal(){ document.getElementById('extraWorkoutModal')?.remove(); }
+
+// ── PROGRAMDAN SEÇ (dinlenme gününde, zaten tanımlı bir antrenman gününü
+// seçip o günün kendi ekranına gidiliyor - programin yapisina/gunun
+// type'ina DOKUNMUYOR, sadece Workout ekraninda o gune atliyor; aynen gun
+// sekmesine elle tiklamis gibi, bkz. selDay). ──
+function showProgramDayPicker(){
+  const prog=activeProgram()||[];
+  const days=prog.map((day,di)=>({day,di})).filter(({day})=>day && day.type==='full' && day.exercises && day.exercises.length);
+  document.getElementById('extraWorkoutModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='extraWorkoutModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9000;overflow-y:auto;padding:24px 16px 40px';
+  const rows = days.length ? days.map(({day,di})=>{
+    const exList = day.exercises.map(ex=>'<div style="font-size:11px;color:var(--text-sub);padding:2px 0">• '+(ex.sets||'?')+' x '+ex.name+'</div>').join('');
+    return `<div style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div><div style="font-family:'Inter',sans-serif;font-weight:700;font-size:16px">${day.name||('Gün '+(di+1))}</div><div style="font-size:11px;color:var(--text-muted)">${day.exercises.length} egzersiz</div></div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button onclick="const d=document.getElementById('pdPrev${di}');d.style.display=d.style.display==='block'?'none':'block'" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border-strong);background:none;color:var(--text-sub);cursor:pointer;font-size:11px">👁 Önizle</button>
+          <button onclick="startProgramDay(${di})" style="padding:8px 14px;border-radius:8px;border:none;background:var(--acc);color:#0c0c0c;cursor:pointer;font-size:11px;font-weight:700">▶ Başlat</button>
+        </div>
+      </div>
+      <div id="pdPrev${di}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">${exList}</div>
+    </div>`;
+  }).join('') : '<div class="empty-state" style="padding:20px 0">Tanımlı antrenman günü bulunamadı.</div>';
+  modal.innerHTML=`<div style="max-width:420px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <button onclick="showExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">←</button>
+      <h2 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;color:var(--acc);flex:1">PROGRAMDAN SEÇ</h2>
+      <button onclick="closeExtraWorkoutModal()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:20px">Hangi günü yapmak istersin?</p>
+    ${rows}
+  </div>`;
+  document.body.appendChild(modal);
+}
+function startProgramDay(di){
+  closeExtraWorkoutModal();
+  curDay=di;
+  persistCurDay();
+  showScreen('workout', navBtnFor('workout'));
+  renderWeekGrid();
+  renderDayContent(di);
+}
 
 // ── NO EXCUSE (HIIT/Circuit, 3 seviye) ──
 const NO_EXCUSE_HIIT = {
@@ -4281,6 +4337,112 @@ function confirmFinishDay(di){
   document.body.appendChild(modal);
 }
 
+// Gunu bitirirken, her egzersizin o oturumda kac set tamamlandigini ve en
+// agir (en iyi) setini cikarir - kutlama ekranindaki "Egzersiz / En İyi Set"
+// tablosu icin. finishDay icinde renderDayContent'ten (setCache'i dokunmaz
+// ama yine de "en guncel veri" garantisi icin) ONCE cagrilir.
+function computeFinishDayExerciseSummary(di){
+  const prog=activeProgram()[di];
+  const uid=activeProfile()?.id;
+  const rows=[];
+  prog.exercises.forEach((ex,ei)=>{
+    let doneCount=0, best=null;
+    for(let s=0;s<ex.sets;s++){
+      const d=setCache[`${uid}_${di}_${ei}_${s}`];
+      if(!d?.done) continue;
+      doneCount++;
+      const w=parseFloat(d.weight)||0;
+      if(!best || w>best.weight) best={weight:w, reps:d.reps||'-'};
+    }
+    if(doneCount) rows.push({ei, name:ex.name, doneCount, best});
+  });
+  return rows;
+}
+
+// Bu oturumda kac "kişisel rekor" kirildigini hesaplar: her egzersizin
+// BUGUNDEN ONCEKI set_history'deki en agir agirligini taban alip, bugunku
+// setleri sirayla gezer - taban deger yoksa (hic yapilmamis egzersiz) ya da
+// bugunku set o ana kadarki en agirdan agirsa 1 PR sayilir ve taban
+// guncellenir. Hevy'nin "ilk antrenmanda butun setler PR" davranisiyla ayni
+// mantik (gecmisi olmayan egzersizde ilk set otomatik rekor olur).
+async function computeSessionPRCount(uid, di, exerciseRows){
+  if(!exerciseRows.length) return 0;
+  const prog=activeProgram()[di];
+  const names=[...new Set(exerciseRows.map(r=>r.name))];
+  const todayStart=new Date(); todayStart.setHours(0,0,0,0);
+  const {data}=await sb.from('set_history').select('exercise_name,weight,logged_at')
+    .eq('user_id', uid).in('exercise_name', names).lt('logged_at', todayStart.toISOString());
+  const priorMax={};
+  (data||[]).forEach(r=>{
+    const w=parseFloat(r.weight)||0;
+    if(priorMax[r.exercise_name]===undefined || w>priorMax[r.exercise_name]) priorMax[r.exercise_name]=w;
+  });
+  let prCount=0;
+  exerciseRows.forEach(({ei, name})=>{
+    const ex=prog.exercises[ei];
+    let running=priorMax[name];
+    for(let s=0;s<ex.sets;s++){
+      const d=setCache[`${uid}_${di}_${ei}_${s}`];
+      if(!d?.done || !d.weight) continue;
+      const w=parseFloat(d.weight)||0;
+      if(running===undefined || w>running){ prCount++; running=w; }
+    }
+  });
+  return prCount;
+}
+
+// Gun tamamlaninca tam ekran kutlama karti (Hevy'nin "Well Done!" ekraninden
+// esinlenildi, kendi marka renklerimizle - bkz. showConfetti).
+async function showWorkoutCompleteModal(di, durationSec, vol, logId, exRows){
+  const prog=activeProgram()[di];
+  const uid=activeProfile()?.id;
+  const prCount=await computeSessionPRCount(uid, di, exRows);
+  let totalCount=null;
+  try{
+    const {count}=await sb.from('session_logs').select('id',{count:'exact',head:true}).eq('user_id',uid);
+    totalCount=count;
+  }catch(e){}
+  showConfetti();
+  document.getElementById('workoutCompleteModal')?.remove();
+  const modal=document.createElement('div');
+  modal.id='workoutCompleteModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:700;padding:20px';
+  const dateTxt=dateForDayIndex(di).toLocaleDateString('tr-TR',{day:'numeric',month:'long',weekday:'long'});
+  const durTxt=durationSec!=null?fmtDuration(durationSec):'-';
+  const exHtml=exRows.map(r=>{
+    const bestTxt=r.best&&r.best.weight?`${r.best.weight} kg x ${r.best.reps}`:'-';
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">'
+      + '<span style="font-size:12px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+r.doneCount+' x '+r.name+'</span>'
+      + '<span style="font-size:12px;font-weight:600;flex-shrink:0;margin-left:10px">'+bestTxt+'</span>'
+      + '</div>';
+  }).join('') || '<div class="empty-state" style="padding:8px 0">Kaydedilen set yok.</div>';
+  const subtitle = totalCount ? (totalCount+'. antrenmanını tamamladın!') : 'Antrenmanı tamamladın!';
+  modal.innerHTML = '<div style="position:relative;background:var(--surface);border:1px solid rgba(232,93,4,.25);border-radius:20px;padding:28px 24px 24px;max-width:380px;width:100%;text-align:center;box-shadow:var(--card-shadow)">'
+    + '<button onclick="document.getElementById(\'workoutCompleteModal\').remove()" style="position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer">✕</button>'
+    + '<div style="display:flex;justify-content:center;align-items:flex-end;gap:6px;margin-bottom:14px">'
+    + '<span style="font-size:24px;color:var(--acc);display:inline-block;animation:starPop .45s ease-out .05s both">★</span>'
+    + '<span style="font-size:40px;color:var(--acc);text-shadow:0 0 18px rgba(232,93,4,.55);display:inline-block;animation:starPop .45s ease-out .2s both">★</span>'
+    + '<span style="font-size:24px;color:var(--acc);display:inline-block;animation:starPop .45s ease-out .35s both">★</span>'
+    + '</div>'
+    + '<h2 style="font-family:\'Inter\',sans-serif;font-weight:700;font-size:24px;letter-spacing:.3px;margin-bottom:4px">Harika!</h2>'
+    + '<p style="font-size:13px;color:var(--text-sub);margin-bottom:20px">'+subtitle+'</p>'
+    + '<div style="text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px">'
+    + '<div style="font-weight:700;font-size:16px;margin-bottom:2px">'+prog.name+'</div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">'+dateTxt+'</div>'
+    + '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">'
+    + '<span style="font-size:12px;color:var(--text-sub)">⏱ '+durTxt+'</span>'
+    + '<span style="font-size:12px;color:var(--text-sub)">🏋️ '+Math.round(vol)+' kg</span>'
+    + (prCount?('<span style="font-size:12px;color:var(--acc);font-weight:600">🏆 '+prCount+' PR</span>'):'')
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;padding-bottom:6px;border-bottom:1px solid var(--border-strong)"><span>Egzersiz</span><span>En İyi Set</span></div>'
+    + exHtml
+    + '</div>'
+    + '<button onclick="document.getElementById(\'workoutCompleteModal\').remove()" style="width:100%;margin-top:18px;padding:12px;border-radius:10px;background:var(--acc);border:none;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:13px">Kapat</button>'
+    + '<button onclick="document.getElementById(\'workoutCompleteModal\').remove();undoFinish(\''+logId+'\')" style="width:100%;margin-top:8px;padding:8px;border-radius:10px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;text-decoration:underline">Geri Al</button>'
+    + '</div>';
+  document.body.appendChild(modal);
+}
+
 async function finishDay(di,sets,vol,skippedSets){
   document.getElementById('finishModal')?.remove();
   // Gunu tamamlama kaydindan ONCE, debounce'ta bekleyen set yazimlarini
@@ -4294,6 +4456,10 @@ async function finishDay(di,sets,vol,skippedSets){
     return;
   }
   const prog=activeProgram()[di],uid=activeProfile()?.id;
+  // Egzersiz/en iyi set ozeti, renderDayContent asagida ekrani yeniden
+  // cizmeden ONCE cikariliyor - setCache'e dokunmuyor ama yine de en guncel
+  // ani yakalamis oluyoruz.
+  const exRows=computeFinishDayExerciseSummary(di);
   // Zamanlayici calisiyorsa (otomatik ya da manuel baslatilmis) o ana kadar
   // gecen sureyi al, manuel durdurulmussa donmus degeri kullan, hic
   // baslatilmadiysa null - ya da bu cagri zamanlayiciyi her durumda temizler.
@@ -4308,15 +4474,7 @@ async function finishDay(di,sets,vol,skippedSets){
   await loadSessionLogs(uid);
   renderWeekGrid();
   await renderDayContent(di, true);
-  // Show success with undo
-  const toast=document.createElement('div');
-  toast.id='finishToast';
-  toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;display:flex;align-items:center;gap:12px;z-index:500;white-space:nowrap;box-shadow:0 8px 32px rgba(0,0,0,.5)';
-  const durTxt = durationSec!=null ? ` · ⏱ ${fmtDuration(durationSec)}` : '';
-  toast.innerHTML=`<span style="font-size:13px">💪 <strong>${prog.name}</strong> tamamlandı!${durTxt}</span>
-    <button onclick="undoFinish('${data.id}')" style="background:rgba(255,92,56,.1);border:1px solid rgba(255,92,56,.2);color:#ff5c38;border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer">Geri Al</button>`;
-  document.body.appendChild(toast);
-  setTimeout(()=>document.getElementById('finishToast')?.remove(),6000);
+  await showWorkoutCompleteModal(di, durationSec, vol, data.id, exRows);
 }
 
 async function undoFinish(logId){
@@ -7071,10 +7229,12 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
   activeMuscles.forEach(m=>{
     const region=REGION_MAP[m]||'Diğer';
     const amt=muscleSets[m]||0;
-    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1, exercises:new Set()};
+    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1, exercises:new Map()};
     regionAgg[region].total+=amt;
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
-    (muscleExercises[m]||[]).forEach(n=>regionAgg[region].exercises.add(n));
+    if(muscleExercises[m]) muscleExercises[m].forEach((sets,n)=>{
+      regionAgg[region].exercises.set(n, (regionAgg[region].exercises.get(n)||0)+sets);
+    });
   });
   // Bolgeler arasi COK/AZ calisma farkini - gune/bolgeye gore ORANTILI degil,
   // MUTLAK set esikleriyle gosteriyoruz (bolgeler birbirine yakin oldugunda
@@ -7091,8 +7251,8 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
     const color = volColor(info.total);
     const label = volLabel(info.total);
     const pct = Math.min(info.total/20*100, 100);
-    const exList = [...info.exercises];
-    const exHtml = exList.length ? exList.map(n=>'<div style="font-size:11px;color:var(--text-sub);padding:3px 0">• '+n+'</div>').join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
+    const exList = [...info.exercises.entries()].sort((a,b)=>b[1]-a[1]);
+    const exHtml = exList.length ? exList.map(([n,s])=>'<div style="font-size:11px;color:var(--text-sub);padding:3px 0;display:flex;justify-content:space-between;gap:8px"><span>• '+n+'</span><span style="color:var(--text-muted);white-space:nowrap">'+s+' set</span></div>').join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
     return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="const d=document.getElementById(\'muscleRegionEx'+i+'\');d.style.display=d.style.display===\'block\'?\'none\':\'block\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between">'
       + '<span style="font-size:12px;font-weight:700;color:var(--acc)">'+region+'</span>'
@@ -7129,16 +7289,17 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
 // kucuk "yogunluk adami" ikonu (miniBodyIcon cagrilari) AYNI hesaplamayi
 // kullansin diye tek yerde toplandi.
 // Bir gunun egzersizlerinden kas-id basina hem TOPLAM SET hem de HANGI
-// EGZERSIZLERIN katkida bulundugunu cikarir - "Çalışan Kaslar" modalinda
-// bolgeye tiklayinca hangi hareketler oldugunu gostermek icin
-// muscleExercises (muscleId -> Set(egzersiz adi)) kullaniliyor.
+// EGZERSIZLERIN KACAR SET katkida bulundugunu cikarir - "Çalışan Kaslar"
+// modalinda bolgeye tiklayinca hangi hareketin kac set oldugunu gostermek
+// icin muscleExercises (muscleId -> Map(egzersiz adi -> set sayisi))
+// kullaniliyor.
 function computeDayMuscleBreakdown(day){
   const muscleSets={}, muscleExercises={};
   if(!day || !day.exercises) return {muscleSets, muscleExercises};
   const add=(m, sets, name)=>{
     muscleSets[m]=(muscleSets[m]||0)+sets;
-    if(!muscleExercises[m]) muscleExercises[m]=new Set();
-    if(name) muscleExercises[m].add(name);
+    if(!muscleExercises[m]) muscleExercises[m]=new Map();
+    if(name) muscleExercises[m].set(name, (muscleExercises[m].get(name)||0)+sets);
   };
   day.exercises.forEach(ex=>{
     const exName=(ex.name||'').toLowerCase().trim();
@@ -7185,9 +7346,9 @@ function computeWeekMuscleBreakdown(prog){
     if(!day || day.type!=='full' || !day.exercises) return;
     const b = computeDayMuscleBreakdown(day);
     Object.entries(b.muscleSets).forEach(([m,s])=>{ muscleSets[m]=(muscleSets[m]||0)+s; });
-    Object.entries(b.muscleExercises).forEach(([m,set])=>{
-      if(!muscleExercises[m]) muscleExercises[m]=new Set();
-      set.forEach(n=>muscleExercises[m].add(n));
+    Object.entries(b.muscleExercises).forEach(([m,map])=>{
+      if(!muscleExercises[m]) muscleExercises[m]=new Map();
+      map.forEach((sets,n)=>muscleExercises[m].set(n, (muscleExercises[m].get(n)||0)+sets));
     });
   });
   return {muscleSets, muscleExercises};
