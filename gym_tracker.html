@@ -7233,7 +7233,10 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
     regionAgg[region].total+=amt;
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
     if(muscleExercises[m]) muscleExercises[m].forEach((sets,n)=>{
-      regionAgg[region].exercises.set(n, (regionAgg[region].exercises.get(n)||0)+sets);
+      const cur = regionAgg[region].exercises.get(n) || {sets:0, muscles:new Set()};
+      cur.sets += sets;
+      cur.muscles.add(m);
+      regionAgg[region].exercises.set(n, cur);
     });
   });
   // Bolgeler arasi COK/AZ calisma farkini - gune/bolgeye gore ORANTILI degil,
@@ -7251,8 +7254,16 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
     const color = volColor(info.total);
     const label = volLabel(info.total);
     const pct = Math.min(info.total/20*100, 100);
-    const exList = [...info.exercises.entries()].sort((a,b)=>b[1]-a[1]);
-    const exHtml = exList.length ? exList.map(([n,s])=>'<div style="font-size:11px;color:var(--text-sub);padding:3px 0;display:flex;justify-content:space-between;gap:8px"><span>• '+n+'</span><span style="color:var(--text-muted);white-space:nowrap">'+s+' set</span></div>').join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
+    const exList = [...info.exercises.entries()].sort((a,b)=>b[1].sets-a[1].sets);
+    // Bir bolge (ör. "Kol") birden fazla kasi (biceps+triceps) icerdigi icin
+    // her hareketin yanina HANGI kasi birincil calistirdigini da yaziyoruz -
+    // "Weighted Dip" Kol altinda gorununce "Triceps" oldugu belli olsun diye.
+    const exHtml = exList.length ? exList.map(([n,v])=>{
+      const muscleLabel = [...v.muscles].map(mid=>ISOLATE_LABEL[mid]||mid).join(' · ');
+      return '<div style="font-size:11px;color:var(--text-sub);padding:3px 0;display:flex;justify-content:space-between;gap:8px">'
+        + '<span>• '+n+(muscleLabel?' <span style="color:var(--text-muted)">('+muscleLabel+')</span>':'')+'</span>'
+        + '<span style="color:var(--text-muted);white-space:nowrap">'+v.sets+' set</span></div>';
+    }).join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
     return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="const d=document.getElementById(\'muscleRegionEx'+i+'\');d.style.display=d.style.display===\'block\'?\'none\':\'block\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between">'
       + '<span style="font-size:12px;font-weight:700;color:var(--acc)">'+region+'</span>'
