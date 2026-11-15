@@ -7248,32 +7248,47 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
   // ikisi farkli olcek oldugu icin bu CELISKI degil.
   const volColor = mode==='week' ? muscleVolumeColor : dailyMuscleVolumeColor;
   const volLabel = mode==='week' ? muscleVolumeLabel : dailyMuscleVolumeLabel;
-  const regionEntries = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total);
-  const regionRows = regionEntries.map(([region,info],i)=>{
-    const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
-    const color = volColor(info.total);
-    const label = volLabel(info.total);
-    const pct = Math.min(info.total/20*100, 100);
-    const exList = [...info.exercises.entries()].sort((a,b)=>b[1].sets-a[1].sets);
-    // Bir bolge (ör. "Kol") birden fazla kasi (biceps+triceps) icerdigi icin
-    // her hareketin yanina HANGI kasi birincil calistirdigini da yaziyoruz -
-    // "Weighted Dip" Kol altinda gorununce "Triceps" oldugu belli olsun diye.
-    const exHtml = exList.length ? exList.map(([n,v])=>{
-      const muscleLabel = [...v.muscles].map(mid=>ISOLATE_LABEL[mid]||mid).join(' · ');
+  // Haftalik gorunumde bolgeye gore GRUPLAYIP ozetlemek yerine (ör. "Kol" =
+  // Biceps+Triceps toplami) HER KASI AYRI SATIR olarak gosteriyoruz - haftalik
+  // toplamda bir bolgenin icindeki kaslar (ör. Kol -> Biceps/Triceps, Omuz ->
+  // 3 ayri delt) birbirinden cok farkli hacimde olabiliyor ve tek bir
+  // "bolge ozeti" bunu gizliyordu. Gunluk gorunum bolge gruplamasinda kaliyor
+  // (tek gunde zaten az kas calisiyor, ozet kaybi yok).
+  const buildRowHtml = (titleLabel, subLabel, total, exEntries, rowId) => {
+    const color = volColor(total);
+    const label = volLabel(total);
+    const pct = Math.min(total/20*100, 100);
+    const exHtml = exEntries.length ? exEntries.map(([n,v])=>{
+      const muscleLabel = v.muscles ? [...v.muscles].map(mid=>ISOLATE_LABEL[mid]||mid).join(' · ') : '';
       return '<div style="font-size:11px;color:var(--text-sub);padding:3px 0;display:flex;justify-content:space-between;gap:8px">'
         + '<span>• '+n+(muscleLabel?' <span style="color:var(--text-muted)">('+muscleLabel+')</span>':'')+'</span>'
         + '<span style="color:var(--text-muted);white-space:nowrap">'+v.sets+' set</span></div>';
     }).join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
-    return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="const d=document.getElementById(\'muscleRegionEx'+i+'\');d.style.display=d.style.display===\'block\'?\'none\':\'block\'">'
+    return '<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="const d=document.getElementById(\''+rowId+'\');d.style.display=d.style.display===\'block\'?\'none\':\'block\'">'
       + '<div style="display:flex;align-items:center;justify-content:space-between">'
-      + '<span style="font-size:12px;font-weight:700;color:var(--acc)">'+region+'</span>'
-      + '<span style="font-size:11px;color:var(--text-muted)">'+isolateLabel+'</span>'
+      + '<span style="font-size:12px;font-weight:700;color:var(--acc)">'+titleLabel+'</span>'
+      + '<span style="font-size:11px;color:var(--text-muted)">'+subLabel+'</span>'
       + '</div>'
       + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(pct)+'%;background:'+color+'"></div></div>'
-      + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-top:3px">'+label+' · '+info.total+' set</div>'
-      + '<div id="muscleRegionEx'+i+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)">'+exHtml+'</div>'
+      + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-top:3px">'+label+' · '+total+' set</div>'
+      + '<div id="'+rowId+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)">'+exHtml+'</div>'
       + '</div>';
-  }).join('') || '<div class="empty-state" style="padding:8px 0">Egzersiz bulunamadı.</div>';
+  };
+  let regionRows;
+  if(mode==='week'){
+    const muscleEntries = activeMuscles.map(m=>({m, sets: muscleSets[m]||0})).sort((a,b)=>b.sets-a.sets);
+    regionRows = muscleEntries.map(({m,sets},i)=>{
+      const exEntries = [...(muscleExercises[m]||new Map()).entries()].map(([n,s])=>[n,{sets:s}]).sort((a,b)=>b[1].sets-a[1].sets);
+      return buildRowHtml(ISOLATE_LABEL[m]||m, REGION_MAP[m]||'Diğer', sets, exEntries, 'muscleRegionEx'+i);
+    }).join('') || '<div class="empty-state" style="padding:8px 0">Egzersiz bulunamadı.</div>';
+  } else {
+    const regionEntries = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total);
+    regionRows = regionEntries.map(([region,info],i)=>{
+      const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
+      const exEntries = [...info.exercises.entries()].sort((a,b)=>b[1].sets-a[1].sets);
+      return buildRowHtml(region, isolateLabel, info.total, exEntries, 'muscleRegionEx'+i);
+    }).join('') || '<div class="empty-state" style="padding:8px 0">Egzersiz bulunamadı.</div>';
+  }
   const tabsHtml = mode ? '<div style="display:flex;gap:6px;margin-bottom:14px">'
     + '<button onclick="switchMuscleModalMode(\'day\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid '+(mode==='day'?'#e85d04':'#2a2a2a')+';background:'+(mode==='day'?'rgba(232,93,4,.15)':'#1e1e1e')+';color:'+(mode==='day'?'#e85d04':'#a0a0a0')+';font-size:12px;font-weight:600;cursor:pointer">Günlük</button>'
     + '<button onclick="switchMuscleModalMode(\'week\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid '+(mode==='week'?'#e85d04':'#2a2a2a')+';background:'+(mode==='week'?'rgba(232,93,4,.15)':'#1e1e1e')+';color:'+(mode==='week'?'#e85d04':'#a0a0a0')+';font-size:12px;font-weight:600;cursor:pointer">Haftalık</button>'
