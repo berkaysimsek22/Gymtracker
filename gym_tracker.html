@@ -6348,7 +6348,12 @@ function showWoDayDetail(i){
     const h=day.hiit||{work:40,rest:20,rounds:8};
     exsHtml = `<div class="wo-ex-item"><div class="n">Çalışma ${h.work}sn / Dinlenme ${h.rest}sn</div><div class="sr">${h.rounds} round</div></div>`;
   } else {
-    exsHtml = (day.exercises||[]).map((ex,ei)=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div>${canEditPreview&&_woPreviewEditMode?`<button onclick="delExFromPreview(${ei})" style="background:none;border:none;color:#ff5c38;font-size:15px;cursor:pointer;padding:2px 6px" title="Sil">🗑</button>`:''}</div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
+    const exCount = (day.exercises||[]).length;
+    exsHtml = (day.exercises||[]).map((ex,ei)=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div>${canEditPreview&&_woPreviewEditMode?`<div style="display:flex;align-items:center">
+      <button onclick="moveExInPreview(${ei},-1)" ${ei===0?'disabled style="opacity:.25"':''} style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:2px 4px" title="Yukarı taşı">▲</button>
+      <button onclick="moveExInPreview(${ei},1)" ${ei===exCount-1?'disabled style="opacity:.25"':''} style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:2px 4px" title="Aşağı taşı">▼</button>
+      <button onclick="delExFromPreview(${ei})" style="background:none;border:none;color:#ff5c38;font-size:15px;cursor:pointer;padding:2px 6px" title="Sil">🗑</button>
+    </div>`:''}</div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
   }
   const {typeLabel} = _woDayMeta(day);
   const sub = day.type==='amrap' ? `AMRAP ${Math.round(((day.amrap&&day.amrap.timeCapSec)||1200)/60)}dk` : typeLabel==='Full' ? '' : typeLabel;
@@ -6462,6 +6467,19 @@ function sortExercisesCompoundFirst(exercises){
   const isolations = exercises.filter(ex=>!isCompoundExercise(ex.name));
   exercises.length = 0;
   exercises.push(...compounds, ...isolations);
+}
+
+// Kullanıcı "▲"/"▼" ile ELLE sıra değiştirdiğinde - otomatik compound-önce
+// sıralamayı (sortExercisesCompoundFirst) KASITLI OLARAK çağırmıyoruz, yoksa
+// kullanıcının kendi tercih ettiği sıra anında geri alınırdı. Ekle/sil hâlâ
+// otomatik sıralıyor, bu ikinci (elle) seçenek sadece kullanıcı istediğinde.
+function moveExInPreview(ei, dir){
+  const day = _woSchedule && _woSchedule[_woDayDetailIdx];
+  if(!day || !day.exercises) return;
+  const target = ei + dir;
+  if(target < 0 || target >= day.exercises.length) return;
+  [day.exercises[ei], day.exercises[target]] = [day.exercises[target], day.exercises[ei]];
+  showWoDayDetail(_woDayDetailIdx);
 }
 
 function delExFromPreview(ei){
