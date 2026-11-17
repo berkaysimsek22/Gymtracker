@@ -6333,7 +6333,13 @@ function showWoDayDetail(i){
   const day = _woSchedule && _woSchedule[i];
   const el = document.getElementById('woContent');
   if(!day || !el) return;
-  const canEditPreview = !!(_woSplitMeta?.isCustom && canEdit() && day.type==='full');
+  // Eskiden sadece "Kendi Split'imi Oluştur" onizlemesinde duzenlenebiliyordu -
+  // hazir split'lerin (Upper/Lower, PPL vb.) onizlemesinde de ayni ekle/sil
+  // ozelligi acildi, isCustom sarti kaldirildi. day.exercises buradan itibaren
+  // split.schedule'in KENDISINE (kopyasina degil) referans oldugu icin yapilan
+  // degisiklikler "🚀 Bu Split'i Uygula"ya basilinca dc() ile aynen kopyalanir -
+  // Kendi Split'imi Oluştur akisindakiyle birebir ayni mekanizma.
+  const canEditPreview = !!(canEdit() && day.type==='full');
   let exsHtml;
   if(day.type==='amrap'){
     const a=day.amrap||{timeCapSec:1200,exercises:[]};
@@ -6347,7 +6353,7 @@ function showWoDayDetail(i){
   const {typeLabel} = _woDayMeta(day);
   const sub = day.type==='amrap' ? `AMRAP ${Math.round(((day.amrap&&day.amrap.timeCapSec)||1200)/60)}dk` : typeLabel==='Full' ? '' : typeLabel;
   const editToggle = canEditPreview ? `<button class="btn btn-outline btn-sm" onclick="toggleWoPreviewEdit()" style="${_woPreviewEditMode?'border-color:var(--acc4);color:var(--acc4)':''}">${_woPreviewEditMode?'✓ Bitti':'✏️ Düzenle'}</button>` : '';
-  const muscleLiveHtml = _woSplitMeta?.isCustom ? renderMiniMuscleVolumeHtml() : '';
+  const muscleLiveHtml = (_woSplitMeta?.isCustom || canEditPreview) ? renderMiniMuscleVolumeHtml() : '';
   const addForm = (canEditPreview && _woPreviewEditMode) ? `<div class="add-ex-form" style="margin-top:12px"><h4>+ Yeni Egzersiz Ekle</h4>
     ${exerciseRegionPillsHtml()}
     <div style="position:relative;margin-bottom:8px">
