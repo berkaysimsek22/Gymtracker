@@ -5595,6 +5595,13 @@ function updateNutTotals(){
 async function updFoodAmount(mi,fi,newAmount){
   const nd=await getNd();
   const food=nd.meals[mi].foods[fi];
+  // ESKI miktar - food.amount'u ezmeden ÖNCE yakalanmali. Eskiden bu satirin
+  // ALTINDA food.amount zaten newAmount'a esitlenmisti, o yuzden "oldAmt"
+  // hesabi kendi kendiyle kiyaslayip hep '100' varsayiyordu - fotografla
+  // analiz edilen (food._kcalPer1/_baseKcal olmayan, sadece duz kcal/protein
+  // degeri olan) besinlerde her tus vurusunda (oninput) yanlis oranla
+  // carpilip makrolar sifira cokuyordu ("tum hesaplar siliniyor" bugu buydu).
+  const prevAmount=food.amount;
   const newAmt=parseFloat(newAmount)||0;
   food.amount=String(newAmount);
   if(!newAmt){saveNutrition(activeProfile()?.id,curNutDate);return;}
@@ -5613,7 +5620,7 @@ async function updFoodAmount(mi,fi,newAmount){
     food.fat=String(Math.round((food._baseFat||0)*r*10)/10);
   } else if(food.kcal && parseFloat(food.kcal)>0){
     // Proportion from old amount
-    const oldAmt=parseFloat(food.amount===String(newAmount)?'100':food.amount)||100;
+    const oldAmt=parseFloat(prevAmount)||100;
     const r=newAmt/oldAmt;
     food.kcal=String(Math.round(parseFloat(food.kcal)*r));
     food.protein=String(Math.round(parseFloat(food.protein||0)*r*10)/10);
@@ -5696,6 +5703,22 @@ function showPhotoSourceMenu(btnEl, camId, galId){
   },0);
 }
 
+// Gemini'nin dondurdugu tek bir besini nutrition.meals[].foods[] formatina
+// cevirir - ayrica gram basina kcal/protein/karb/yag degerini (_kcalPer1 vb,
+// veritabanindan besin secilince ayni sekilde set edilen alanlar) SAKLAR ki
+// updFoodAmount gram degisince SABIT bu orandan hesaplasin, art arda tus
+// vurusuyla (oninput) biriken yuvarlama hatasina/sifira cokmeye maruz kalmasin.
+function foodFromAiResult(f){
+  const amt=parseFloat(f.amount)||0;
+  const food={name:f.name||'',amount:String(f.amount||''),unit:f.unit||'gram',kcal:String(f.kcal||''),protein:String(f.protein||''),carb:String(f.carb||''),fat:String(f.fat||'')};
+  if(amt>0){
+    food._kcalPer1=(parseFloat(f.kcal)||0)/amt;
+    food._protPer1=(parseFloat(f.protein)||0)/amt;
+    food._carbPer1=(parseFloat(f.carb)||0)/amt;
+    food._fatPer1=(parseFloat(f.fat)||0)/amt;
+  }
+  return food;
+}
 async function analyzeFoodPhoto(input, targetMealIdx){
   const file=input.files[0];
   if(!file)return;
@@ -5752,7 +5775,7 @@ async function analyzeFoodPhoto(input, targetMealIdx){
     const nd=await loadNutrition(activeProfile()&&activeProfile().id,curNutDate);
     const hr=new Date().getHours(),mn=new Date().getMinutes();
     if(targetMealIdx!==undefined&&nd.meals[targetMealIdx]){
-      const newFoods=result.foods.map(function(f){return {name:f.name||'',amount:String(f.amount||''),unit:f.unit||'gram',kcal:String(f.kcal||''),protein:String(f.protein||''),carb:String(f.carb||''),fat:String(f.fat||'')};});
+      const newFoods=result.foods.map(foodFromAiResult);
       nd.meals[targetMealIdx].foods=(nd.meals[targetMealIdx].foods||[]).concat(newFoods);
       nd.meals[targetMealIdx].open=true;
       saveNutrition(activeProfile().id,curNutDate);
@@ -5768,7 +5791,7 @@ async function analyzeFoodPhoto(input, targetMealIdx){
     nd.meals.push({
       name:mealTypeByHour(hr),
       time:hr.toString().padStart(2,'0')+':'+mn.toString().padStart(2,'0'),
-      foods:result.foods.map(function(f){return {name:f.name||'',amount:String(f.amount||''),unit:f.unit||'gram',kcal:String(f.kcal||''),protein:String(f.protein||''),carb:String(f.carb||''),fat:String(f.fat||'')};},),
+      foods:result.foods.map(foodFromAiResult),
       open:true
     });
     saveNutrition(activeProfile().id,curNutDate);
