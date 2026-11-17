@@ -6418,11 +6418,58 @@ function renderMiniMuscleVolumeHtml(){
 
 function toggleWoPreviewEdit(){ _woPreviewEditMode = !_woPreviewEditMode; showWoDayDetail(_woDayDetailIdx); }
 
+// Hareket adına göre: true = compound (çok eklemli), false = izolasyon (tek
+// eklemli). "Antrenman günlerinde hareket sırasını compound-önce-izole-sonra
+// yap" PR'ındaki siniflandirmanin AYNISI - onizleme ekle/sil sonrasi da
+// sirayi otomatik yenileyebilsin diye burada da (statik veri degil, canli
+// kod olarak) tutuluyor.
+const COMPOUND_EXERCISE_NAMES = [
+  'Back Squat','Back Squat (Hafif)','Back Squat (Rekor)','Barbell Squat','Squat',
+  'Front Squat','Hack Squat','Smith Machine Squat','Smith Machine Lunge',
+  'Leg Press','Bulgarian Split Squat','Walking Lunge','Step Up',
+  'Deadlift','Deadlift (Rekor)','Romanian Deadlift','Stiff Leg Deadlift','Good Morning','Hip Thrust',
+  'Bench Press','Bench Press (Rekor)','Flat Bench Press','Incline Bench Press','Incline Barbell Press',
+  'Incline DB Press','Close Grip Bench Press','Close Grip Bench','Dip','Weighted Dip','Push Up',
+  'Overhead Press','Shoulder Press','DB Shoulder Press','Seated DB Shoulder Press',
+  'Pull-Up','Chin-Up','Weighted Pull-Up','Weighted Pull Up','Lat Pulldown',
+  'Barbell Row','Seated Row','Cable Row','Chest Supported Row',
+];
+const ISOLATION_EXERCISE_NAMES = [
+  'Cable Fly','Dumbbell Fly','Pec Deck',
+  'Lateral Raise','Cable Lateral Raise','DB Lateral Raise','Front Raise',
+  'Face Pull','Reverse Pec Deck','Rear Delt Fly','Shrug',
+  'Barbell Curl','Incline DB Curl','Hammer Curl','Preacher Curl','EZ Bar Curl',
+  'Bayesian Cable Curl','Reverse Curl','Cable Curl',
+  'Overhead Triceps Extension','Overhead Triceps','Overhead Cable Triceps',
+  'Tricep Pushdown','Triceps Pushdown','Cable Pushdown','JM Press',
+  'Calf Raise','Seated Calf Raise','Standing Calf Raise','Straight Leg Calf Raise',
+  'Plank','Cable Crunch','Hanging Leg Raise',
+  'Straight Arm Pushdown','Wrist Roller','Wrist Curl','Barbell Wrist Twist',
+  'Leg Curl','Lying Leg Curl','Seated Leg Curl','Leg Extension',
+  'Hip Abduction','Machine Kick Back','Cable Kickback','Roman Chair Back Ext',
+];
+function isCompoundExercise(name){
+  if(COMPOUND_EXERCISE_NAMES.includes(name)) return true;
+  if(ISOLATION_EXERCISE_NAMES.includes(name)) return false;
+  return true; // bilinmeyen isim: izolasyonlarin arkasinda mahsur kalmasin diye varsayilan compound
+}
+// Stabil bolme: compound'lar KENDI aralarindaki sirayi koruyarak once, izole
+// hareketler KENDI aralarindaki sirayi koruyarak sonra gelir - PR #116'daki
+// toplu duzenlemeyle ayni mantik, tek farki bunun CANLI calisan bir fonksiyon
+// olmasi (ekle/sil sonrasi her seferinde yeniden uygulanabiliyor).
+function sortExercisesCompoundFirst(exercises){
+  const compounds = exercises.filter(ex=>isCompoundExercise(ex.name));
+  const isolations = exercises.filter(ex=>!isCompoundExercise(ex.name));
+  exercises.length = 0;
+  exercises.push(...compounds, ...isolations);
+}
+
 function delExFromPreview(ei){
   const day = _woSchedule && _woSchedule[_woDayDetailIdx];
   if(!day) return;
   if(!confirm(`"${day.exercises[ei].name}" silinsin mi?`)) return;
   day.exercises.splice(ei,1);
+  sortExercisesCompoundFirst(day.exercises);
   showWoDayDetail(_woDayDetailIdx);
 }
 
@@ -6438,6 +6485,7 @@ function addExToPreview(){
     restSec:parseInt(document.getElementById('aef-rest')?.value)||90,
     tip:document.getElementById('aef-tip')?.value.trim()||null
   });
+  sortExercisesCompoundFirst(day.exercises);
   showWoDayDetail(_woDayDetailIdx);
 }
 
