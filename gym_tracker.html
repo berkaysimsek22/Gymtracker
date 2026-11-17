@@ -687,6 +687,7 @@ button:active{transform:scale(.97)}
     <div class="stats-header"><h2>İstatistikler</h2></div>
     <div class="stats-grid" id="statsGrid"></div>
     <div id="fatigueSection" style="margin:12px 16px 0"></div>
+    <div id="effectiveVolumeSection" style="margin:12px 16px 0"></div>
     <div id="weightChartSection" style="margin:12px 16px 0"></div>
     <div id="muscleTrendSection" style="margin:12px 16px 0"></div>
     <div id="nutChartSection" style="margin:10px 16px 0"></div>
@@ -5008,6 +5009,7 @@ async function renderStats(){
     ${tSkipped?`<div class="stat-card"><div class="sc-lbl">Atlanan Set</div><div class="sc-val" style="color:var(--warning)">${tSkipped}</div><div class="sc-sub">ağırlık/tekrar girilmedi</div></div>`:''}`;
   // Load weight logs and draw chart
   await renderFatigueSection(uid);
+  await renderEffectiveVolumeSection(uid);
   await renderWeightChart(p);
   await renderMuscleTrendChart(uid);
   await renderNutChart(p);
@@ -5921,14 +5923,14 @@ const POPULAR_SPLITS = [
       {name:'Legs B',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Leg Press','Quad',4,'8-10',120),_woEx('Walking Lunge','Glute · Quad',3,'12',60),_woEx('Leg Extension','Quad',3,'12-15',60),_woEx('Lying Leg Curl','Hamstring',3,'12-15',60),_woEx('Seated Calf Raise','Baldır',4,'15',45),_woEx('Shrug','Trapez',3,'12-15',60),_woEx('Reverse Curl','Brachialis',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'15',60)]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
-  {id:'upper_lower', name:'Upper / Lower', days:4, tagline:'Üst/alt vücut ayrımı, haftada 2x tekrar — güç ve hacim dengesi.',
+  {id:'upper_lower', name:'Upper / Lower', days:4, tagline:'Üst/alt vücut ayrımı, haftada 2x tekrar — LOCKIN efektif hacim sistemiyle uyumlu güncel program.',
     schedule:[
-      {name:'Upper A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Incline Bench Press','Göğüs (Üst)',5,'6-8',120),_woEx('Seated Row','Sırt',4,'6-8',120),_woEx('Overhead Press','Omuz',3,'8-10',90),_woEx('Pull-Up','Sırt',3,'10-12',90),_woEx('Seated DB Shoulder Press','Deltoid (Ön/Yan)',3,'10-12',90),_woEx('Close Grip Bench','Triceps',3,'10',90),_woEx('Barbell Curl','Biceps',3,'10-12',60),_woEx('Overhead Triceps Extension','Triceps',3,'10-12',60),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Reverse Curl','Brachialis',3,'12-15',60)]},
-      {name:'Lower A',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'6-8',150),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Seated Leg Curl','Hamstring',3,'10-12',60),_woEx('Calf Raise','Baldır',5,'12-15',45),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Shrug','Trapez',3,'12-15',60),_woEx('Reverse Curl','Brachialis',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'15',60)]},
+      {name:'Upper A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Incline Barbell Bench Press','Göğüs (Üst)',4,'6-8',150),_woEx('Pull-Up / Lat Pulldown','Sırt',3,'8-12',120),_woEx('Chest Supported Row','Sırt',3,'8-12',120),_woEx('Cable Fly','Göğüs',3,'10-15',75),_woEx('DB Lateral Raise','Lateral Deltoid',3,'12-15',60),_woEx('Incline DB Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Overhead Cable Triceps Extension','Triceps (Uzun Kafa)',3,'10-12',60),_woEx('Face Pull','Omuz (Arka)',2,'15-20',60)]},
+      {name:'Lower A',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'6-8',150),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Seated Leg Curl','Hamstring',3,'10-12',75),_woEx('Standing Calf Raise','Gastrocnemius (Baldır)',5,'10-15',60),_woEx('Cable Crunch','Karın',3,'12-15',60)]},
       {name:'Dinlenme',type:'rest',day:'Çarşamba',warmup:null,exercises:[]},
-      {name:'Upper B',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Lat Pulldown','Sırt',4,'AMRAP',90),_woEx('Barbell Row','Sırt',3,'10-12',90),_woEx('Seated DB Shoulder Press','Deltoid (Ön/Yan)',3,'10-12',90),_woEx('Chest Supported Row','Sırt',3,'10,10,8',90),_woEx('Cable Fly','Göğüs',4,'8-12',90),_woEx('Lateral Raise','Omuz',3,'12-15',60),_woEx('Incline DB Curl','Biceps',3,'10-12',60),_woEx('Tricep Pushdown','Triceps',3,'10-12',60),_woEx('Shrug','Trapez',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'15',60),_woEx('Hammer Curl','Biceps',3,'12',60)]},
-      {name:'Lower B',type:'full',day:'Cuma',warmup:null,exercises:[_woEx('Deadlift','Hamstring · Sırt',4,'5-8',150),_woEx('Leg Press','Quad',3,'8-10',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',60),_woEx('Lying Leg Curl','Hamstring',3,'10-12',60),_woEx('Seated Calf Raise','Baldır',4,'12-15',45),_woEx('Face Pull','Omuz (Arka)',3,'15-20',60),_woEx('Shrug','Trapez',3,'12-15',60),_woEx('Reverse Curl','Brachialis',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'15',60)]},
-      {name:'Dinlenme',type:'rest',day:'Cumartesi',warmup:null,exercises:[]},
+      {name:'Upper B',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Incline DB Press','Göğüs',3,'8-12',120),_woEx('Lat Pulldown','Latissimus Dorsi',3,'10-12',90),_woEx('Barbell Row','Sırt',3,'8-10',120),_woEx('Seated DB Shoulder Press','Deltoid (Ön/Yan)',3,'8-12',90),_woEx('Cable Lateral Raise','Lateral Deltoid',5,'12-20',60),_woEx('Reverse Pec Deck','Posterior Deltoid',3,'12-20',60),_woEx('Bayesian Cable Curl','Biceps (Uzun Kafa)',3,'10-15',60),_woEx('Hammer Curl','Brachialis · Biceps',2,'10-12',60),_woEx('Cable Triceps Pushdown','Triceps (Lateral)',3,'10-12',60),_woEx('Shrug','Trapez',3,'12-15',60)]},
+      {name:'Dinlenme',type:'rest',day:'Cuma',warmup:null,exercises:[]},
+      {name:'Lower B',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Leg Press','Quad',3,'10-12',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',90),_woEx('Hip Thrust','Glute Maximus',3,'8-12',90),_woEx('Lying Leg Curl','Hamstring',4,'10-12',75),_woEx('Leg Extension','Quadriceps',2,'12-15',60),_woEx('Seated Calf Raise','Soleus (Baldır)',5,'12-15',60),_woEx('Reverse Curl','Brachialis',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'12-15',60)]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'bro_split', name:'Bro Split', days:5, tagline:'Her gün ayrı bir kas grubu — bodybuilding\'in en klasik programı.',
@@ -6799,6 +6801,238 @@ async function renderFatigueSection(uid){
   }).join('');
   el.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
     <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px">🔥 Haftalık Yorgunluk Skoru</h3>
+    ${rows}
+  </div>`;
+}
+
+// ── ETKİLİ HACİM (Direct / Indirect / Effective Set) ──
+// Direct Set: hareketin PRIMARY (ana hedef) kasi icin 1.0 set.
+// Indirect Set: hareketin SECONDARY (ikincil) kasi icin 1.0 set, ama
+// Effective Volume'a katkisi EVOL katsayisiyla (varsayilan 0.5, ayarlardan
+// degistirilebilir) çarpilarak eklenir - Effective = Direct + Indirect*katsayi.
+// 0.5 sabit bir fizyolojik gercek degil, pratik bir programlama tahminidir.
+// name -> {primary:[ANALYSIS_MUSCLE_GROUPS id...], secondary:[...]} - bir kas
+// bir hareket icin HEM primary HEM secondary olarak gecemez (addEffectiveSets
+// bunu calisma zamaninda da garanti eder, bkz. altta).
+const EFFECTIVE_MUSCLE_MAP = {
+  'incline barbell bench press':{primary:['pectoral'],secondary:['triceps','front_delt']},
+  'incline db press':{primary:['pectoral'],secondary:['triceps','front_delt']},
+  'cable fly':{primary:['pectoral'],secondary:[]},
+  'pull up':{primary:['lat'],secondary:['biceps']},
+  'lat pulldown':{primary:['lat'],secondary:['biceps']},
+  'chest supported row':{primary:['rhomboid'],secondary:['biceps','rear_delt']},
+  'barbell row':{primary:['rhomboid'],secondary:['biceps','rear_delt']},
+  'seated db shoulder press':{primary:['front_delt'],secondary:['side_delt','triceps']},
+  'db lateral raise':{primary:['side_delt'],secondary:[]},
+  'cable lateral raise':{primary:['side_delt'],secondary:[]},
+  'face pull':{primary:['rear_delt'],secondary:['traps']},
+  'reverse pec deck':{primary:['rear_delt'],secondary:[]},
+  'incline db curl':{primary:['biceps'],secondary:[]},
+  'bayesian cable curl':{primary:['biceps'],secondary:[]},
+  'hammer curl':{primary:['biceps','brachialis'],secondary:[]},
+  'reverse curl':{primary:['brachialis'],secondary:[]},
+  'overhead cable triceps extension':{primary:['triceps'],secondary:[]},
+  'cable triceps pushdown':{primary:['triceps'],secondary:[]},
+  'squat':{primary:['quad'],secondary:['glute']},
+  'leg press':{primary:['quad'],secondary:['glute']},
+  'romanian deadlift':{primary:['hamstring'],secondary:['glute']},
+  'seated leg curl':{primary:['hamstring'],secondary:[]},
+  'lying leg curl':{primary:['hamstring'],secondary:[]},
+  'walking lunge':{primary:['glute'],secondary:['quad']},
+  'hip thrust':{primary:['glute'],secondary:[]},
+  'leg extension':{primary:['quad'],secondary:[]},
+  'standing calf raise':{primary:['calves'],secondary:[]},
+  'seated calf raise':{primary:['calves'],secondary:[]},
+  'shrug':{primary:['traps'],secondary:[]},
+  'cable crunch':{primary:['abs'],secondary:[]},
+};
+// Tam eslesme yoksa alt dize (substring) eslesmesine, o da yoksa mevcut
+// classifyExerciseName'e (tek grup, hepsi direct sayilir) duser - boylece
+// EFFECTIVE_MUSCLE_MAP'te olmayan/adi degismis bir hareket asla haritasiz
+// kalmaz, sadece indirect ayrimi kaybolur (guvenli varsayilan).
+function lookupEffectiveMuscleMap(name){
+  const n = normalizeExName(name);
+  if(EFFECTIVE_MUSCLE_MAP[n]) return EFFECTIVE_MUSCLE_MAP[n];
+  for(const k in EFFECTIVE_MUSCLE_MAP){ if(n.includes(k)||k.includes(n)) return EFFECTIVE_MUSCLE_MAP[k]; }
+  return {primary:classifyExerciseName(name), secondary:[]};
+}
+// acc[gid] = {direct, indirect, exercises:{adı:{direct,indirect}}} biriktirir.
+// Bir kas ayni egzersizde iki kez sayilmasin diye secondary, o egzersizde
+// zaten primary olarak islenmis kaslari (seen) atlar.
+function addEffectiveSets(acc, exName, setCount){
+  if(!(setCount>0)) return;
+  const map = lookupEffectiveMuscleMap(exName);
+  const seen = new Set();
+  (map.primary||[]).forEach(gid=>{
+    if(seen.has(gid) || !acc[gid]) return;
+    seen.add(gid);
+    acc[gid].direct += setCount;
+    if(!acc[gid].exercises[exName]) acc[gid].exercises[exName]={direct:0,indirect:0};
+    acc[gid].exercises[exName].direct += setCount;
+  });
+  (map.secondary||[]).forEach(gid=>{
+    if(seen.has(gid) || !acc[gid]) return;
+    seen.add(gid);
+    acc[gid].indirect += setCount;
+    if(!acc[gid].exercises[exName]) acc[gid].exercises[exName]={direct:0,indirect:0};
+    acc[gid].exercises[exName].indirect += setCount;
+  });
+}
+// entries: [{name, sets}] -> her ANALYSIS_MUSCLE_GROUPS id'si icin
+// {direct, indirect, effective, exercises}. coef verilmezse kayitli ayar
+// (varsayilan 0.5) kullanilir. Set sayisi 0/negatif olan girdiler atlanir.
+function computeEffectiveMuscleVolume(entries, coef){
+  const c = (coef===undefined||coef===null) ? getEffectiveVolumeSettings().coef : coef;
+  const acc = {};
+  ANALYSIS_MUSCLE_GROUPS.forEach(g=>{ acc[g.id]={direct:0,indirect:0,exercises:{}}; });
+  (entries||[]).forEach(e=>{
+    if(!e || !e.name) return;
+    const n = parseInt(e.sets)||0;
+    if(n>0) addEffectiveSets(acc, e.name, n);
+  });
+  const result = {};
+  ANALYSIS_MUSCLE_GROUPS.forEach(g=>{
+    const a = acc[g.id];
+    result[g.id] = {direct:a.direct, indirect:a.indirect, effective:Math.round((a.direct+a.indirect*c)*10)/10, exercises:a.exercises};
+  });
+  return result;
+}
+// Programlanan (PLANNED) haftalik hacim: schedule'daki tum 'full' gunlerin
+// egzersiz set sayilarini isim bazinda toplar.
+function programWeeklyEntries(schedule){
+  const sums = {};
+  (schedule||[]).forEach(day=>{
+    if(!day || day.type!=='full' || !day.exercises) return;
+    day.exercises.forEach(ex=>{
+      if(!ex || !ex.name) return;
+      sums[ex.name] = (sums[ex.name]||0) + (parseInt(ex.sets)||0);
+    });
+  });
+  return Object.entries(sums).map(([name,sets])=>({name,sets}));
+}
+function computePlannedEffectiveMuscleVolume(schedule, coef){
+  return computeEffectiveMuscleVolume(programWeeklyEntries(schedule), coef);
+}
+// Gerceklesen (ACTUAL) haftalik hacim: workout_sets'ten bu hafta done=true
+// olan kayitlari sayar (computeWeeklyFatigue ile AYNI hafta/eslesme mantigi)
+// - tamamlanmamis bir set hacme hic eklenmez.
+async function computeActualWeeklyEffectiveVolume(userId, coef){
+  const prog = activeProgram();
+  const now=new Date();
+  const monday=new Date(now); monday.setDate(now.getDate()-(now.getDay()===0?6:now.getDay()-1)); monday.setHours(0,0,0,0);
+  const nextMonday=new Date(monday); nextMonday.setDate(monday.getDate()+7);
+  const {data}=await sb.from('workout_sets').select('*').eq('user_id',userId).eq('done',true);
+  const sums={};
+  (data||[]).forEach(row=>{
+    const doneAt=row.done_at?new Date(row.done_at):null;
+    if(!doneAt||doneAt<monday||doneAt>=nextMonday) return;
+    const ex=prog[row.day_index%7]?.exercises?.[row.exercise_index];
+    if(!ex || !ex.name) return;
+    sums[ex.name]=(sums[ex.name]||0)+1;
+  });
+  const entries=Object.entries(sums).map(([name,sets])=>({name,sets}));
+  return computeEffectiveMuscleVolume(entries, coef);
+}
+
+// ── ETKİLİ HACİM AYARLARI (indirect katsayisi + haftalik hedef araligi) ──
+// localStorage'da saklanir (theme/splitType ile ayni kurulan desen) - DB
+// semasi degisikligi gerektirmez, cihaza ozeldir.
+function getEffectiveVolumeSettings(){
+  const def = {coef:0.5, min:10, max:20};
+  try{
+    const raw = localStorage.getItem('gt_evolSettings');
+    if(raw){
+      const o = JSON.parse(raw);
+      const coef = Math.min(1, Math.max(0, parseFloat(o.coef)));
+      const min = Math.max(0, parseInt(o.min));
+      const max = Math.max(min||0, parseInt(o.max));
+      if(isFinite(coef) && isFinite(min) && isFinite(max)) return {coef, min, max};
+    }
+  }catch(e){}
+  return def;
+}
+function setEffectiveVolumeSettings(coef, min, max){
+  const c = Math.min(1, Math.max(0, parseFloat(coef)));
+  const mn = Math.max(0, parseInt(min)||0);
+  const mx = Math.max(mn, parseInt(max)||mn);
+  const o = {coef:isFinite(c)?c:0.5, min:mn, max:mx};
+  try{ localStorage.setItem('gt_evolSettings', JSON.stringify(o)); }catch(e){}
+  return o;
+}
+function effectiveVolumeTier(sets, settings){
+  if(!sets) return {label:'Çalışmıyor', color:'#3a3a3a'};
+  if(sets<settings.min) return {label:'Az', color:'#eab308'};
+  if(sets<=settings.max) return {label:'Hedefte', color:'#22c55e'};
+  return {label:'Yüksek', color:'#f97316'};
+}
+
+let _evolMode='actual', _evolUid=null;
+function setEvolMode(mode){ _evolMode=mode; renderEffectiveVolumeSection(_evolUid); }
+function toggleEvolSettings(){
+  const panel=document.getElementById('evolSettingsPanel');
+  if(!panel) return;
+  if(panel.style.display==='block'){ panel.style.display='none'; return; }
+  const s=getEffectiveVolumeSettings();
+  panel.innerHTML = `<div style="display:flex;flex-direction:column;gap:8px">
+    <label style="font-size:10px;color:var(--muted)">Dolaylı (indirect) katsayısı: <b id="evolCoefVal">${s.coef}</b></label>
+    <input type="range" min="0" max="1" step="0.05" value="${s.coef}" oninput="document.getElementById('evolCoefVal').textContent=this.value" id="evolCoefInput" style="width:100%">
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label style="font-size:10px;color:var(--muted)">Hedef Min</label><input type="number" id="evolMinInput" value="${s.min}" style="width:100%;box-sizing:border-box;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)"></div>
+      <div style="flex:1"><label style="font-size:10px;color:var(--muted)">Hedef Max</label><input type="number" id="evolMaxInput" value="${s.max}" style="width:100%;box-sizing:border-box;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)"></div>
+    </div>
+    <button onclick="saveEvolSettings()" style="padding:8px;border-radius:8px;background:#e85d04;border:none;color:#0c0c0c;font-weight:700;cursor:pointer;font-size:12px">Kaydet</button>
+  </div>`;
+  panel.style.display='block';
+}
+function saveEvolSettings(){
+  const coef=document.getElementById('evolCoefInput').value;
+  const min=document.getElementById('evolMinInput').value;
+  const max=document.getElementById('evolMaxInput').value;
+  setEffectiveVolumeSettings(coef, min, max);
+  const panel=document.getElementById('evolSettingsPanel');
+  if(panel) panel.style.display='none';
+  renderEffectiveVolumeSection(_evolUid);
+}
+async function renderEffectiveVolumeSection(uid){
+  const el=document.getElementById('effectiveVolumeSection');
+  if(!el) return;
+  if(!uid){ el.innerHTML=''; return; }
+  _evolUid = uid;
+  const settings = getEffectiveVolumeSettings();
+  const result = _evolMode==='actual'
+    ? await computeActualWeeklyEffectiveVolume(uid, settings.coef)
+    : computePlannedEffectiveMuscleVolume(activeProgram(), settings.coef);
+  const active = ANALYSIS_MUSCLE_GROUPS.map(g=>({g, v:result[g.id]})).filter(x=>x.v.direct>0||x.v.indirect>0).sort((a,b)=>b.v.effective-a.v.effective);
+  const rows = active.map((x,i)=>{
+    const tier = effectiveVolumeTier(x.v.effective, settings);
+    const pct = Math.min(100, Math.round(x.v.effective/Math.max(settings.max,1)*100));
+    const exList = Object.entries(x.v.exercises).sort((a,b)=>(b[1].direct+b[1].indirect)-(a[1].direct+a[1].indirect));
+    const exHtml = exList.length ? exList.map(([n,s])=>{
+      const parts=[]; if(s.direct) parts.push(s.direct+' direkt'); if(s.indirect) parts.push(s.indirect+' dolaylı');
+      return `<div style="font-size:11px;color:var(--text-sub);padding:3px 0;display:flex;justify-content:space-between;gap:8px">
+        <span>• ${n}</span><span style="color:var(--text-muted);white-space:nowrap">${parts.join(' + ')}</span></div>`;
+    }).join('') : '<div style="font-size:11px;color:var(--text-muted);padding:3px 0">Hareket bulunamadı</div>';
+    const rowId='evolEx'+i;
+    return `<div style="padding:8px 12px;background:rgba(232,93,4,.06);border:1px solid rgba(232,93,4,.18);border-radius:10px;margin-bottom:6px;cursor:pointer" onclick="const d=document.getElementById('${rowId}');d.style.display=d.style.display==='block'?'none':'block'">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${x.g.label}</span>
+        <span style="font-size:13px;font-weight:700;color:${tier.color}">${x.v.effective} efektif set</span>
+      </div>
+      <div class="nut-bar"><div class="nut-bar-fill" style="width:${pct}%;background:${tier.color}"></div></div>
+      <div style="font-size:10px;color:${tier.color};font-weight:600;margin-top:3px">${tier.label} · ${x.v.direct} direkt + ${x.v.indirect} dolaylı (×${settings.coef}) · hedef ${settings.min}-${settings.max}</div>
+      <div id="${rowId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)">${exHtml}</div>
+    </div>`;
+  }).join('') || '<div class="empty-state" style="padding:8px 0">'+(_evolMode==='actual'?'Bu hafta tamamlanmış set bulunamadı.':'Programda egzersiz bulunamadı.')+'</div>';
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:0">💪 Etkili Haftalık Hacim</h3>
+      <button onclick="toggleEvolSettings()" style="background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer">⚙️</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button onclick="setEvolMode('actual')" style="flex:1;padding:6px;border-radius:8px;border:1px solid ${_evolMode==='actual'?'#e85d04':'#2a2a2a'};background:${_evolMode==='actual'?'rgba(232,93,4,.15)':'transparent'};color:${_evolMode==='actual'?'#e85d04':'var(--muted)'};font-size:11px;font-weight:600;cursor:pointer">Gerçekleşen</button>
+      <button onclick="setEvolMode('planned')" style="flex:1;padding:6px;border-radius:8px;border:1px solid ${_evolMode==='planned'?'#e85d04':'#2a2a2a'};background:${_evolMode==='planned'?'rgba(232,93,4,.15)':'transparent'};color:${_evolMode==='planned'?'#e85d04':'var(--muted)'};font-size:11px;font-weight:600;cursor:pointer">Planlanan</button>
+    </div>
+    <div id="evolSettingsPanel" style="display:none;margin-bottom:10px;padding:10px;background:var(--surface2);border-radius:10px"></div>
     ${rows}
   </div>`;
 }
