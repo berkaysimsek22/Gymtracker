@@ -236,6 +236,15 @@ test('haftalık planlanan effective hacim - quad/glute/hamstring/biceps/triceps 
   assert.strictEqual(r.triceps.direct, 6); assert.strictEqual(r.triceps.indirect, 13); assert.strictEqual(r.triceps.effective, 12.5);
 });
 
+test('Upper B\'de Barbell Row yerine Seated Row kullanılıyor ve aynı rhomboid/biceps/rear_delt eşlemesine sahip', () => {
+  const upperB = ul.schedule.find(d => d.name === 'Upper B');
+  assert.ok(upperB.exercises.some(e => e.name === 'Seated Row'));
+  assert.ok(!upperB.exercises.some(e => e.name === 'Barbell Row'));
+  const m = lookupEffectiveMuscleMap('Seated Row');
+  assert.deepStrictEqual(m.primary, ['rhomboid']);
+  assert.deepStrictEqual(m.secondary.sort(), ['biceps', 'rear_delt']);
+});
+
 test('exercises dökümü doğru egzersizleri listeliyor (kas kartına dokunma -> katkı listesi, acceptance #8)', () => {
   const r = computePlannedEffectiveMuscleVolume(ul.schedule, 0.5);
   assert.strictEqual(r.quad.exercises['Squat'].direct, 5);
