@@ -59,6 +59,7 @@ const parts = [
   extractFunction('rotateScheduleToStartDay'),
   extractFunction('_woEx'),
   extractFunction('_woExDetailed'),
+  extractFunction('_woWarm'),
   extractConst('POPULAR_SPLITS'),
 ].join('\n');
 

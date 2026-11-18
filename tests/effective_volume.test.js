@@ -79,6 +79,7 @@ const parts = [
   extractFunction('effectiveVolumeTier'),
   extractFunction('_woEx'),
   extractFunction('_woExDetailed'),
+  extractFunction('_woWarm'),
   extractConst('POPULAR_SPLITS'),
 ].join('\n');
 
@@ -136,16 +137,42 @@ test('egzersiz sayıları: Upper A=8, Lower A=6, Upper B=10, Lower B=8', () => {
 
 test('set/tekrar/dinlenme değerleri doğru (acceptance #2)', () => {
   const findEx = (dayName, exName) => ul.schedule.find(d => d.name === dayName).exercises.find(e => e.name === exName);
+  // Incline Barbell Bench Press: 1 ısınma + 4 working set (tablodaki "4x6-8"
+  // korunur, ısınma EKLENMİŞ olduğu için toplam ex.sets 5'tir).
   const ibbp = findEx('Upper A', 'Incline Barbell Bench Press');
-  assert.strictEqual(ibbp.sets, 4); assert.strictEqual(ibbp.reps, '6-8'); assert.strictEqual(ibbp.restSec, 150);
+  assert.strictEqual(ibbp.sets, 5); assert.strictEqual(ibbp.restSec, 150);
+  assert.strictEqual(ibbp.setsDef[0].type, 'warmup');
+  assert.strictEqual(ibbp.setsDef.filter(s => s.type === 'working').length, 4);
+  assert.ok(ibbp.setsDef.filter(s => s.type === 'working').every(s => s.reps === '6-8'));
   const fp = findEx('Upper A', 'Face Pull');
   assert.strictEqual(fp.sets, 2);
   const clr = findEx('Upper B', 'Cable Lateral Raise');
   assert.strictEqual(clr.sets, 5); assert.strictEqual(clr.reps, '12-20');
   const le = findEx('Lower B', 'Leg Extension');
   assert.strictEqual(le.sets, 2);
+  // Standing Calf Raise: 1 ısınma + 5 working (tablodaki "5x10-15" korunur).
   const scr = findEx('Lower A', 'Standing Calf Raise');
-  assert.strictEqual(scr.sets, 5);
+  assert.strictEqual(scr.sets, 6);
+  assert.strictEqual(scr.setsDef.filter(s => s.type === 'working').length, 5);
+});
+
+test('ısınma seti eklenen hareketlerde WORKING set sayısı/tekrar aralığı değişmez, sadece önüne 1 ısınma eklenir', () => {
+  const findEx = (dayName, exName) => ul.schedule.find(d => d.name === dayName).exercises.find(e => e.name === exName);
+  [
+    ['Lower A', 'Squat', 4, '6-8'],
+    ['Lower A', 'Romanian Deadlift', 3, '8-10'],
+    ['Lower B', 'Hip Thrust', 3, '8-12'],
+    ['Lower B', 'Lying Leg Curl', 4, '10-12'],
+    ['Upper B', 'Seated DB Shoulder Press', 3, '8-12'],
+    ['Upper B', 'Bayesian Cable Curl', 3, '10-15'],
+  ].forEach(([dayName, exName, expectedWorking, expectedReps]) => {
+    const ex = findEx(dayName, exName);
+    assert.ok(ex, exName + ' bulunamadı');
+    assert.strictEqual(ex.setsDef[0].type, 'warmup', exName + ' ısınma seti eksik');
+    const working = ex.setsDef.filter(s => s.type === 'working');
+    assert.strictEqual(working.length, expectedWorking, exName + ' working set sayısı');
+    assert.ok(working.every(s => s.reps === expectedReps), exName + ' working reps korunmamış');
+  });
 });
 
 console.log('== EFFECTIVE_MUSCLE_MAP veri bütünlüğü ==');
@@ -196,18 +223,31 @@ test('addEffectiveSets çalışma zamanında da aynı kası iki kez saymaz (data
 });
 
 console.log('== Gerçek Upper/Lower split üzerinden entegrasyon testi (programWeeklyEntries) ==');
-test('haftalık planlanan effective hacim - quad/glute/hamstring/biceps/triceps (coef=0.5)', () => {
+test('haftalık planlanan effective hacim - quad/glute/hamstring/biceps/triceps (coef=0.5, ısınma setleri dahil)', () => {
+  // Isınma setleri de _woExDetailed'in (Berkay's Split ile AYNI) yerleşik
+  // davranışı gereği ex.sets'e dahil olduğu için direct/indirect sayıları
+  // ısınma eklenen hareketlerde +1 artar (bkz. tests/apply_split_day.test.js
+  // ve bu dosyadaki "ısınma seti eklenen hareketlerde..." testi).
   const r = computePlannedEffectiveMuscleVolume(ul.schedule, 0.5);
-  assert.strictEqual(r.quad.direct, 12); assert.strictEqual(r.quad.indirect, 3); assert.strictEqual(r.quad.effective, 13.5);
-  assert.strictEqual(r.glute.direct, 6); assert.strictEqual(r.glute.indirect, 13); assert.strictEqual(r.glute.effective, 12.5);
-  assert.strictEqual(r.hamstring.direct, 10); assert.strictEqual(r.hamstring.indirect, 0); assert.strictEqual(r.hamstring.effective, 10);
-  assert.strictEqual(r.biceps.direct, 8); assert.strictEqual(r.biceps.indirect, 12); assert.strictEqual(r.biceps.effective, 14);
-  assert.strictEqual(r.triceps.direct, 6); assert.strictEqual(r.triceps.indirect, 10); assert.strictEqual(r.triceps.effective, 11);
+  assert.strictEqual(r.quad.direct, 14); assert.strictEqual(r.quad.indirect, 3); assert.strictEqual(r.quad.effective, 15.5);
+  assert.strictEqual(r.glute.direct, 7); assert.strictEqual(r.glute.indirect, 16); assert.strictEqual(r.glute.effective, 15);
+  assert.strictEqual(r.hamstring.direct, 12); assert.strictEqual(r.hamstring.indirect, 0); assert.strictEqual(r.hamstring.effective, 12);
+  assert.strictEqual(r.biceps.direct, 10); assert.strictEqual(r.biceps.indirect, 14); assert.strictEqual(r.biceps.effective, 17);
+  assert.strictEqual(r.triceps.direct, 6); assert.strictEqual(r.triceps.indirect, 13); assert.strictEqual(r.triceps.effective, 12.5);
+});
+
+test('Upper B\'de Barbell Row yerine Seated Row kullanılıyor ve aynı rhomboid/biceps/rear_delt eşlemesine sahip', () => {
+  const upperB = ul.schedule.find(d => d.name === 'Upper B');
+  assert.ok(upperB.exercises.some(e => e.name === 'Seated Row'));
+  assert.ok(!upperB.exercises.some(e => e.name === 'Barbell Row'));
+  const m = lookupEffectiveMuscleMap('Seated Row');
+  assert.deepStrictEqual(m.primary, ['rhomboid']);
+  assert.deepStrictEqual(m.secondary.sort(), ['biceps', 'rear_delt']);
 });
 
 test('exercises dökümü doğru egzersizleri listeliyor (kas kartına dokunma -> katkı listesi, acceptance #8)', () => {
   const r = computePlannedEffectiveMuscleVolume(ul.schedule, 0.5);
-  assert.strictEqual(r.quad.exercises['Squat'].direct, 4);
+  assert.strictEqual(r.quad.exercises['Squat'].direct, 5);
   assert.strictEqual(r.quad.exercises['Walking Lunge'].indirect, 3);
   assert.ok(!r.quad.exercises['Walking Lunge'].direct || r.quad.exercises['Walking Lunge'].direct === 0);
 });

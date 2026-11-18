@@ -5902,6 +5902,17 @@ function _woExDetailed(name, muscle, warmup, setsDef, restSec, tip){
     reps: setsDef.map(s=>s.reps).join(','),
   };
 }
+// Tek ısınma seti + N adet AYNI tekrar aralığına sahip düz working set
+// üretir (ör. "4x6-8" + 1 ısınma) - working set sayısı/tekrar aralığı
+// AYNEN korunur, sadece önüne hafif yüklü bir ısınma seti eklenir. sets
+// parametresi WORKING set sayısıdır; toplam ex.sets (ısınma dahil) bir
+// fazla olur - bu da _woExDetailed'in (bkz. Berkay's Split) yerleşik
+// davranışıdır, kas hacmi hesaplarında ısınma seti de sayılır.
+function _woWarm(name, muscle, warmupReps, sets, reps, restSec){
+  const setsDef = [{reps:warmupReps, type:'warmup', effort:'warmup'}];
+  for(let i=0;i<sets;i++) setsDef.push({reps, type:'working'});
+  return _woExDetailed(name, muscle, true, setsDef, restSec);
+}
 const POPULAR_SPLITS = [
   {id:'full_body', name:'Full Body', days:3, tagline:'Her antrenmanda tüm vücut — başlangıç/orta seviye için en verimli frekans.',
     schedule:[
@@ -5925,12 +5936,12 @@ const POPULAR_SPLITS = [
     ]},
   {id:'upper_lower', name:'Upper / Lower', days:4, tagline:'Üst/alt vücut ayrımı, haftada 2x tekrar — LOCKIN efektif hacim sistemiyle uyumlu güncel program.',
     schedule:[
-      {name:'Upper A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woEx('Incline Barbell Bench Press','Göğüs (Üst)',4,'6-8',150),_woEx('Pull-Up / Lat Pulldown','Sırt',3,'8-12',120),_woEx('Chest Supported Row','Sırt',3,'8-12',120),_woEx('Cable Fly','Göğüs',3,'10-15',75),_woEx('DB Lateral Raise','Lateral Deltoid',3,'12-15',60),_woEx('Incline DB Curl','Biceps (Uzun Kafa)',3,'10-12',60),_woEx('Overhead Cable Triceps Extension','Triceps (Uzun Kafa)',3,'10-12',60),_woEx('Face Pull','Omuz (Arka)',2,'15-20',60)]},
-      {name:'Lower A',type:'full',day:'Salı',warmup:null,exercises:[_woEx('Squat','Quad · Glute',4,'6-8',150),_woEx('Romanian Deadlift','Hamstring · Glute',3,'8-10',120),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Seated Leg Curl','Hamstring',3,'10-12',75),_woEx('Standing Calf Raise','Gastrocnemius (Baldır)',5,'10-15',60),_woEx('Cable Crunch','Karın',3,'12-15',60)]},
+      {name:'Upper A',type:'full',day:'Pazartesi',warmup:null,exercises:[_woWarm('Incline Barbell Bench Press','Göğüs (Üst)','10',4,'6-8',150),_woWarm('Pull-Up / Lat Pulldown','Sırt','12',3,'8-12',120),_woEx('Chest Supported Row','Sırt',3,'8-12',120),_woEx('Cable Fly','Göğüs',3,'10-15',75),_woWarm('DB Lateral Raise','Lateral Deltoid','15',3,'12-15',60),_woWarm('Incline DB Curl','Biceps (Uzun Kafa)','15',3,'10-12',60),_woEx('Overhead Cable Triceps Extension','Triceps (Uzun Kafa)',3,'10-12',60),_woEx('Face Pull','Omuz (Arka)',2,'15-20',60)]},
+      {name:'Lower A',type:'full',day:'Salı',warmup:null,exercises:[_woWarm('Squat','Quad · Glute','10',4,'6-8',150),_woWarm('Romanian Deadlift','Hamstring · Glute','12',3,'8-10',120),_woEx('Leg Press','Quad',3,'10-12',90),_woEx('Seated Leg Curl','Hamstring',3,'10-12',75),_woWarm('Standing Calf Raise','Gastrocnemius (Baldır)','15',5,'10-15',60),_woEx('Cable Crunch','Karın',3,'12-15',60)]},
       {name:'Dinlenme',type:'rest',day:'Çarşamba',warmup:null,exercises:[]},
-      {name:'Upper B',type:'full',day:'Perşembe',warmup:null,exercises:[_woEx('Incline DB Press','Göğüs',3,'8-12',120),_woEx('Lat Pulldown','Latissimus Dorsi',3,'10-12',90),_woEx('Barbell Row','Sırt',3,'8-10',120),_woEx('Seated DB Shoulder Press','Deltoid (Ön/Yan)',3,'8-12',90),_woEx('Cable Lateral Raise','Lateral Deltoid',5,'12-20',60),_woEx('Reverse Pec Deck','Posterior Deltoid',3,'12-20',60),_woEx('Bayesian Cable Curl','Biceps (Uzun Kafa)',3,'10-15',60),_woEx('Hammer Curl','Brachialis · Biceps',2,'10-12',60),_woEx('Cable Triceps Pushdown','Triceps (Lateral)',3,'10-12',60),_woEx('Shrug','Trapez',3,'12-15',60)]},
+      {name:'Upper B',type:'full',day:'Perşembe',warmup:null,exercises:[_woWarm('Incline DB Press','Göğüs','12',3,'8-12',120),_woWarm('Lat Pulldown','Latissimus Dorsi','15',3,'10-12',90),_woEx('Seated Row','Sırt',3,'8-10',120),_woWarm('Seated DB Shoulder Press','Deltoid (Ön/Yan)','12',3,'8-12',90),_woEx('Cable Lateral Raise','Lateral Deltoid',5,'12-20',60),_woEx('Reverse Pec Deck','Posterior Deltoid',3,'12-20',60),_woWarm('Bayesian Cable Curl','Biceps (Uzun Kafa)','15',3,'10-15',60),_woEx('Hammer Curl','Brachialis · Biceps',2,'10-12',60),_woEx('Cable Triceps Pushdown','Triceps (Lateral)',3,'10-12',60),_woEx('Shrug','Trapez',3,'12-15',60)]},
       {name:'Dinlenme',type:'rest',day:'Cuma',warmup:null,exercises:[]},
-      {name:'Lower B',type:'full',day:'Cumartesi',warmup:null,exercises:[_woEx('Leg Press','Quad',3,'10-12',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',90),_woEx('Hip Thrust','Glute Maximus',3,'8-12',90),_woEx('Lying Leg Curl','Hamstring',4,'10-12',75),_woEx('Leg Extension','Quadriceps',2,'12-15',60),_woEx('Seated Calf Raise','Soleus (Baldır)',5,'12-15',60),_woEx('Reverse Curl','Brachialis',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'12-15',60)]},
+      {name:'Lower B',type:'full',day:'Cumartesi',warmup:null,exercises:[_woWarm('Leg Press','Quad','15',3,'10-12',120),_woEx('Walking Lunge','Glute · Quad',3,'10-12',90),_woWarm('Hip Thrust','Glute Maximus','12',3,'8-12',90),_woWarm('Lying Leg Curl','Hamstring','15',4,'10-12',75),_woEx('Leg Extension','Quadriceps',2,'12-15',60),_woWarm('Seated Calf Raise','Soleus (Baldır)','15',5,'12-15',60),_woEx('Reverse Curl','Brachialis',3,'12-15',60),_woEx('Cable Crunch','Karın',3,'12-15',60)]},
       {name:'Dinlenme',type:'rest',day:'Pazar',warmup:null,exercises:[]},
     ]},
   {id:'bro_split', name:'Bro Split', days:5, tagline:'Her gün ayrı bir kas grubu — bodybuilding\'in en klasik programı.',
@@ -6873,6 +6884,7 @@ const EFFECTIVE_MUSCLE_MAP = {
   'pull up':{primary:['lat'],secondary:['biceps']},
   'lat pulldown':{primary:['lat'],secondary:['biceps']},
   'chest supported row':{primary:['rhomboid'],secondary:['biceps','rear_delt']},
+  'seated row':{primary:['rhomboid'],secondary:['biceps','rear_delt']},
   'barbell row':{primary:['rhomboid'],secondary:['biceps','rear_delt']},
   'seated db shoulder press':{primary:['front_delt'],secondary:['side_delt','triceps']},
   'db lateral raise':{primary:['side_delt'],secondary:[]},
