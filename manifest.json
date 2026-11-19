@@ -1,6 +1,6 @@
 {
-  "name": "Gym Tracker",
-  "short_name": "GymTracker",
+  "name": "LockIn",
+  "short_name": "LockIn",
   "description": "Kişisel fitness ve beslenme takip uygulaması",
   "start_url": "/Gymtracker/gym_tracker.html",
   "display": "standalone",

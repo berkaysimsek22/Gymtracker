@@ -10,11 +10,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="GymTracker">
+  <meta name="apple-mobile-web-app-title" content="LockIn">
   <link rel="apple-touch-icon" href="icon-192.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>GYM TRACKER</title>
+<title>LOCKIN</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -563,8 +563,8 @@ button:active{transform:scale(.97)}
 <div id="authScreen" style="display:none">
   <div class="auth-screen">
     <div class="auth-box">
-      <div class="auth-logo"><img src="icon-512.png" alt="Gym Tracker"><div class="auth-logo-text">GYM TRACKER</div></div>
-      <div class="auth-sub">Kişisel fitness & beslenme takibi</div>
+      <div class="auth-logo"><img src="icon-512.png" alt="LockIn"><div class="auth-logo-text">LOCKIN</div></div>
+      <div class="auth-sub">Your fitness. One place.</div>
       <div class="auth-tabs">
         <button class="auth-tab active" onclick="switchAuthTab('login')">Giriş Yap</button>
         <button class="auth-tab" onclick="switchAuthTab('register')">Kayıt Ol</button>
@@ -3181,7 +3181,7 @@ async function exportAllUsersExcel(){
     wb.SheetNames.unshift(wb.SheetNames.pop());
 
     const today = localDateStr();
-    XLSX.writeFile(wb, `gym-tracker-rapor-${today}.xlsx`);
+    XLSX.writeFile(wb, `lockin-rapor-${today}.xlsx`);
   }catch(e){
     console.error('exportAllUsersExcel error:', e);
     alert('Rapor oluşturulamadı: '+(e.message||e));
@@ -6785,6 +6785,19 @@ const EXDB_TAG_TO_GROUP = {
   front_delt:'front_delt', side_delt:'side_delt', rear_delt:'rear_delt',
   biceps:'biceps', triceps:'triceps', abs:'abs', calves:'calves', forearm:'brachialis'
 };
+// EXDB_TAG_TO_GROUP'un TERSİ - "Çalışan Kaslar" modalinin (computeDayMuscleBreakdown)
+// EXERCISE_DB'de eşi bulunamayan hareketler için classifyExerciseMuscles'tan
+// (ANALYSIS_MUSCLE_GROUPS şeması) dönen grupları kendi EXERCISE_DB şemasına
+// çevirmesi için kullanılır. 'traps' için ayrı bir EXDB etiketi yok, en
+// yakın karşılığı 'mid_back' (bu modalde "Mid Back · Traps" olarak
+// etiketleniyor zaten); 'glute' için 'glute_max' varsayılıyor (fallback'te
+// max/med ayrımı yapacak bilgi yok).
+const GROUP_TO_EXDB_TAG = {
+  pectoral:'chest', lat:'lat', rhomboid:'mid_back', traps:'mid_back',
+  front_delt:'front_delt', side_delt:'side_delt', rear_delt:'rear_delt',
+  biceps:'biceps', triceps:'triceps', brachialis:'forearm',
+  quad:'quad', hamstring:'hamstring', glute:'glute_max', calves:'calves', abs:'abs',
+};
 function classifyExerciseName(name){
   const n=(name||'').toLowerCase().trim();
   const found = EXERCISE_DB.find(e=>e.name.toLowerCase()===n)
@@ -7597,9 +7610,19 @@ function miniBodyIcon(muscleSets){
   return bodyFrontSvg(18, Object.keys(muscleSets||{}));
 }
 
-function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
+function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode, effResult){
   muscleSets = muscleSets || {};
   muscleExercises = muscleExercises || {};
+  // EXERCISE_DB semasindaki (chest/mid_back/glute_max vb.) her aktif kas
+  // id'si icin, EXDB_TAG_TO_GROUP ile ANALYSIS_MUSCLE_GROUPS karsiligini
+  // bulup computeEffectiveMuscleVolume ciktisindan (renderMuscleModalForState
+  // tarafindan hazirlanir) Direct+Indirect*katsayi degerini okuyoruz - "set"
+  // rakami YANINDA, ikincil bir "efektif set" bilgisi olarak gosterilsin diye.
+  const effByTag = {};
+  (activeMuscles||[]).forEach(m=>{
+    const gid = EXDB_TAG_TO_GROUP[m];
+    effByTag[m] = (gid && effResult && effResult[gid]) ? effResult[gid].effective : null;
+  });
   const existing=document.getElementById('muscleVisualModal');
   if(existing)existing.remove();
   const modal=document.createElement('div');
@@ -7665,8 +7688,9 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
   activeMuscles.forEach(m=>{
     const region=REGION_MAP[m]||'Diğer';
     const amt=muscleSets[m]||0;
-    if(!regionAgg[region]) regionAgg[region]={total:0, top:null, topAmt:-1, exercises:new Map()};
+    if(!regionAgg[region]) regionAgg[region]={total:0, effTotal:null, top:null, topAmt:-1, exercises:new Map()};
     regionAgg[region].total+=amt;
+    if(effByTag[m]!==null && effByTag[m]!==undefined) regionAgg[region].effTotal = (regionAgg[region].effTotal||0) + effByTag[m];
     if(amt>regionAgg[region].topAmt){ regionAgg[region].topAmt=amt; regionAgg[region].top=m; }
     if(muscleExercises[m]) muscleExercises[m].forEach((sets,n)=>{
       const cur = regionAgg[region].exercises.get(n) || {sets:0, muscles:new Set()};
@@ -7690,10 +7714,14 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
   // 3 ayri delt) birbirinden cok farkli hacimde olabiliyor ve tek bir
   // "bolge ozeti" bunu gizliyordu. Gunluk gorunum bolge gruplamasinda kaliyor
   // (tek gunde zaten az kas calisiyor, ozet kaybi yok).
-  const buildRowHtml = (titleLabel, subLabel, total, exEntries, rowId) => {
+  const buildRowHtml = (titleLabel, subLabel, total, exEntries, rowId, effTotal) => {
     const color = volColor(total);
     const label = volLabel(total);
     const pct = Math.min(total/20*100, 100);
+    // Effektif set (direct + indirect*katsayı) - ham set sayısının YANINDA
+    // ikincil bilgi olarak gösteriliyor; hesaplanamadıysa (effResult
+    // verilmediyse, ör. tekil egzersiz bilgi penceresi) hiç gösterilmez.
+    const effHtml = (effTotal!==null && effTotal!==undefined) ? ' <span style="color:var(--text-muted);font-weight:400">('+(Math.round(effTotal*10)/10)+' efektif)</span>' : '';
     const exHtml = exEntries.length ? exEntries.map(([n,v])=>{
       const muscleLabel = v.muscles ? [...v.muscles].map(mid=>ISOLATE_LABEL[mid]||mid).join(' · ') : '';
       return '<div style="font-size:11px;color:var(--text-sub);padding:3px 0;display:flex;justify-content:space-between;gap:8px">'
@@ -7706,7 +7734,7 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
       + '<span style="font-size:11px;color:var(--text-muted)">'+subLabel+'</span>'
       + '</div>'
       + '<div class="nut-bar"><div class="nut-bar-fill" style="width:'+Math.round(pct)+'%;background:'+color+'"></div></div>'
-      + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-top:3px">'+label+' · '+total+' set</div>'
+      + '<div style="font-size:10px;color:'+color+';font-weight:600;margin-top:3px">'+label+' · '+total+' set'+effHtml+'</div>'
       + '<div id="'+rowId+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08)">'+exHtml+'</div>'
       + '</div>';
   };
@@ -7715,14 +7743,14 @@ function showMuscleVisual(activeMuscles, muscleSets, muscleExercises, mode){
     const muscleEntries = activeMuscles.map(m=>({m, sets: muscleSets[m]||0})).sort((a,b)=>b.sets-a.sets);
     regionRows = muscleEntries.map(({m,sets},i)=>{
       const exEntries = [...(muscleExercises[m]||new Map()).entries()].map(([n,s])=>[n,{sets:s}]).sort((a,b)=>b[1].sets-a[1].sets);
-      return buildRowHtml(ISOLATE_LABEL[m]||m, REGION_MAP[m]||'Diğer', sets, exEntries, 'muscleRegionEx'+i);
+      return buildRowHtml(ISOLATE_LABEL[m]||m, REGION_MAP[m]||'Diğer', sets, exEntries, 'muscleRegionEx'+i, effByTag[m]);
     }).join('') || '<div class="empty-state" style="padding:8px 0">Egzersiz bulunamadı.</div>';
   } else {
     const regionEntries = Object.entries(regionAgg).sort((a,b)=>b[1].total-a[1].total);
     regionRows = regionEntries.map(([region,info],i)=>{
       const isolateLabel = ISOLATE_LABEL[info.top] || info.top || '';
       const exEntries = [...info.exercises.entries()].sort((a,b)=>b[1].sets-a[1].sets);
-      return buildRowHtml(region, isolateLabel, info.total, exEntries, 'muscleRegionEx'+i);
+      return buildRowHtml(region, isolateLabel, info.total, exEntries, 'muscleRegionEx'+i, info.effTotal);
     }).join('') || '<div class="empty-state" style="padding:8px 0">Egzersiz bulunamadı.</div>';
   }
   const tabsHtml = mode ? '<div style="display:flex;gap:6px;margin-bottom:14px">'
@@ -7775,23 +7803,19 @@ function computeDayMuscleBreakdown(day){
     const found = EXERCISE_DB.find(e=>e.name.toLowerCase()===exName)
       || EXERCISE_DB.find(e=>e.name.toLowerCase().includes(exName) || exName.includes(e.name.toLowerCase()));
     if(found) found.muscles.forEach(m=>add(m, sets, displayName));
-    else if(ex.muscle){
-      // Fallback: map muscle text to muscle IDs
-      const m=ex.muscle.toLowerCase();
-      if(m.includes('glute max')) add('glute_max', sets, displayName);
-      if(m.includes('glute med')) add('glute_med', sets, displayName);
-      if(m.includes('quad')) add('quad', sets, displayName);
-      if(m.includes('hamstring')) add('hamstring', sets, displayName);
-      if(m.includes('chest')||m.includes('pectoral')) add('chest', sets, displayName);
-      if(m.includes('lat')) add('lat', sets, displayName);
-      if(m.includes('mid back')||m.includes('rhomboid')||m.includes('trap')) add('mid_back', sets, displayName);
-      if(m.includes('front delt')||m.includes('anterior')) add('front_delt', sets, displayName);
-      if(m.includes('side delt')||m.includes('lateral delt')) add('side_delt', sets, displayName);
-      if(m.includes('rear delt')||m.includes('posterior')) add('rear_delt', sets, displayName);
-      if(m.includes('bicep')) add('biceps', sets, displayName);
-      if(m.includes('tricep')) add('triceps', sets, displayName);
-      if(m.includes('abs')||m.includes('core')||m.includes('karın')) add('abs', sets, displayName);
-      if(m.includes('calf')||m.includes('baldır')||m.includes('soleus')) add('calves', sets, displayName);
+    else {
+      // Eski fallback SADECE Ingilizce anahtar kelime ariyordu ('chest',
+      // 'bicep' vb.) - program egzersizlerinin cogu Turkce etiket kullandigi
+      // icin ("Göğüs (Üst)", "Sırt", "Omuz" gibi) hic eslesmeyip o kas HİÇ
+      // sayilmiyordu (ör. "Incline Barbell Bench Press" / "Göğüs (Üst)"
+      // göğüse hiç yansımiyordu, sadece Cable Fly'in 3 seti görünüyordu).
+      // classifyExerciseMuscles zaten Turkce+Ingilizce zengin anahtar kelime
+      // motoruna sahip ("Kas Grubu Analizi" ekraninda kullanilan AYNI
+      // fonksiyon) - donen ANALYSIS_MUSCLE_GROUPS id'lerini bu ekranin kendi
+      // EXERCISE_DB semasina (GROUP_TO_EXDB_TAG) cevirip ayni sekilde
+      // ekliyoruz.
+      const groups = classifyExerciseMuscles(ex);
+      groups.forEach(gid=>{ const tag=GROUP_TO_EXDB_TAG[gid]; if(tag) add(tag, sets, displayName); });
     }
   });
   return {muscleSets, muscleExercises};
@@ -7852,7 +7876,12 @@ function switchMuscleModalMode(mode){
 function renderMuscleModalForState(){
   const {prog, di, mode} = _muscleModalState;
   const {muscleSets, muscleExercises} = mode==='day' ? computeDayMuscleBreakdown(prog[di]) : computeWeekMuscleBreakdown(prog);
-  showMuscleVisual(Object.keys(muscleSets), muscleSets, muscleExercises, mode);
+  // "day" modda SADECE o gunun, "week" modda TUM haftanin planlanan
+  // effektif (Direct/Indirect) hacmi - Etkili Haftalık Hacim kartıyla
+  // (İstatistik sekmesi) AYNI ayarlar (katsayı) kullanılır.
+  const effSchedule = mode==='day' ? [prog[di]] : prog;
+  const effResult = computePlannedEffectiveMuscleVolume(effSchedule, getEffectiveVolumeSettings().coef);
+  showMuscleVisual(Object.keys(muscleSets), muscleSets, muscleExercises, mode, effResult);
 }
 
 
@@ -9314,7 +9343,7 @@ async function doResetPassword() {
   document.getElementById('resetForm').remove();
   document.querySelector('.auth-tabs').style.display = 'flex';
   document.getElementById('loginForm').style.display = 'block';
-  document.querySelector('.auth-sub').textContent = 'Kişisel fitness & beslenme takibi';
+  document.querySelector('.auth-sub').textContent = 'Your fitness. One place.';
   showAuthErr('✅ Şifre güncellendi! Şimdi giriş yapabilirsin.');
   document.querySelector('.auth-err').style.color = 'var(--acc)';
   isResettingPassword = false;
