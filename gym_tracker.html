@@ -564,7 +564,7 @@ button:active{transform:scale(.97)}
   <div class="auth-screen">
     <div class="auth-box">
       <div class="auth-logo"><img src="icon-512.png" alt="LockIn"><div class="auth-logo-text">LOCKIN</div></div>
-      <div class="auth-sub">Kişisel fitness & beslenme takibi</div>
+      <div class="auth-sub">Your fitness. One place.</div>
       <div class="auth-tabs">
         <button class="auth-tab active" onclick="switchAuthTab('login')">Giriş Yap</button>
         <button class="auth-tab" onclick="switchAuthTab('register')">Kayıt Ol</button>
@@ -9343,7 +9343,7 @@ async function doResetPassword() {
   document.getElementById('resetForm').remove();
   document.querySelector('.auth-tabs').style.display = 'flex';
   document.getElementById('loginForm').style.display = 'block';
-  document.querySelector('.auth-sub').textContent = 'Kişisel fitness & beslenme takibi';
+  document.querySelector('.auth-sub').textContent = 'Your fitness. One place.';
   showAuthErr('✅ Şifre güncellendi! Şimdi giriş yapabilirsin.');
   document.querySelector('.auth-err').style.color = 'var(--acc)';
   isResettingPassword = false;
