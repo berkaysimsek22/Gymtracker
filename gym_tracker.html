@@ -10,11 +10,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="GymTracker">
+  <meta name="apple-mobile-web-app-title" content="LockIn">
   <link rel="apple-touch-icon" href="icon-192.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>GYM TRACKER</title>
+<title>LOCKIN</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -563,7 +563,7 @@ button:active{transform:scale(.97)}
 <div id="authScreen" style="display:none">
   <div class="auth-screen">
     <div class="auth-box">
-      <div class="auth-logo"><img src="icon-512.png" alt="Gym Tracker"><div class="auth-logo-text">GYM TRACKER</div></div>
+      <div class="auth-logo"><img src="icon-512.png" alt="LockIn"><div class="auth-logo-text">LOCKIN</div></div>
       <div class="auth-sub">Kişisel fitness & beslenme takibi</div>
       <div class="auth-tabs">
         <button class="auth-tab active" onclick="switchAuthTab('login')">Giriş Yap</button>
@@ -3181,7 +3181,7 @@ async function exportAllUsersExcel(){
     wb.SheetNames.unshift(wb.SheetNames.pop());
 
     const today = localDateStr();
-    XLSX.writeFile(wb, `gym-tracker-rapor-${today}.xlsx`);
+    XLSX.writeFile(wb, `lockin-rapor-${today}.xlsx`);
   }catch(e){
     console.error('exportAllUsersExcel error:', e);
     alert('Rapor oluşturulamadı: '+(e.message||e));

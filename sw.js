@@ -1,4 +1,4 @@
-const CACHE = 'gymtracker-v3';
+const CACHE = 'lockin-v1';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
