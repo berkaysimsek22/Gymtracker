@@ -2152,6 +2152,24 @@ async function loadTodayActivityLogs(uid){
   return data||[];
 }
 
+// Araba gösterge paneli gibi yarım daire ("speedometer") ölçer - düz
+// yatay ilerleme çubuklarının yerine, kalori/protein doluluğunu dairesel
+// bir ibre yayı olarak çizer. pct 0-100 aralığına sıkıştırılır (hedefi
+// aşan değerler yayı taşırmaz, sadece tam dolu görünür). valueText arkın
+// İÇİNDEKİ büyük rakam, label arkın altındaki küçük etiket.
+function speedoGauge(pct, color, label, valueText){
+  const clamped = Math.max(0, Math.min(100, pct||0));
+  const r = 42, strokeW = 10;
+  const fullC = Math.PI * r; // yarım çevre
+  const visible = fullC * (clamped/100);
+  return `<svg viewBox="0 0 100 58" width="100%" style="display:block;overflow:visible">
+    <path d="M 8 50 A ${r} ${r} 0 0 1 92 50" fill="none" stroke="var(--surface3)" stroke-width="${strokeW}" stroke-linecap="round"/>
+    <path d="M 8 50 A ${r} ${r} 0 0 1 92 50" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round"
+      stroke-dasharray="${visible.toFixed(1)} ${fullC.toFixed(1)}" style="transition:stroke-dasharray .5s ease"/>
+    <text x="50" y="40" text-anchor="middle" font-family="'Inter',sans-serif" font-size="17" font-weight="700" fill="${color}">${valueText}</text>
+    <text x="50" y="53" text-anchor="middle" font-size="7" letter-spacing="0.5" fill="var(--muted)">${label}</text>
+  </svg>`;
+}
 async function renderDashCalCard(){
   const el = document.getElementById('dashCalCard');
   if(!el) return;
@@ -2223,25 +2241,20 @@ async function renderDashCalCard(){
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Kalori Dengesi</div>
       <button onclick="openActivityModal()" style="background:rgba(232,93,4,.1);border:1px solid rgba(232,93,4,.3);color:var(--acc);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap">+ Aktivite Ekle</button>
     </div>
-    <div style="text-align:center;margin:10px 0 14px">
-      <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:44px;line-height:1;color:${color}">${kalan===null?'—':(kalan>0?'+':'')+kalan}</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">kalan kcal</div>
-      ${caption?`<div style="font-size:11px;color:${color};margin-top:4px;font-weight:600">${caption}</div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px">
+      <div style="text-align:center">
+        ${speedoGauge(kcalPct, color, 'KALORİ', alinan)}
+        <div style="font-size:9px;color:var(--muted);margin-top:-2px">Hedef ${target===null?'—':target} · Kalan ${kalan===null?'—':kalan}</div>
+      </div>
+      <div style="text-align:center">
+        ${speedoGauge(proteinPct, proteinBarColor, 'PROTEİN', proteinAlinan+'g')}
+        <div style="font-size:9px;color:var(--muted);margin-top:-2px">Hedef ${proteinTarget>0?proteinTarget+'g':'—'}</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:8px">
+      ${caption?`<div style="font-size:11px;color:${color};font-weight:600">${caption}</div>`:''}
       ${targetNote}
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
-      <div><div style="font-size:17px;font-weight:700;color:var(--text)">${alinan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Alınan</div></div>
-      <div><div style="font-size:17px;font-weight:700;color:var(--muted)">${target===null?'—':target}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Hedef</div></div>
-      <div><div style="font-size:17px;font-weight:700;color:${color}">${kalan===null?'—':kalan}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Kalan</div></div>
-    </div>
-    ${target?`<div style="margin-top:14px">
-      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Kalori</span><span>${alinan} / ${target}</span></div>
-      <div class="nut-bar"><div class="nut-bar-fill" style="width:${kcalPct}%;background:${color}"></div></div>
-    </div>`:''}
-    ${proteinTarget>0?`<div style="margin-top:10px">
-      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Protein</span><span>${proteinAlinan} / ${proteinTarget}g</span></div>
-      <div class="nut-bar"><div class="nut-bar-fill" style="width:${proteinPct}%;background:${proteinBarColor}"></div></div>
-    </div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
       <div><div style="font-size:15px;font-weight:700;color:var(--text)">${avgProteinDisp}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Ort. Protein</div></div>
       <div><div style="font-size:15px;font-weight:700;color:var(--text)">${avgCarbDisp}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Ort. Karb</div></div>
