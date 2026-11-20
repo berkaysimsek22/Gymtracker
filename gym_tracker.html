@@ -1876,11 +1876,11 @@ async function renderDashboard(){
   if(!p) return;
   renderDashGreeting();
   renderDashMotivation();
-  renderDashTodayCard();
   renderDashMonthBadge();
   renderDashLastWorkout();
   renderDashRestSuggestion();
   await Promise.all([
+    renderDashTodayCard(),
     renderDashCalCard(),
     renderDashWater(),
     renderDashPRCard(),
@@ -2083,7 +2083,7 @@ function dashMuscleRegion(muscleStr){
 // (goToTodayWorkout, degismedi). AMRAP/HIIT/Dinlenme gunleri icin eski
 // basit ozet karti korunuyor (sayisal set listesi o gun tiplerinde anlamli
 // degil).
-function renderDashTodayCard(){
+async function renderDashTodayCard(){
   const el = document.getElementById('dashTodayCard');
   if(!el) return;
   const todayIdx = new Date().getDay()===0?6:new Date().getDay()-1;
@@ -2092,6 +2092,13 @@ function renderDashTodayCard(){
   const uid = activeProfile()?.id;
 
   if(day.type==='full' && day.exercises && day.exercises.length){
+    // Uygulama ilk acildiginda (Antrenman sekmesine hic girilmeden) setCache
+    // bugunun gunu icin HENUZ BOS olabiliyordu - "tamamlandi" kontrolu her
+    // zaman false donup satirlar hic uzeri-cizili gorunmuyordu, Antrenman'a
+    // gidip gelince (orada loadSetsForDay calistigi icin) duzeliyordu.
+    // Burada da ayni yukleme yapilarak Ana Sayfa'nin KENDI BASINA dogru
+    // tamamlanma durumunu gostermesi saglaniyor.
+    if(uid) await loadSetsForDay(uid, todayIdx, day.exercises);
     // Egzersiz egzersiz degil, kas grubu bazinda (reportPrimaryMuscle ile
     // ayni mantik) - toplam set sayisina gore en cok calisandan en aza
     // siralanmis, detaysiz (set/tekrar/egzersiz adi yok) bir liste.
