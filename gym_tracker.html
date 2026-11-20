@@ -2215,7 +2215,7 @@ async function renderDashCalCard(){
   // "Bu Ay" kart yukarida (Merhaba yaninda) tasindigindan, bu iki satir
   // (ort. protein + son kilo) eskiden ayri bir 3'lu istatistik satirindaydi -
   // artik Kalori Dengesi'nin icine tasindi, Ana Sayfa'da tekrarlanmasin diye.
-  const macros = await avgMacrosLast7Days(uid);
+  const macros = await avgMacrosAllTime(uid);
   let lastWeight = p?.weight || null;
   const {data: wData} = await sb.from('weight_logs').select('weight,date').eq('user_id', uid).order('date', {ascending:false}).limit(1);
   if(wData && wData.length) lastWeight = wData[0].weight;
@@ -2261,7 +2261,7 @@ async function renderDashCalCard(){
       <div><div style="font-size:15px;font-weight:700;color:var(--text)">${avgFatDisp}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Ort. Yağ</div></div>
       <div><div style="font-size:15px;font-weight:700;color:var(--text)">${lastWeight?lastWeight+' kg':'—'}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Son Kilo</div></div>
     </div>
-    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:4px">Son 7 günün ortalaması</div>
+    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:4px">Tüm zamanların ortalaması</div>
     ${actList}
   </div>`;
 }
@@ -3030,7 +3030,7 @@ async function renderProfile(p) {
 // ve Beslenme sayfasindaki compact pill rozeti ayni kilo/hedef-kalori/ort.kalori
 // verisini kullaniyor - tekrar hesaplamamak icin ortak fonksiyon.
 async function computeHeaderStats(p){
-  const macros = await avgMacrosLast7Days(p.id);
+  const macros = await avgMacrosAllTime(p.id);
   const goalKcal = computeGoalCalorieTarget(p);
   return { weight: p.weight||null, targetWeight: p.target_weight||null, avgKcal: macros.kcal, goalKcal };
 }
@@ -3249,21 +3249,25 @@ async function exportAllUsersExcel(){
   }
 }
 
-// Son 7 gunun (gercekten yemek girilmis gunlerin) ortalama kcal/protein/
-// karbonhidrat/yag alimini TEK sorguda hesaplar. Eskiden avgKcalLast7Days
-// ve avgProteinLast7Days AYRI sorgu atiyordu VE farkli bir "gun sayildi mi"
+// Kullanicinin BESLENME GIRISI YAPTIGI GUN SAYISI 7'den az oldugunda
+// "son 7 gun" penceresi cogu zaman bos kaliyor, "Ort. Protein" hep "—"
+// gosteriyordu - kullanici bunun yerine EN BASTAN BERI girilen tum
+// gunlerin ortalamasini istedi. Artik tarih araligi sinirlanmiyor,
+// kullanicinin nutrition_logs'ta kayitli HER gunu (gercekten yemek
+// girilmis olanlar) taraniyor.
+//
+// Gercekten yemek girilmis gunlerin ortalama kcal/protein/karbonhidrat/
+// yag alimini TEK sorguda hesaplar. Eskiden avgKcalLast7Days ve
+// avgProteinLast7Days AYRI sorgu atiyordu VE farkli bir "gun sayildi mi"
 // esigi kullaniyordu (biri dayKcal>0, digeri dayProtein>0) - bir gunde
 // kcal'li ama proteinsiz bir besin varsa (ör. sadece meyve/yag) o gun
-// kcal ortalamasina giriyor ama protein ortalamasindan hep DUSUYORDU; eger
-// son 7 gunde boyle tek bir kayit varsa protein ortalamasi hep "—"
-// gosteriyordu. Artik TEK esik (dayKcal>0) kullaniliyor, dort makro da
-// ayni gunler uzerinden tutarli hesaplaniyor.
-async function avgMacrosLast7Days(userId){
+// kcal ortalamasina giriyor ama protein ortalamasindan hep DUSUYORDU.
+// Artik TEK esik (dayKcal>0) kullaniliyor, dort makro da ayni gunler
+// uzerinden tutarli hesaplaniyor.
+async function avgMacrosAllTime(userId){
   const empty = {kcal:null, protein:null, carb:null, fat:null};
-  const end = new Date(); const start = new Date(); start.setDate(end.getDate()-6);
-  const {data, error} = await sb.from('nutrition_logs').select('data')
-    .eq('user_id', userId).gte('date', localDateStr(start)).lte('date', localDateStr(end));
-  if(error){ console.error('avgMacrosLast7Days error:', error); return empty; }
+  const {data, error} = await sb.from('nutrition_logs').select('data').eq('user_id', userId);
+  if(error){ console.error('avgMacrosAllTime error:', error); return empty; }
   let kcalSum=0, proteinSum=0, carbSum=0, fatSum=0, days=0;
   (data||[]).forEach(row=>{
     let dayKcal=0, dayProtein=0, dayCarb=0, dayFat=0;

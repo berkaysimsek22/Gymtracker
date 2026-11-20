@@ -1,4 +1,4 @@
-// Birim testi: avgMacrosLast7Days - Ana Sayfa'daki "Ort. Protein/Karb/Yağ"
+// Birim testi: avgMacrosAllTime - Ana Sayfa'daki "Ort. Protein/Karb/Yağ"
 // hesaplaması. Eskiden kcal ve protein AYRI fonksiyonlarda, FARKLI bir "gün
 // sayıldı mı" eşiğiyle hesaplanıyordu (biri dayKcal>0, diğeri dayProtein>0) -
 // bir günde proteinsiz (ör. sadece meyve) bir şey yenmişse o gün kcal
@@ -48,22 +48,27 @@ function extractFunction(name) {
 }
 const parts = [
   extractFunction('localDateStr'),
-  extractFunction('avgMacrosLast7Days'),
+  extractFunction('avgMacrosAllTime'),
 ].join('\n');
 
 function makeSandbox(rows) {
+  // Gerçek Supabase query builder'ı gibi "thenable" - zincirin HANGİ
+  // metotla bitirildiğine bakılmaksızın (select/eq/gte/lte...) await
+  // edildiğinde {data, error} ile çözülür.
   const sb = {
     from(table) {
-      return {
-        select() { return this; },
-        eq() { return this; },
-        gte() { return this; },
-        lte() { return Promise.resolve({ data: rows, error: null }); },
+      const qb = {
+        select() { return qb; },
+        eq() { return qb; },
+        gte() { return qb; },
+        lte() { return qb; },
+        then(resolve, reject) { return Promise.resolve({ data: rows, error: null }).then(resolve, reject); },
       };
+      return qb;
     },
   };
   const sandbox = { sb, console };
-  new Function('exports', 'sb', parts + '\nexports.avgMacrosLast7Days = avgMacrosLast7Days;')(sandbox, sb);
+  new Function('exports', 'sb', parts + '\nexports.avgMacrosAllTime = avgMacrosAllTime;')(sandbox, sb);
   return sandbox;
 }
 
@@ -79,16 +84,16 @@ async function test(name, fn) {
 }
 
 (async () => {
-  console.log('== avgMacrosLast7Days ==');
+  console.log('== avgMacrosAllTime ==');
 
-  await test('3 gün gerçek veri, boş günler yok sayılır (kullanıcı 7 günün sadece 3\'ünde yemiş)', async () => {
+  await test('3 günün gerçek verisinin ortalaması doğru hesaplanır (tarih aralığı sınırı yok, tüm kayıtlı günler taranır)', async () => {
     const rows = [
       mealRow([{ kcal: 2000, protein: 150, carb: 200, fat: 60 }]),
       mealRow([{ kcal: 1800, protein: 140, carb: 180, fat: 55 }]),
       mealRow([{ kcal: 2200, protein: 160, carb: 220, fat: 65 }]),
     ];
-    const { avgMacrosLast7Days } = makeSandbox(rows);
-    const r = await avgMacrosLast7Days('u1');
+    const { avgMacrosAllTime } = makeSandbox(rows);
+    const r = await avgMacrosAllTime('u1');
     assert.strictEqual(r.kcal, 2000);
     assert.strictEqual(r.protein, 150);
     assert.strictEqual(r.carb, 200);
@@ -100,16 +105,16 @@ async function test(name, fn) {
       mealRow([{ kcal: 2000, protein: 150, carb: 200, fat: 60 }]),
       mealRow([{ kcal: 95, protein: 0, carb: 25, fat: 0 }]), // ör. sadece bir elma
     ];
-    const { avgMacrosLast7Days } = makeSandbox(rows);
-    const r = await avgMacrosLast7Days('u1');
+    const { avgMacrosAllTime } = makeSandbox(rows);
+    const r = await avgMacrosAllTime('u1');
     assert.notStrictEqual(r.protein, null, 'protein "—" (null) olmamalı');
     assert.strictEqual(r.protein, 75); // (150+0)/2
     assert.strictEqual(r.kcal, Math.round((2000 + 95) / 2));
   });
 
   await test('hiç gün yoksa (gerçekten boşsa) hepsi null döner', async () => {
-    const { avgMacrosLast7Days } = makeSandbox([]);
-    const r = await avgMacrosLast7Days('u1');
+    const { avgMacrosAllTime } = makeSandbox([]);
+    const r = await avgMacrosAllTime('u1');
     assert.deepStrictEqual(r, { kcal: null, protein: null, carb: null, fat: null });
   });
 
@@ -118,8 +123,8 @@ async function test(name, fn) {
       mealRow([{ kcal: 2000, protein: 150, carb: 200, fat: 60 }]),
       { data: { meals: [] } }, // kayıt var ama hiç yemek yok
     ];
-    const { avgMacrosLast7Days } = makeSandbox(rows);
-    const r = await avgMacrosLast7Days('u1');
+    const { avgMacrosAllTime } = makeSandbox(rows);
+    const r = await avgMacrosAllTime('u1');
     assert.strictEqual(r.kcal, 2000);
   });
 
