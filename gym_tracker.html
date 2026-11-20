@@ -2197,11 +2197,13 @@ async function renderDashCalCard(){
   // "Bu Ay" kart yukarida (Merhaba yaninda) tasindigindan, bu iki satir
   // (ort. protein + son kilo) eskiden ayri bir 3'lu istatistik satirindaydi -
   // artik Kalori Dengesi'nin icine tasindi, Ana Sayfa'da tekrarlanmasin diye.
-  const avgProtein = await avgProteinLast7Days(uid);
+  const macros = await avgMacrosLast7Days(uid);
   let lastWeight = p?.weight || null;
   const {data: wData} = await sb.from('weight_logs').select('weight,date').eq('user_id', uid).order('date', {ascending:false}).limit(1);
   if(wData && wData.length) lastWeight = wData[0].weight;
-  const avgProteinDisp = avgProtein!==null ? `${avgProtein}g` : '—';
+  const avgProteinDisp = macros.protein!==null ? `${macros.protein}g` : '—';
+  const avgCarbDisp = macros.carb!==null ? `${macros.carb}g` : '—';
+  const avgFatDisp = macros.fat!==null ? `${macros.fat}g` : '—';
   const activities = await loadTodayActivityLogs(uid);
   const actList = activities.length ? '<div style="margin-top:12px">' + activities.map(a=>{
     const isAuto = a.activity_type==='workout_auto'||a.activity_type==='workout_auto_edited';
@@ -2240,10 +2242,13 @@ async function renderDashCalCard(){
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px"><span>Protein</span><span>${proteinAlinan} / ${proteinTarget}g</span></div>
       <div class="nut-bar"><div class="nut-bar-fill" style="width:${proteinPct}%;background:${proteinBarColor}"></div></div>
     </div>`:''}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
-      <div><div style="font-size:17px;font-weight:700;color:var(--text)">${avgProteinDisp}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ort. Protein (7g)</div></div>
-      <div><div style="font-size:17px;font-weight:700;color:var(--text)">${lastWeight?lastWeight+' kg':'—'}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Son Kilo</div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center;margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">
+      <div><div style="font-size:15px;font-weight:700;color:var(--text)">${avgProteinDisp}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Ort. Protein</div></div>
+      <div><div style="font-size:15px;font-weight:700;color:var(--text)">${avgCarbDisp}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Ort. Karb</div></div>
+      <div><div style="font-size:15px;font-weight:700;color:var(--text)">${avgFatDisp}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Ort. Yağ</div></div>
+      <div><div style="font-size:15px;font-weight:700;color:var(--text)">${lastWeight?lastWeight+' kg':'—'}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Son Kilo</div></div>
     </div>
+    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:4px">Son 7 günün ortalaması</div>
     ${actList}
   </div>`;
 }
@@ -3012,9 +3017,9 @@ async function renderProfile(p) {
 // ve Beslenme sayfasindaki compact pill rozeti ayni kilo/hedef-kalori/ort.kalori
 // verisini kullaniyor - tekrar hesaplamamak icin ortak fonksiyon.
 async function computeHeaderStats(p){
-  const avg = await avgKcalLast7Days(p.id);
+  const macros = await avgMacrosLast7Days(p.id);
   const goalKcal = computeGoalCalorieTarget(p);
-  return { weight: p.weight||null, targetWeight: p.target_weight||null, avgKcal: avg, goalKcal };
+  return { weight: p.weight||null, targetWeight: p.target_weight||null, avgKcal: macros.kcal, goalKcal };
 }
 
 function renderDashSummaryLine(stats){
@@ -3231,33 +3236,35 @@ async function exportAllUsersExcel(){
   }
 }
 
-// Son 7 gunun (kayit girilmis olanlarin) ortalama kalori alimini hesaplar
-async function avgKcalLast7Days(userId){
+// Son 7 gunun (gercekten yemek girilmis gunlerin) ortalama kcal/protein/
+// karbonhidrat/yag alimini TEK sorguda hesaplar. Eskiden avgKcalLast7Days
+// ve avgProteinLast7Days AYRI sorgu atiyordu VE farkli bir "gun sayildi mi"
+// esigi kullaniyordu (biri dayKcal>0, digeri dayProtein>0) - bir gunde
+// kcal'li ama proteinsiz bir besin varsa (ör. sadece meyve/yag) o gun
+// kcal ortalamasina giriyor ama protein ortalamasindan hep DUSUYORDU; eger
+// son 7 gunde boyle tek bir kayit varsa protein ortalamasi hep "—"
+// gosteriyordu. Artik TEK esik (dayKcal>0) kullaniliyor, dort makro da
+// ayni gunler uzerinden tutarli hesaplaniyor.
+async function avgMacrosLast7Days(userId){
+  const empty = {kcal:null, protein:null, carb:null, fat:null};
   const end = new Date(); const start = new Date(); start.setDate(end.getDate()-6);
   const {data, error} = await sb.from('nutrition_logs').select('data')
     .eq('user_id', userId).gte('date', localDateStr(start)).lte('date', localDateStr(end));
-  if(error){ console.error('avgKcalLast7Days error:', error); return null; }
-  let total=0, days=0;
+  if(error){ console.error('avgMacrosLast7Days error:', error); return empty; }
+  let kcalSum=0, proteinSum=0, carbSum=0, fatSum=0, days=0;
   (data||[]).forEach(row=>{
-    let dayKcal=0;
-    (row.data?.meals||[]).forEach(m=>(m.foods||[]).forEach(f=>dayKcal+=parseFloat(f.kcal||0)));
-    if(dayKcal>0){ total+=dayKcal; days++; }
+    let dayKcal=0, dayProtein=0, dayCarb=0, dayFat=0;
+    (row.data?.meals||[]).forEach(m=>(m.foods||[]).forEach(f=>{
+      dayKcal+=parseFloat(f.kcal||0); dayProtein+=parseFloat(f.protein||0);
+      dayCarb+=parseFloat(f.carb||0); dayFat+=parseFloat(f.fat||0);
+    }));
+    if(dayKcal>0){ kcalSum+=dayKcal; proteinSum+=dayProtein; carbSum+=dayCarb; fatSum+=dayFat; days++; }
   });
-  return days ? Math.round(total/days) : null;
-}
-
-async function avgProteinLast7Days(userId){
-  const end = new Date(); const start = new Date(); start.setDate(end.getDate()-6);
-  const {data, error} = await sb.from('nutrition_logs').select('data')
-    .eq('user_id', userId).gte('date', localDateStr(start)).lte('date', localDateStr(end));
-  if(error){ console.error('avgProteinLast7Days error:', error); return null; }
-  let total=0, days=0;
-  (data||[]).forEach(row=>{
-    let dayProtein=0;
-    (row.data?.meals||[]).forEach(m=>(m.foods||[]).forEach(f=>dayProtein+=parseFloat(f.protein||0)));
-    if(dayProtein>0){ total+=dayProtein; days++; }
-  });
-  return days ? Math.round(total/days) : null;
+  if(!days) return empty;
+  return {
+    kcal: Math.round(kcalSum/days), protein: Math.round(proteinSum/days),
+    carb: Math.round(carbSum/days), fat: Math.round(fatSum/days),
+  };
 }
 
 function renderDayTabs(){} // removed
