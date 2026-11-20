@@ -1,0 +1,13 @@
+-- "Çalıştığım hareketin son ağırlığını göster, o gün o slotta duran ESKİ
+-- hareketin ağırlığını değil" talebi için: her workout_sets satırına hangi
+-- egzersize ait olduğunu (ismen) de kaydediyoruz. Program değişirse (split
+-- değişimi, hareket takası - ör. "Barbell Row" yerine "Seated Row", sıra
+-- değişimi) aynı (day_index, exercise_index) slotunda artık FARKLI bir
+-- egzersiz görünebiliyordu; uygulama eskiden slotun eski ağırlığını yeni
+-- egzersize aitmiş gibi gösteriyordu. Artık yüklerken exercise_name
+-- karşılaştırılıyor; uyuşmuyorsa o slot boş başlatılıyor.
+--
+-- Zorunlu değil (nullable) - bu script çalıştırılmadan da uygulama eskisi
+-- gibi çalışmaya devam eder (yeni özellik sadece pasif kalır), ama
+-- çalıştırmadan "o hareketin kendi son ağırlığı" düzeltmesi aktif olmaz.
+ALTER TABLE workout_sets ADD COLUMN IF NOT EXISTS exercise_name text;

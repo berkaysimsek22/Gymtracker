@@ -1104,7 +1104,18 @@ async function loadSessionLogs(userId) {
   sessionCache = data || [];
 }
 
-async function loadSetsForDay(userId, dayIdx) {
+// workout_sets satırının taşıdığı exercise_name, bugün o (day_index,
+// exercise_index) slotunda GERÇEKTEN duran egzersizle uyuşmuyorsa true -
+// program değişmiş (reorder, split değişimi, hareket takası) ve o satırın
+// ağırlığı/tekrarı ARTIK BAŞKA bir egzersize ait demektir. exercise_name
+// NULL ise (migration öncesi eski satır) uyuşmazlık VARSAYILMAZ - geriye
+// dönük davranış korunur, sadece script/workout-sets-exercise-name-column.sql
+// çalıştırıldıktan SONRA yazılan satırlar için aktif olur.
+function isWorkoutSetRowStale(row, dayExercises){
+  const currentExName = dayExercises && dayExercises[row.exercise_index] ? dayExercises[row.exercise_index].name : null;
+  return !!(row.exercise_name && currentExName && row.exercise_name !== currentExName);
+}
+async function loadSetsForDay(userId, dayIdx, dayExercises) {
   const {data} = await sb.from('workout_sets').select('*').eq('user_id', userId).eq('day_index', storageDayIndex(userId, dayIdx));
   // Get this week's Monday at 00:00
   const now = new Date();
@@ -1134,7 +1145,20 @@ async function loadSetsForDay(userId, dayIdx) {
     // Only show done if viewing current week
     const isDone = row.done === true && isCurrentWeek;
     if(row.done === true && doneAt && !isCurrentWeek) staleIds.push(row.id);
-    setCache[k] = {weight: row.weight, reps: row.reps, note: row.note, done: isDone, done_at: row.done_at, rir: row.rir, db_id: row.id};
+    // Bu slot (day_index+exercise_index) GECMISTE baska bir egzersize aitti
+    // ve program o slotu BASKA bir egzersizle degistirdiyse (reorder, split
+    // degisimi, "Barbell Row -> Seated Row" gibi bir takas vb.) - row.weight/
+    // reps/done ARTIK O FARKLI egzersize ait, bugun ekranda gosterilen
+    // egzersize degil. exercise_name sutunu (bkz. scripts/workout-sets-
+    // exercise-name-column.sql) bu uyusmazligi tespit edip eski degerleri
+    // GOSTERMEDEN bu slotu bos baslatir - kullanicinin "son antrenman
+    // gunundeki agirligi degil, bu hareketin kendi son agirligini goster"
+    // talebinin karsiligi. db_id KORUNUR: sonraki kayit bu satiri yeni
+    // egzersizin verisiyle (ve dogru exercise_name ile) dogal olarak devralir.
+    const exerciseMismatch = isWorkoutSetRowStale(row, dayExercises);
+    setCache[k] = exerciseMismatch
+      ? {weight: null, reps: null, note: null, done: false, done_at: null, rir: null, db_id: row.id}
+      : {weight: row.weight, reps: row.reps, note: row.note, done: isDone, done_at: row.done_at, rir: row.rir, db_id: row.id, exercise_name: row.exercise_name};
   });
   if(staleIds.length){
     sb.from('workout_sets').update({done:false, done_at:null}).in('id', staleIds)
@@ -1256,6 +1280,12 @@ async function saveProgram(userId) {
 // deneniyor, hala basarisizsa false donuyor ki finishDay gunu YANLIŞLIKLA
 // "tamamlandi" olarak isaretlemesin.
 let lastSetSaveError = null;
+// scripts/workout-sets-exercise-name-column.sql henuz calistirilmadiysa
+// 'exercise_name' sutunu DB'de yok - asagidaki yazim bunu tespit edip bir
+// kere isaretler, bu oturumun geri kalaninda o alan hic gonderilmez (aksi
+// halde HER set kaydi "Could not find the 'exercise_name' column" hatasiyla
+// sessizce basarisiz olurdu - 'ts' alaninda yasanmis AYNI bug sinifi).
+let _skipExerciseNameColumn = false;
 async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
   try {
     const storeDi = storageDayIndex(userId, parseInt(dayIdx));
@@ -1273,6 +1303,7 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
     // olustugu icin, ayni setler HER SEFERINDE, hicbir onceki fix'ten sonra
     // bile duzelmeden basarisiz oluyordu.
     const {db_id, ts, ...cacheable} = setCache[k];
+    if(_skipExerciseNameColumn) delete cacheable.exercise_name;
     const row = {user_id: userId, day_index: storeDi, exercise_index: parseInt(exIdx), set_index: parseInt(setIdx), ...cacheable};
     let writeError = null, writtenRow = null;
     if(setCache[k].db_id) {
@@ -1317,7 +1348,13 @@ async function performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt=1) {
       writtenRow = res.data;
       if(res.data) setCache[k].db_id = res.data.id;
     }
-    if(writeError) throw writeError;
+    if(writeError){
+      if(!_skipExerciseNameColumn && /exercise_name/i.test(writeError.message||'') && /column/i.test(writeError.message||'')){
+        _skipExerciseNameColumn = true;
+        return performSetSave(userId, dayIdx, exIdx, setIdx, k, attempt);
+      }
+      throw writeError;
+    }
     // Hicbir hata yok AMA hicbir satir da donmediyse (ör. RLS sessizce
     // engelledi) bunu BASARISIZLIK say - sessizce "basarili" donup veriyi
     // kaybettirmek yerine yeniden denesin/sonunda kullaniciya gorunur hata versin.
@@ -1808,7 +1845,11 @@ async function _syncAutoWorkoutKcalImpl(uid){
   if(autoRows.length) await sb.from('activity_logs').delete().in('id', autoRows.map(a=>a.id));
   await sb.from('activity_logs').insert({user_id:uid, date:todayStr(), activity_type:'workout_auto', duration_min:durationMin, kcal_burned:kcal});
 }
-async function editAutoWorkoutKcal(id, currentKcal){
+async function editAutoWorkoutKcal(id, currentKcal, currentDuration){
+  const vDur = prompt('Antrenman süresini düzenle (dakika):', Math.round(currentDuration));
+  if(vDur===null) return;
+  const duration = parseFloat(vDur);
+  if(!duration || duration<0){ alert('Geçerli bir süre değeri gir.'); return; }
   const v = prompt('Antrenman kalorisini düzenle (kcal):', Math.round(currentKcal));
   if(v===null) return;
   const kcal = parseFloat(v);
@@ -1816,7 +1857,7 @@ async function editAutoWorkoutKcal(id, currentKcal){
   const {data: row} = await sb.from('activity_logs').select('*').eq('id', id).single();
   if(!row) return;
   await sb.from('activity_logs').delete().eq('id', id);
-  await sb.from('activity_logs').insert({user_id:row.user_id, date:row.date, activity_type:'workout_auto_edited', duration_min:row.duration_min, kcal_burned:kcal});
+  await sb.from('activity_logs').insert({user_id:row.user_id, date:row.date, activity_type:'workout_auto_edited', duration_min:duration, kcal_burned:kcal});
   renderDashCalCard();
 }
 
@@ -2169,7 +2210,7 @@ async function renderDashCalCard(){
       <div style="font-size:12px">${ACTIVITY_ICONS[a.activity_type]||'🏃'} ${label} · ${a.duration_min} dk</div>
       <div style="display:flex;align-items:center;gap:10px">
         <div style="font-size:12px;color:var(--text-muted)">${Math.round(a.kcal_burned)} kcal</div>
-        ${isAuto?`<button onclick="editAutoWorkoutKcal('${a.id}',${parseFloat(a.kcal_burned)})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✏️</button>`:''}
+        ${isAuto?`<button onclick="editAutoWorkoutKcal('${a.id}',${parseFloat(a.kcal_burned)},${parseFloat(a.duration_min)})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✏️</button>`:''}
         <button onclick="deleteActivityLog('${a.id}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:2px">✕</button>
       </div>
     </div>`;
@@ -3243,7 +3284,7 @@ async function renderDayContent(di, skipFetch) {
   if(!uid) return;
 
   // Load sets for this day
-  if(!skipFetch) await loadSetsForDay(uid, di);
+  if(!skipFetch) await loadSetsForDay(uid, di, day.exercises);
 
   const overrideBadge = isOverride ? '<span style="font-size:9px;padding:3px 8px;border-radius:8px;background:rgba(56,182,255,.15);color:var(--acc3);border:1px solid rgba(56,182,255,.3);white-space:nowrap">📌 Bugüne özel</span>' : '';
   const dayMenuBtn = canEdit() ? `<button class="btn btn-outline btn-sm" onclick="showDayMenu(${di},this)" title="Gün seçenekleri">⋯</button>` : '';
@@ -3538,7 +3579,16 @@ function buildExCard(ex, di, ei, prevSets) {
   card.id = `ec_${di}_${ei}`;
   let setRows = '';
   for(let s=0;s<ex.sets;s++){
-    const k=`${uid}_${di}_${ei}_${s}`,sd=setCache[k]||{},isDone=weekOffset===0&&!!sd.done;
+    const k=`${uid}_${di}_${ei}_${s}`;
+    // setCache[k] her zaman GERCEK bir nesne olarak tutulur (sd=...||{} ile
+    // sadece OKUMA icin gecici bir kopya degil) - bu sette ileride bir
+    // kaydetme (agirlik/tekrar/tamamlandi) tetiklenirse, o kaydin HANGI
+    // egzersize ait oldugunu (exercise_name) da tasisin diye. loadSetsForDay
+    // bu alani, programda o slotta ARTIK FARKLI bir egzersiz varsa eski
+    // agirlik/tekrarin yanlislikla gosterilmemesi icin kullanir (bkz. orada).
+    if(!setCache[k]) setCache[k]={};
+    setCache[k].exercise_name = ex.name;
+    const sd=setCache[k], isDone=weekOffset===0&&!!sd.done;
     // setsDef varsa (bkz. _woExDetailed) her setin kendi hedef tekrar
     // sayisi/turu/efor yuzdesi burada okunuyor; yoksa eski davranis
     // (tum setler icin ayni "reps" araligi) korunuyor.
