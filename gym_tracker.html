@@ -777,6 +777,7 @@ button:active{transform:scale(.97)}
 
     <div id="profileEditCard" class="bq-frame-sm"></div>
     <div id="weightLogCard" class="bq-frame-sm"></div>
+    <div id="nutritionProgramCard" class="bq-frame-sm"></div>
     <div id="adminReportCard" class="bq-frame-sm"></div>
     <div id="autoProgCard" class="bq-frame-sm"></div>
     <div id="deleteProfileCard" class="bq-frame-sm"></div>
@@ -3093,6 +3094,103 @@ function computeGoalCalorieTarget(p){
     return Math.max(maint - dailyAdj, floor);
   }
   return maint + dailyAdj;
+}
+
+// ── BESLENME PROGRAMI SİHİRBAZI (MacroFactor tarzı) ──
+// Profil sekmesindeki "Beslenme Programı" bölümü için - yukarıdaki tek
+// adımlık "Otomatik Hesapla" (calcMacros/computeGoalCalorieTarget) kaba
+// tahmininin YANINDA, kullanıcının hedef hızını/diyet tipini/kalori
+// tabanını/antrenman tipini/protein tercihini kendisinin seçtiği, adım
+// adım bir akış. Hesaplama sonuçları profiles.nutrition_program'a
+// (scripts/profiles-nutrition-program-column.sql) kaydedilir.
+const NUTRITION_GOAL_RATES = {
+  slow:     {id:'slow',     label:'Yavaş',    pctBW:0.25},
+  standard: {id:'standard', label:'Standart', pctBW:0.5},
+  fast:     {id:'fast',     label:'Hızlı',    pctBW:0.75},
+};
+// carbPct/fatPct/proteinPct toplamı her diyet tipinde 1.0 - ama gercek
+// hesaplamada protein ayrica (g/kg tercihinden) belirlendigi icin, kalan
+// kaloriyi karb/yag arasinda bolerken SADECE carbPct/fatPct birbirine
+// oranlanir (asagidaki computeNutritionProgram'da fatShare/carbShare),
+// proteinPct sadece bilgilendirme/etiket amaclidir.
+const NUTRITION_DIET_TYPES = {
+  balanced: {id:'balanced', label:'Balanced', carbPct:0.45, fatPct:0.30, proteinPct:0.25},
+  low_fat:  {id:'low_fat',  label:'Low-fat',  carbPct:0.55, fatPct:0.20, proteinPct:0.25},
+  low_carb: {id:'low_carb', label:'Low-carb', carbPct:0.25, fatPct:0.40, proteinPct:0.35},
+  keto:     {id:'keto',     label:'Keto',     carbPct:0.05, fatPct:0.60, proteinPct:0.35},
+};
+const NUTRITION_CALORIE_FLOORS = {
+  standard: {id:'standard', label:'Standard Floor', female:1200, male:1500},
+  low:      {id:'low',      label:'Low Floor',      female:1000, male:1200},
+};
+const NUTRITION_TRAINING_TYPES = {
+  none:    {id:'none',    label:'None/Relaxed',  pal:1.2},
+  lifting: {id:'lifting', label:'Lifting',       pal:1.55},
+  cardio:  {id:'cardio',  label:'Cardio',        pal:1.5},
+  both:    {id:'both',    label:'Cardio & Lifting', pal:1.65},
+};
+const NUTRITION_PROTEIN_PREFS = {
+  low:        {id:'low',        label:'Low',        gPerKg:1.6},
+  moderate:   {id:'moderate',   label:'Moderate',   gPerKg:2.0},
+  high:       {id:'high',       label:'High',       gPerKg:2.2},
+  extra_high: {id:'extra_high', label:'Extra High', gPerKg:2.5},
+};
+// p: {age,height,weight,gender} gerekli. choices: {targetWeight,
+// goalRateId, dietTypeId, calorieFloorId, trainingTypeId, proteinPrefId}.
+// Eksik profil bilgisiyle null doner (BMR hesaplanamaz).
+function computeNutritionProgram(p, choices){
+  if(!p || !p.age || !p.height || !p.weight || !p.gender) return null;
+  choices = choices || {};
+  const bmr = p.gender==='female'
+    ? 10*p.weight + 6.25*p.height - 5*p.age - 161
+    : 10*p.weight + 6.25*p.height - 5*p.age + 5;
+  const trainingType = NUTRITION_TRAINING_TYPES[choices.trainingTypeId] || NUTRITION_TRAINING_TYPES.none;
+  const tdee = bmr * trainingType.pal;
+
+  const targetWeight = (choices.targetWeight!=null && !isNaN(choices.targetWeight)) ? choices.targetWeight : p.weight;
+  const diffKg = targetWeight - p.weight;
+  // Fark cok kucukse (<0.1kg) yon/hiz anlamli degil - dogrudan koruma.
+  const isMaintain = Math.abs(diffKg) < 0.1;
+  const direction = isMaintain ? 'maintain' : (diffKg < 0 ? 'cut' : 'bulk');
+
+  const goalRate = NUTRITION_GOAL_RATES[choices.goalRateId] || NUTRITION_GOAL_RATES.standard;
+  const weeklyChangeKg = isMaintain ? 0 : p.weight * (goalRate.pctBW/100);
+  // 7700 kcal ~= 1 kg yag (yaygin kabul gören yaklasik deger).
+  const dailyKcalDiff = isMaintain ? 0 : (weeklyChangeKg * 7700 / 7) * (direction==='cut' ? -1 : 1);
+
+  const floorCfg = NUTRITION_CALORIE_FLOORS[choices.calorieFloorId] || NUTRITION_CALORIE_FLOORS.standard;
+  const floorKcal = p.gender==='female' ? floorCfg.female : floorCfg.male;
+  const preFloorKcal = tdee + dailyKcalDiff;
+  const kcal = Math.round(Math.max(preFloorKcal, floorKcal));
+  const floorApplied = preFloorKcal < floorKcal;
+
+  const proteinPref = NUTRITION_PROTEIN_PREFS[choices.proteinPrefId] || NUTRITION_PROTEIN_PREFS.moderate;
+  const protein = Math.round(p.weight * proteinPref.gPerKg);
+  const remainingKcal = Math.max(0, kcal - protein*4);
+
+  const dietType = NUTRITION_DIET_TYPES[choices.dietTypeId] || NUTRITION_DIET_TYPES.balanced;
+  const fatCarbTotalPct = dietType.fatPct + dietType.carbPct;
+  const fatShare = fatCarbTotalPct>0 ? dietType.fatPct/fatCarbTotalPct : 0;
+  const carbShare = fatCarbTotalPct>0 ? dietType.carbPct/fatCarbTotalPct : 0;
+  const fat = Math.round((remainingKcal*fatShare)/9);
+  const carb = Math.round((remainingKcal*carbShare)/4);
+
+  let totalWeeks = null, estEndDate = null;
+  if(!isMaintain && weeklyChangeKg>0){
+    totalWeeks = Math.abs(diffKg)/weeklyChangeKg;
+    const end = new Date(); end.setDate(end.getDate() + Math.round(totalWeeks*7));
+    estEndDate = localDateStr(end);
+  }
+
+  return {
+    kcal, protein, fat, carb, direction,
+    targetWeight,
+    weeklyChangeKg: Math.round(weeklyChangeKg*100)/100,
+    totalWeeks: totalWeeks!==null ? Math.round(totalWeeks*10)/10 : null,
+    estEndDate,
+    bmr: Math.round(bmr), tdee: Math.round(tdee),
+    floorApplied, floorKcal,
+  };
 }
 
 // ── TUM UYELER EXCEL RAPORU ──
@@ -8510,6 +8608,7 @@ function renderProfileScreen(){
   renderProfileHeader(p);
   renderProfileEditCard(p);
   renderWeightLogCard(p);
+  renderNutritionProgramCard(p);
   renderAdminReportCard();
   renderAutoProgCard(p);
   renderDeleteProfileCard(p);
@@ -8625,6 +8724,240 @@ async function renderProfileHeader(p){
     const {count} = await sb.from('session_logs').select('id', {count:'exact', head:true}).eq('user_id', p.id);
     statsEl.innerHTML = `Bu ay <b style="color:var(--acc)">${monthCount}</b> antrenman &nbsp;·&nbsp; Toplam <b style="color:var(--acc)">${count||0}</b> antrenman`;
   }
+}
+
+// ── BESLENME PROGRAMI KARTI + SİHİRBAZI (Profil sekmesi) ──
+function renderNutritionProgramCard(p){
+  const el = document.getElementById('nutritionProgramCard');
+  if(!el || !p) return;
+  const prog = p.nutrition_program;
+  if(!prog){
+    el.innerHTML = `<div class="prof-section">
+      <h3>🥗 Beslenme Programı</h3>
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px;line-height:1.6">Boy/kilo/hedef kilonu kullanarak kişisel bir kalori ve makro planı oluştur - hedef hızını, diyet tipini ve antrenman tipini kendin seç.</div>
+      <button class="btn btn-acc" style="width:100%" onclick="startNutritionProgramWizard()">+ Yeni Program Oluştur</button>
+    </div>`;
+    return;
+  }
+  const dirLabel = prog.direction==='cut'?'📉 Kilo Kaybı':prog.direction==='bulk'?'📈 Kilo Kazanımı':'⚖️ Koruma';
+  const endLine = prog.estEndDate ? ` · Tahmini bitiş ${fmtShortDate(new Date(prog.estEndDate))}` : '';
+  el.innerHTML = `<div class="prof-section">
+    <h3>🥗 Beslenme Programı</h3>
+    <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px">${dirLabel} · ${p.weight} kg → ${prog.targetWeight} kg${endLine}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;text-align:center;margin-bottom:12px">
+      <div><div style="font-size:15px;font-weight:700;color:var(--acc)">${prog.kcal}</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Kcal</div></div>
+      <div><div style="font-size:15px;font-weight:700;color:#ef4444">${prog.protein}g</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Protein</div></div>
+      <div><div style="font-size:15px;font-weight:700;color:#f59e0b">${prog.fat}g</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Yağ</div></div>
+      <div><div style="font-size:15px;font-weight:700;color:#22c55e">${prog.carb}g</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Karb</div></div>
+    </div>
+    <button class="btn btn-outline" style="width:100%" onclick="startNutritionProgramWizard()">🔁 Yeni Program Oluştur</button>
+  </div>`;
+}
+
+const NUTRITION_WIZARD_STEPS = 7;
+let _nutProgWizard = null; // {step, targetWeight, goalRateId, dietTypeId, calorieFloorId, trainingTypeId, proteinPrefId}
+function startNutritionProgramWizard(){
+  const p = activeProfile();
+  if(!p) return;
+  if(!p.age || !p.height || !p.weight || !p.gender){
+    alert('Önce yukarıdaki "Kişisel Bilgiler" bölümünden yaş/boy/kilo/cinsiyet bilgilerini doldurup kaydet.');
+    return;
+  }
+  _nutProgWizard = {
+    step: 1,
+    targetWeight: p.target_weight || p.weight,
+    goalRateId: 'standard',
+    dietTypeId: 'balanced',
+    calorieFloorId: 'standard',
+    trainingTypeId: 'lifting',
+    proteinPrefId: 'moderate',
+  };
+  renderNutProgWizard();
+}
+function closeNutProgWizard(){
+  document.getElementById('nutProgWizardModal')?.remove();
+  _nutProgWizard = null;
+}
+function nutProgWizardNext(){ if(_nutProgWizard && _nutProgWizard.step<NUTRITION_WIZARD_STEPS){ _nutProgWizard.step++; renderNutProgWizard(); } }
+function nutProgWizardBack(){ if(_nutProgWizard && _nutProgWizard.step>1){ _nutProgWizard.step--; renderNutProgWizard(); } }
+function nutProgSetField(field, val){
+  if(!_nutProgWizard) return;
+  _nutProgWizard[field] = val;
+  renderNutProgWizard();
+}
+function nutWizOptionBtn(active, onclick, html){
+  return `<button class="goal-btn${active?' active':''}" style="width:100%;text-align:left;margin-bottom:8px;display:block" onclick="${onclick}">${html}</button>`;
+}
+function stepTargetWeightHtml(p, w){
+  const diff = w.targetWeight - p.weight;
+  const isMaintain = Math.abs(diff) < 0.1;
+  const dirLabel = isMaintain ? '⚖️ Koruma (Maintain)' : diff<0 ? '📉 Kilo Kaybı (Cut)' : '📈 Kilo Kazanımı (Bulk)';
+  const dirColor = isMaintain ? 'var(--muted)' : diff<0 ? '#ef4444' : '#34d399';
+  return `<div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px">Mevcut kilon: <b style="color:var(--text)">${p.weight} kg</b></div>
+    <input class="prof-input" type="number" step="0.5" value="${w.targetWeight}" style="text-align:center;font-size:22px;font-weight:700"
+      onchange="nutProgSetField('targetWeight', parseFloat(this.value)||${p.weight})">
+    <div style="text-align:center;margin-top:14px;font-size:13px;font-weight:600;color:${dirColor}">${dirLabel}${!isMaintain?' · '+Math.abs(Math.round(diff*10)/10)+' kg':''}</div>
+  </div>`;
+}
+function stepGoalRateHtml(p, w){
+  const rows = Object.values(NUTRITION_GOAL_RATES).map(r=>{
+    const preview = computeNutritionProgram(p, {...w, goalRateId:r.id});
+    const weeklyKg = Math.round(p.weight*(r.pctBW/100)*100)/100;
+    const endTxt = preview?.estEndDate ? ' · bitiş ~'+fmtShortDate(new Date(preview.estEndDate)) : '';
+    return nutWizOptionBtn(w.goalRateId===r.id, `nutProgSetField('goalRateId','${r.id}')`, `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div><div style="font-weight:700">${r.label}</div><div style="font-size:11px;opacity:.75">%${r.pctBW} BW/hafta · ~${weeklyKg} kg/hafta</div></div>
+        <div style="text-align:right;flex-shrink:0"><div style="font-weight:700;color:#e85d04">${preview?preview.kcal:'—'} kcal</div><div style="font-size:9px;opacity:.7">${endTxt}</div></div>
+      </div>`);
+  }).join('');
+  return `<div>${rows}</div>`;
+}
+function stepDietTypeHtml(p, w){
+  const rows = Object.values(NUTRITION_DIET_TYPES).map(d=>{
+    const preview = computeNutritionProgram(p, {...w, dietTypeId:d.id});
+    return nutWizOptionBtn(w.dietTypeId===d.id, `nutProgSetField('dietTypeId','${d.id}')`, `
+      <div style="font-weight:700">${d.label}</div>
+      <div style="font-size:11px;opacity:.75">Karb %${Math.round(d.carbPct*100)} · Yağ %${Math.round(d.fatPct*100)} · Protein %${Math.round(d.proteinPct*100)}</div>
+      ${preview?`<div style="font-size:11px;margin-top:4px;color:#e85d04">${preview.carb}g karb · ${preview.fat}g yağ</div>`:''}`);
+  }).join('');
+  return `<div>${rows}</div>`;
+}
+function stepCalorieFloorHtml(p, w){
+  const rows = Object.values(NUTRITION_CALORIE_FLOORS).map(f=>{
+    const floorVal = p.gender==='female' ? f.female : f.male;
+    return nutWizOptionBtn(w.calorieFloorId===f.id, `nutProgSetField('calorieFloorId','${f.id}')`, `
+      <div style="font-weight:700">${f.label}</div>
+      <div style="font-size:11px;opacity:.75">Minimum ${floorVal} kcal (${p.gender==='female'?'kadın':'erkek'})</div>`);
+  }).join('');
+  return `<div>${rows}</div>`;
+}
+function stepTrainingTypeHtml(p, w){
+  const rows = Object.values(NUTRITION_TRAINING_TYPES).map(t=>{
+    const preview = computeNutritionProgram(p, {...w, trainingTypeId:t.id});
+    return nutWizOptionBtn(w.trainingTypeId===t.id, `nutProgSetField('trainingTypeId','${t.id}')`, `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div><div style="font-weight:700">${t.label}</div><div style="font-size:11px;opacity:.75">PAL ${t.pal}</div></div>
+        <div style="font-weight:700;color:#e85d04;flex-shrink:0">${preview?preview.kcal:'—'} kcal</div>
+      </div>`);
+  }).join('');
+  return `<div>${rows}</div>`;
+}
+function stepProteinPrefHtml(p, w){
+  const rows = Object.values(NUTRITION_PROTEIN_PREFS).map(pp=>{
+    const preview = computeNutritionProgram(p, {...w, proteinPrefId:pp.id});
+    return nutWizOptionBtn(w.proteinPrefId===pp.id, `nutProgSetField('proteinPrefId','${pp.id}')`, `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div><div style="font-weight:700">${pp.label}</div><div style="font-size:11px;opacity:.75">${pp.gPerKg} g/kg</div></div>
+        <div style="font-weight:700;color:#ef4444;flex-shrink:0">${preview?preview.protein+'g':'—'}</div>
+      </div>`);
+  }).join('');
+  return `<div>${rows}</div>`;
+}
+function stepSummaryHtml(p, w, result){
+  if(!result) return '<div class="empty-state">Hesaplanamadı - profil bilgilerini kontrol et.</div>';
+  const weekDays = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+  const weekRow = weekDays.map(d=>`<div style="text-align:center">
+    <div style="font-size:9px;color:var(--muted);margin-bottom:4px">${d}</div>
+    <div style="background:rgba(56,182,255,.15);border:1px solid rgba(56,182,255,.35);color:var(--acc3);border-radius:8px;padding:6px 2px;font-size:11px;font-weight:700">${result.kcal}</div>
+  </div>`).join('');
+  const dirLabel = result.direction==='cut'?'Kilo Kaybı':result.direction==='bulk'?'Kilo Kazanımı':'Koruma';
+  const endLine = result.estEndDate ? `Tahmini bitiş: <b>${fmtShortDate(new Date(result.estEndDate))}</b> (~${result.totalWeeks} hafta)` : 'Zaten hedef kiloya yakınsın';
+  const floorNote = result.floorApplied ? `<div style="font-size:11px;color:#eab308;margin-top:6px">⚠️ Hesaplanan açık seçtiğin kalori tabanının altına düşüyordu - taban (${result.floorKcal} kcal) uygulandı.</div>` : '';
+  const goalRateLabel = NUTRITION_GOAL_RATES[w.goalRateId].label;
+  const dietLabel = NUTRITION_DIET_TYPES[w.dietTypeId].label;
+  const palVal = NUTRITION_TRAINING_TYPES[w.trainingTypeId].pal;
+  const gPerKg = NUTRITION_PROTEIN_PREFS[w.proteinPrefId].gPerKg;
+  return `<div>
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text-sub)">${dirLabel} · ${p.weight} kg → ${w.targetWeight} kg</div>
+      <div style="font-size:12px;color:var(--text-sub);margin-top:2px">${endLine}</div>
+      ${floorNote}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:14px">${weekRow}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#ef4444">${result.protein}g</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Protein</div>
+      </div>
+      <div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#f59e0b">${result.fat}g</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Yağ</div>
+      </div>
+      <div style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:18px;font-weight:700;color:#22c55e">${result.carb}g</div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px">Karb</div>
+      </div>
+    </div>
+    <ol style="font-size:11px;color:var(--text-sub);line-height:1.8;padding-left:18px;margin:0">
+      <li>BMR (Mifflin-St Jeor): <b>${result.bmr}</b> kcal</li>
+      <li>TDEE (BMR × PAL ${palVal}): <b>${result.tdee}</b> kcal</li>
+      <li>Haftalık hedef değişim (${goalRateLabel}): <b>${result.weeklyChangeKg}</b> kg</li>
+      <li>Günlük kalori hedefi: <b>${result.kcal}</b> kcal</li>
+      <li>Protein: ${p.weight} kg × ${gPerKg} g/kg = <b>${result.protein}</b>g</li>
+      <li>Kalan kalori ${dietLabel} oranına göre karb/yağa bölündü</li>
+    </ol>
+  </div>`;
+}
+function renderNutProgWizard(){
+  const p = activeProfile();
+  if(!p || !_nutProgWizard) return;
+  const w = _nutProgWizard;
+  const result = computeNutritionProgram(p, w);
+  document.getElementById('nutProgWizardModal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'nutProgWizardModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:700;padding:16px;overflow-y:auto';
+  const stepLabels = ['Hedef Kilo','Hedef Hız','Diyet Tipi','Kalori Tabanı','Antrenman Tipi','Protein Tercihi','Program Özeti'];
+  const stepDots = Array.from({length:NUTRITION_WIZARD_STEPS},(_,i)=>`<div style="width:${i+1===w.step?'18px':'6px'};height:6px;border-radius:3px;background:${i+1<=w.step?'#e85d04':'#333'};transition:width .2s"></div>`).join('');
+  let bodyHtml;
+  if(w.step===1) bodyHtml = stepTargetWeightHtml(p,w);
+  else if(w.step===2) bodyHtml = stepGoalRateHtml(p,w);
+  else if(w.step===3) bodyHtml = stepDietTypeHtml(p,w);
+  else if(w.step===4) bodyHtml = stepCalorieFloorHtml(p,w);
+  else if(w.step===5) bodyHtml = stepTrainingTypeHtml(p,w);
+  else if(w.step===6) bodyHtml = stepProteinPrefHtml(p,w);
+  else bodyHtml = stepSummaryHtml(p,w,result);
+  const backBtn = w.step>1 ? `<button class="btn btn-outline" style="flex:1" onclick="nutProgWizardBack()">‹ Geri</button>` : '';
+  const nextLabel = w.step===NUTRITION_WIZARD_STEPS ? '✅ Programı Kaydet' : 'İleri ›';
+  const nextAction = w.step===NUTRITION_WIZARD_STEPS ? 'finishNutProgWizard()' : 'nutProgWizardNext()';
+  modal.innerHTML = `<div style="background:#141414;border:1px solid rgba(232,93,4,.25);border-radius:16px;padding:22px;max-width:420px;width:100%;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:18px">🥗 Beslenme Programı</h3>
+      <button onclick="closeNutProgWizard()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Adım ${w.step} / ${NUTRITION_WIZARD_STEPS} — ${stepLabels[w.step-1]}</div>
+    <div style="display:flex;gap:4px;justify-content:center;margin-bottom:16px">${stepDots}</div>
+    ${bodyHtml}
+    <div style="display:flex;gap:8px;margin-top:18px">
+      ${backBtn}
+      <button class="btn btn-acc" style="flex:2" onclick="${nextAction}">${nextLabel}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+async function finishNutProgWizard(){
+  const p = activeProfile();
+  if(!p || !_nutProgWizard) return;
+  const result = computeNutritionProgram(p, _nutProgWizard);
+  if(!result){ alert('Hesaplanamadı, profil bilgilerini kontrol et.'); return; }
+  const program = {..._nutProgWizard, ...result, createdAt: new Date().toISOString()};
+  const {error} = await sb.from('profiles').update({nutrition_program: program}).eq('id', p.id);
+  if(error){ alert('Kaydedilemedi: '+error.message); return; }
+  p.nutrition_program = program;
+  const idx = allProfiles.findIndex(x=>x.id===p.id);
+  if(idx>=0) allProfiles[idx] = {...allProfiles[idx], nutrition_program: program};
+  // Gunluk beslenme hedeflerine de uygula - mevcut "Otomatik Hesapla" (calcMacros) ile AYNI mekanizma.
+  const nd = await loadNutrition(p.id, todayStr());
+  nd.targets = {kcal:result.kcal, protein:result.protein, carb:result.carb, fat:result.fat};
+  saveNutrition(p.id, todayStr());
+  closeNutProgWizard();
+  renderNutritionProgramCard(p);
+  const t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid rgba(232,93,4,.3);border-radius:12px;padding:12px 20px;z-index:500;font-size:13px;color:#e85d04;white-space:nowrap';
+  t.textContent='✅ Beslenme programı oluşturuldu!';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2500);
 }
 
 function renderProfileEditCard(p){
