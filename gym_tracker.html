@@ -1167,6 +1167,21 @@ async function loadSetsForDay(userId, dayIdx, dayExercises) {
   }
 }
 
+// Yeni bir beslenme gunu ("Beslenme" sekmesinde o gune hic kayit yoksa)
+// bos baslamak yerine 4 varsayilan ogunle (MacroFactor tarzi: Kahvaltı/
+// Öğle Yemeği/Atıştırmalıklar/Akşam Yemeği) acilsin - kullanici her gun
+// once "+ Öğün Ekle"ye tiklayip ogunu kendi adlandirmak zorunda kalmasin,
+// dogrudan ilgili ogune besin eklesin. Hepsi ACIK baslar (henuz hic besin
+// yok, kapatmanin loadNutrition'daki "uzun liste ekrani kaplamasin"
+// gerekcesi burada gecerli degil).
+function defaultMealSlots(){
+  return [
+    {name:'Kahvaltı', time:'08:00', foods:[], open:true},
+    {name:'Öğle Yemeği', time:'13:00', foods:[], open:true},
+    {name:'Atıştırmalıklar', time:'16:00', foods:[], open:true},
+    {name:'Akşam Yemeği', time:'19:00', foods:[], open:true},
+  ];
+}
 async function loadNutrition(userId, date) {
   const k = `${userId}_${date}`;
   if(nutCache[k]) return nutCache[k];
@@ -1191,8 +1206,11 @@ async function loadNutrition(userId, date) {
   } else {
     // Yeni gun: gunluk hedef makrolari sifirdan (2000/150/200/70) baslatmak yerine
     // kullanicinin en son girdigi hedeflerden devam ettir - her gun tekrar girmek
-    // zorunda kalinmasin.
-    nd = {meals:[], water:0, note:'', targets: await lastKnownTargets(userId, date)};
+    // zorunda kalinmasin. Ogunler de BOS baslamak yerine 4 varsayilan ogunle
+    // (Kahvaltı/Öğle Yemeği/Atıştırmalıklar/Akşam Yemeği) hazir geliyor -
+    // kullanici "+ Öğün Ekle"ye once tiklamak zorunda kalmadan dogrudan
+    // ilgili ogune besin ekleyebilsin diye.
+    nd = {meals:defaultMealSlots(), water:0, note:'', targets: await lastKnownTargets(userId, date)};
     nd._dbId = null;
   }
   nutCache[k] = nd;
