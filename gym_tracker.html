@@ -3073,14 +3073,26 @@ function estimateMaintenanceKcal(p){
   return Math.round(bmr * (actMap[p.activity] || 1.4));
 }
 
-// Hedef kiloya makul/saglikli bir hizla (haftada ~0.5 kg) ulasmak icin gereken gunluk kalori
+// Hedef kiloya makul/saglikli bir hizla (haftada ~0.5 kg) ulasmak icin gereken gunluk kalori.
+// Bakim kalorisi zaten dusuk olan biri icin (kisa boy/ileri yas/sedanter
+// aktivite - ör. 155cm/57 yas/72kg/sedanter -> bakim ~1491 kcal) sabit
+// 550 kcal'lik acik, hedefi saglıksız derecede dusuk bir seviyeye
+// (ör. 941 kcal) indirebiliyordu - bu seviyede protein+yag hedefleri TEK
+// BASINA toplam kaloriyi asip karbonhidrati her zaman sifira dusuruyordu
+// (kullanicinin "0 carb neden?" sorusunun kok sebebi). Kilo verirken
+// genel kabul goren, profesyonel gozetim olmadan altina inilmemesi
+// onerilen bir taban (kadin icin 1200, erkek icin 1500 kcal) uygulaniyor.
 function computeGoalCalorieTarget(p){
   const maint = estimateMaintenanceKcal(p);
   if(maint===null || !p.weight || !p.target_weight) return null;
   const diff = p.target_weight - p.weight;
   if(Math.abs(diff) < 0.5) return maint;
   const dailyAdj = 550; // ~0.5 kg/hafta yag degisimi icin gereken gunluk kalori farki
-  return diff < 0 ? maint - dailyAdj : maint + dailyAdj;
+  if(diff < 0){
+    const floor = p.gender==='female' ? 1200 : 1500;
+    return Math.max(maint - dailyAdj, floor);
+  }
+  return maint + dailyAdj;
 }
 
 // ── TUM UYELER EXCEL RAPORU ──
