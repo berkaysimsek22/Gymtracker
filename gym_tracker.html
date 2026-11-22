@@ -1522,6 +1522,7 @@ function showMainApp() {
   renderDashboard();
   restoreLastScreen();
   startQuoteRotation();
+  maybeShowOnboarding();
 }
 
 function renderAdminTabs() {
@@ -8978,6 +8979,205 @@ async function finishNutProgWizard(){
   setTimeout(()=>t.remove(),2500);
 }
 
+// ===== Hoş Geldin Onboarding (tek ekran) =====
+// MacroFactor tarzı "her soru ayrı ekran" akışının yorucu bulunması üzerine
+// bütün sorular TEK bir kaydırılabilir ekranda toplanıyor. Zorunlu alanlar
+// (cinsiyet/yaş/boy/kilo) BMR hesaplaması için şart; geri kalanı opsiyonel
+// profil zenginleştirme - boş bırakılıp geçilebilir.
+const ONBOARD_ACTIVITY_OPTIONS = [
+  {id:'sedentary', label:'Hareketsiz', sub:'Masa başı iş'},
+  {id:'light', label:'Hafif Aktif', sub:'Haftada 1-2 gün'},
+  {id:'moderate', label:'Orta Aktif', sub:'Haftada 3-4 gün'},
+  {id:'active', label:'Çok Aktif', sub:'Haftada 5+ gün'},
+];
+const ONBOARD_LEVEL_OPTIONS = [
+  {id:'none', label:'Yok', sub:'Yeni başlıyorum'},
+  {id:'beginner', label:'Başlangıç', sub:'0-1 yıl'},
+  {id:'intermediate', label:'Orta', sub:'1-3 yıl'},
+  {id:'advanced', label:'İleri', sub:'3+ yıl'},
+];
+const ONBOARD_EXERCISE_FREQ_OPTIONS = [
+  {id:'0', label:'0 seans', sub:'/hafta'},
+  {id:'1-3', label:'1-3 seans', sub:'/hafta'},
+  {id:'4-6', label:'4-6 seans', sub:'/hafta'},
+  {id:'7+', label:'7+ seans', sub:'/hafta'},
+];
+const ONBOARD_BODY_FAT_OPTIONS = ['3-4','5-7','8-12','13-17','18-23','24-29','30-34','35-39','40+','bilmiyorum'];
+const ONBOARD_WEIGHT_TREND_OPTIONS = [
+  {id:'losing', label:'↓ Kilo Veriyorum'},
+  {id:'gaining', label:'↑ Kilo Alıyorum'},
+  {id:'stable', label:'— Sabit'},
+  {id:'unsure', label:'? Emin Değilim'},
+];
+const ONBOARD_WEIGHT_HISTORY_OPTIONS = [
+  {id:'yes', label:'Evet'},
+  {id:'no', label:'Hayır'},
+  {id:'unsure', label:'Emin Değilim'},
+];
+const ONBOARD_ATHLETIC_OPTIONS = [
+  {id:'regular', label:'Düzenli Egzersiz Yapıyorum'},
+  {id:'athlete', label:'Sporcuyum'},
+  {id:'pro', label:'Profesyonel Sporcuyum'},
+];
+
+// Onboarding ekranindaki yeni alanlar icin migration (scripts/profile-
+// onboarding-fields-column.sql) henuz calistirilmamissa 'column not found'
+// hatasi TUM profil kaydini basarisiz kilardi (exercise_name/'ts' alanlarinda
+// yasanan hatayla ayni sinif) - bu kolonlari cikarip bir kez daha deniyoruz.
+const ONBOARD_NEW_COLUMNS = ['exercise_frequency','body_fat_range','weight_trend','weight_history','athletic_level'];
+async function updateProfileSafe(id, fields){
+  let {error} = await sb.from('profiles').update(fields).eq('id', id);
+  if(error && /column/i.test(error.message||'')){
+    const stripped = {...fields};
+    ONBOARD_NEW_COLUMNS.forEach(c=>{ delete stripped[c]; });
+    ({error} = await sb.from('profiles').update(stripped).eq('id', id));
+  }
+  return {error};
+}
+
+let _onboardState = null;
+
+function isOnboardingNeeded(p){
+  return !!p && !(p.gender && p.age && p.height && p.weight);
+}
+
+function maybeShowOnboarding(){
+  if(!isOnboardingNeeded(currentProfile)) return;
+  _onboardState = {
+    gender: currentProfile.gender || '',
+    age: currentProfile.age || '',
+    height: currentProfile.height || '',
+    weight: currentProfile.weight || '',
+    activity: currentProfile.activity || '',
+    level: currentProfile.level || '',
+    exercise_frequency: currentProfile.exercise_frequency || '',
+    body_fat_range: currentProfile.body_fat_range || '',
+    weight_trend: currentProfile.weight_trend || '',
+    weight_history: currentProfile.weight_history || '',
+    athletic_level: currentProfile.athletic_level || '',
+  };
+  renderOnboardingModal();
+}
+function onboardSetField(field, val){
+  if(!_onboardState) return;
+  _onboardState[field] = val;
+  renderOnboardingModal();
+}
+function closeOnboardingModal(){
+  document.getElementById('onboardModal')?.remove();
+  _onboardState = null;
+}
+function onboardOptionGrid(options, selectedId, field, cols){
+  cols = cols || 2;
+  return `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px">
+    ${options.map(o=>`<button class="goal-btn${selectedId===o.id?' active':''}" onclick="onboardSetField('${field}','${o.id}')">
+      <div style="font-weight:700">${o.label}</div>
+      ${o.sub?`<div style="font-size:10px;opacity:.7">${o.sub}</div>`:''}
+    </button>`).join('')}
+  </div>`;
+}
+function renderOnboardingModal(){
+  if(!_onboardState) return;
+  const s = _onboardState;
+  const p = currentProfile;
+  document.getElementById('onboardModal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'onboardModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding:0;overflow-y:auto';
+  const bodyFatGrid = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+    ${ONBOARD_BODY_FAT_OPTIONS.map(v=>`<button class="goal-btn${s.body_fat_range===v?' active':''}" style="padding:8px 4px;font-size:10px" onclick="onboardSetField('body_fat_range','${v}')">${v==='bilmiyorum'?'Bilmiyorum':'%'+v}</button>`).join('')}
+  </div>`;
+  modal.innerHTML = `<div style="background:var(--bg);width:100%;max-width:480px;min-height:100%;padding:28px 18px 110px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">
+      <div>
+        <div style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:-.3px;color:var(--acc)">LockIn'e Hoş Geldin${p?.name?', '+p.name:''}!</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.5">Sana özel antrenman ve beslenme deneyimini oluşturmak için birkaç bilgiye ihtiyacımız var.</div>
+      </div>
+      <button onclick="closeOnboardingModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;flex-shrink:0;padding:4px">✕</button>
+    </div>
+
+    <div class="prof-section" style="margin-top:18px">
+      <h3>👤 Temel Bilgiler <span style="color:var(--acc2)">*</span></h3>
+      ${onboardOptionGrid([{id:'female',label:'Kadın'},{id:'male',label:'Erkek'}], s.gender, 'gender', 2)}
+      <div class="prof-row" style="margin-top:10px">
+        <div class="prof-field"><label>Yaş</label>
+          <input class="prof-input" type="number" value="${s.age}" placeholder="25" oninput="onboardSetField('age', parseInt(this.value)||'')"></div>
+        <div class="prof-field"><label>Boy (cm)</label>
+          <input class="prof-input" type="number" value="${s.height}" placeholder="170" oninput="onboardSetField('height', parseFloat(this.value)||'')"></div>
+      </div>
+      <div class="prof-field"><label>Kilo (kg)</label>
+        <input class="prof-input" type="number" step="0.1" value="${s.weight}" placeholder="70" oninput="onboardSetField('weight', parseFloat(this.value)||'')"></div>
+    </div>
+
+    <div class="prof-section" style="margin-top:14px">
+      <h3>🏃 Aktivite Seviyesi</h3>
+      ${onboardOptionGrid(ONBOARD_ACTIVITY_OPTIONS, s.activity, 'activity', 2)}
+    </div>
+
+    <div class="prof-section" style="margin-top:14px">
+      <h3>🏋️ Antrenman Deneyimi</h3>
+      ${onboardOptionGrid(ONBOARD_LEVEL_OPTIONS, s.level, 'level', 2)}
+    </div>
+
+    <div class="prof-section" style="margin-top:14px">
+      <h3>📅 Ne Sıklıkla Egzersiz Yapıyorsun?</h3>
+      ${onboardOptionGrid(ONBOARD_EXERCISE_FREQ_OPTIONS, s.exercise_frequency, 'exercise_frequency', 2)}
+    </div>
+
+    <div class="prof-section" style="margin-top:14px">
+      <h3>📊 Vücut Yağ Oranın Yaklaşık Kaç?</h3>
+      ${bodyFatGrid}
+    </div>
+
+    <div class="prof-section" style="margin-top:14px">
+      <h3>⚖️ Kilon Son Zamanlarda Nasıl Değişiyor?</h3>
+      ${onboardOptionGrid(ONBOARD_WEIGHT_TREND_OPTIONS, s.weight_trend, 'weight_trend', 2)}
+    </div>
+
+    <div class="prof-section" style="margin-top:14px">
+      <h3>📈 Şu Anki Kilondan Belirgin Derecede Fazla Tarttığın Oldu mu?</h3>
+      ${onboardOptionGrid(ONBOARD_WEIGHT_HISTORY_OPTIONS, s.weight_history, 'weight_history', 3)}
+    </div>
+
+    <div class="prof-section" style="margin-top:14px">
+      <h3>🏆 Sportif Düzeyini En İyi Hangisi Anlatır?</h3>
+      ${onboardOptionGrid(ONBOARD_ATHLETIC_OPTIONS, s.athletic_level, 'athletic_level', 1)}
+    </div>
+
+    <div style="position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;padding:14px 18px;background:var(--bg);border-top:1px solid var(--border)">
+      <button class="btn btn-acc" style="width:100%" onclick="finishOnboarding()">Kaydet ve Başla</button>
+      <button onclick="closeOnboardingModal()" style="display:block;width:100%;text-align:center;background:none;border:none;color:var(--text-muted);font-size:11px;margin-top:8px;cursor:pointer">Şimdilik geç</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+async function finishOnboarding(){
+  const s = _onboardState;
+  if(!s) return;
+  if(!s.gender || !s.age || !s.height || !s.weight){
+    alert('Devam etmek için cinsiyet, yaş, boy ve kilo bilgilerini doldur.');
+    return;
+  }
+  const p = currentProfile;
+  if(!p) return;
+  Object.assign(p, s);
+  const {error} = await updateProfileSafe(p.id, {
+    gender: s.gender, age: s.age, height: s.height, weight: s.weight,
+    activity: s.activity || null, level: s.level || null,
+    exercise_frequency: s.exercise_frequency || null,
+    body_fat_range: s.body_fat_range || null,
+    weight_trend: s.weight_trend || null,
+    weight_history: s.weight_history || null,
+    athletic_level: s.athletic_level || null,
+  });
+  if(error){ alert('Kaydedilemedi: '+error.message); return; }
+  if(s.weight) await saveWeightLog(p.id, s.weight, localDateStr());
+  const idx = allProfiles.findIndex(x=>x.id===p.id);
+  if(idx>=0) allProfiles[idx] = {...allProfiles[idx], ...s};
+  closeOnboardingModal();
+  renderAll();
+}
+
 function renderProfileEditCard(p){
   const el = document.getElementById('profileEditCard');
   if(!el) return;
@@ -9015,6 +9215,7 @@ function renderProfileEditCard(p){
     </div>
     <div class="prof-field"><label>Antrenman Deneyimi</label>
       <select class="prof-input" id="pf_level">
+        <option value="none" ${(p.level||'')==='none'?'selected':''}>Yok (Yeni başlıyorum)</option>
         <option value="beginner" ${(p.level||'')==='beginner'?'selected':''}>Başlangıç (0-1 yıl)</option>
         <option value="intermediate" ${(p.level||'')==='intermediate'?'selected':''}>Orta (1-3 yıl)</option>
         <option value="advanced" ${(p.level||'')==='advanced'?'selected':''}>İleri (3+ yıl)</option>
@@ -9026,6 +9227,39 @@ function renderProfileEditCard(p){
         <option value="4" ${(p.trainingDays||'4')==='4'?'selected':''}>4 gün</option>
         <option value="5" ${(p.trainingDays||'4')==='5'?'selected':''}>5 gün</option>
         <option value="6" ${(p.trainingDays||'4')==='6'?'selected':''}>6 gün</option>
+      </select>
+    </div>
+  </div>
+  <div class="prof-section" style="margin-top:14px">
+    <h3>📊 Vücut & Yaşam Tarzı</h3>
+    <div class="prof-row">
+      <div class="prof-field"><label>Egzersiz Sıklığı</label>
+        <select class="prof-input" id="pf_exfreq">
+          <option value="" ${!p.exercise_frequency?'selected':''}>—</option>
+          ${ONBOARD_EXERCISE_FREQ_OPTIONS.map(o=>`<option value="${o.id}" ${p.exercise_frequency===o.id?'selected':''}>${o.label} ${o.sub}</option>`).join('')}
+        </select></div>
+      <div class="prof-field"><label>Vücut Yağ Oranı</label>
+        <select class="prof-input" id="pf_bodyfat">
+          <option value="" ${!p.body_fat_range?'selected':''}>—</option>
+          ${ONBOARD_BODY_FAT_OPTIONS.map(v=>`<option value="${v}" ${p.body_fat_range===v?'selected':''}>${v==='bilmiyorum'?'Bilmiyorum':'%'+v}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="prof-row">
+      <div class="prof-field"><label>Kilo Trendi</label>
+        <select class="prof-input" id="pf_wtrend">
+          <option value="" ${!p.weight_trend?'selected':''}>—</option>
+          ${ONBOARD_WEIGHT_TREND_OPTIONS.map(o=>`<option value="${o.id}" ${p.weight_trend===o.id?'selected':''}>${o.label}</option>`).join('')}
+        </select></div>
+      <div class="prof-field"><label>Önceden Daha Ağırdın mı?</label>
+        <select class="prof-input" id="pf_whist">
+          <option value="" ${!p.weight_history?'selected':''}>—</option>
+          ${ONBOARD_WEIGHT_HISTORY_OPTIONS.map(o=>`<option value="${o.id}" ${p.weight_history===o.id?'selected':''}>${o.label}</option>`).join('')}
+        </select></div>
+    </div>
+    <div class="prof-field"><label>Sportif Düzey</label>
+      <select class="prof-input" id="pf_athletic">
+        <option value="" ${!p.athletic_level?'selected':''}>—</option>
+        ${ONBOARD_ATHLETIC_OPTIONS.map(o=>`<option value="${o.id}" ${p.athletic_level===o.id?'selected':''}>${o.label}</option>`).join('')}
       </select>
     </div>
   </div>`;
@@ -9421,12 +9655,17 @@ async function saveProfileAll(){
   p.activity = document.getElementById('pf_activity')?.value || p.activity;
   p.level = document.getElementById('pf_level')?.value || p.level;
   p.trainingDays = document.getElementById('pf_days')?.value || p.trainingDays;
+  p.exercise_frequency = document.getElementById('pf_exfreq')?.value || p.exercise_frequency || null;
+  p.body_fat_range = document.getElementById('pf_bodyfat')?.value || p.body_fat_range || null;
+  p.weight_trend = document.getElementById('pf_wtrend')?.value || p.weight_trend || null;
+  p.weight_history = document.getElementById('pf_whist')?.value || p.weight_history || null;
+  p.athletic_level = document.getElementById('pf_athletic')?.value || p.athletic_level || null;
   // Save all to Supabase
   // trainingDays profiles tablosunda kolon olarak yok (sadece sihirbaz/program
   // onerisi sirasinda bellekte kullanilan gecici bir alan) - DB'ye yazmaya
   // calismak "Could not find the 'trainingDays' column" hatasiyla TUM profil
   // kaydini basarisiz kiliyordu (admin/RLS ile ilgisi yoktu).
-  const {error: profErr} = await sb.from('profiles').update({
+  const {error: profErr} = await updateProfileSafe(p.id, {
     name: p.name,
     weight: p.weight,
     target_weight: p.target_weight,
@@ -9438,7 +9677,12 @@ async function saveProfileAll(){
     level: p.level,
     mainGoal: p.mainGoal,
     muscleGoals: p.muscleGoals,
-  }).eq('id', p.id);
+    exercise_frequency: p.exercise_frequency,
+    body_fat_range: p.body_fat_range,
+    weight_trend: p.weight_trend,
+    weight_history: p.weight_history,
+    athletic_level: p.athletic_level,
+  });
   if(profErr) console.error('Profile save error:', profErr);
 
   // Save weight measurement with date
