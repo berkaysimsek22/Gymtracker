@@ -7137,18 +7137,27 @@ const EFFECTIVE_MUSCLE_MAP = {
 // classifyExerciseName'e (tek grup, hepsi direct sayilir) duser - boylece
 // EFFECTIVE_MUSCLE_MAP'te olmayan/adi degismis bir hareket asla haritasiz
 // kalmaz, sadece indirect ayrimi kaybolur (guvenli varsayilan).
-function lookupEffectiveMuscleMap(name){
+function lookupEffectiveMuscleMap(name, muscle){
   const n = normalizeExName(name);
   if(EFFECTIVE_MUSCLE_MAP[n]) return EFFECTIVE_MUSCLE_MAP[n];
   for(const k in EFFECTIVE_MUSCLE_MAP){ if(n.includes(k)||k.includes(n)) return EFFECTIVE_MUSCLE_MAP[k]; }
-  return {primary:classifyExerciseName(name), secondary:[]};
+  const byName = classifyExerciseName(name);
+  if(byName.length) return {primary:byName, secondary:[]};
+  // İsimden (EXERCISE_DB + boş muscle ile classifyExerciseMuscles) hiçbir kas
+  // çıkmadıysa (ör. "Incline Barbell Press" - EFFECTIVE_MUSCLE_MAP'teki
+  // "incline barbell BENCH press" ile alt dize eşleşmiyor, EXERCISE_DB'de de
+  // yok), egzersizin KENDİ muscle etiketi varsa ("Pectoral (Üst)" gibi) onu
+  // kullanarak son bir deneme yap - "Çalışan Kaslar" panelinin zaten doğru
+  // sınıflandırdığı bilgiyi burada da kullanmış oluyoruz, aksi halde bu
+  // hareketin setleri Etkili Hacim'de SESSİZCE 0 sayılıyordu.
+  return {primary: muscle ? classifyExerciseMuscles({name, muscle}) : [], secondary:[]};
 }
 // acc[gid] = {direct, indirect, exercises:{adı:{direct,indirect}}} biriktirir.
 // Bir kas ayni egzersizde iki kez sayilmasin diye secondary, o egzersizde
 // zaten primary olarak islenmis kaslari (seen) atlar.
-function addEffectiveSets(acc, exName, setCount){
+function addEffectiveSets(acc, exName, setCount, muscle){
   if(!(setCount>0)) return;
-  const map = lookupEffectiveMuscleMap(exName);
+  const map = lookupEffectiveMuscleMap(exName, muscle);
   const seen = new Set();
   (map.primary||[]).forEach(gid=>{
     if(seen.has(gid) || !acc[gid]) return;
@@ -7175,7 +7184,7 @@ function computeEffectiveMuscleVolume(entries, coef){
   (entries||[]).forEach(e=>{
     if(!e || !e.name) return;
     const n = parseInt(e.sets)||0;
-    if(n>0) addEffectiveSets(acc, e.name, n);
+    if(n>0) addEffectiveSets(acc, e.name, n, e.muscle);
   });
   const result = {};
   ANALYSIS_MUSCLE_GROUPS.forEach(g=>{
@@ -7192,10 +7201,11 @@ function programWeeklyEntries(schedule){
     if(!day || day.type!=='full' || !day.exercises) return;
     day.exercises.forEach(ex=>{
       if(!ex || !ex.name) return;
-      sums[ex.name] = (sums[ex.name]||0) + (parseInt(ex.sets)||0);
+      if(!sums[ex.name]) sums[ex.name] = {sets:0, muscle:ex.muscle||''};
+      sums[ex.name].sets += (parseInt(ex.sets)||0);
     });
   });
-  return Object.entries(sums).map(([name,sets])=>({name,sets}));
+  return Object.entries(sums).map(([name,v])=>({name, sets:v.sets, muscle:v.muscle}));
 }
 function computePlannedEffectiveMuscleVolume(schedule, coef){
   return computeEffectiveMuscleVolume(programWeeklyEntries(schedule), coef);
@@ -7215,9 +7225,10 @@ async function computeActualWeeklyEffectiveVolume(userId, coef){
     if(!doneAt||doneAt<monday||doneAt>=nextMonday) return;
     const ex=prog[row.day_index%7]?.exercises?.[row.exercise_index];
     if(!ex || !ex.name) return;
-    sums[ex.name]=(sums[ex.name]||0)+1;
+    if(!sums[ex.name]) sums[ex.name] = {sets:0, muscle:ex.muscle||''};
+    sums[ex.name].sets += 1;
   });
-  const entries=Object.entries(sums).map(([name,sets])=>({name,sets}));
+  const entries=Object.entries(sums).map(([name,v])=>({name, sets:v.sets, muscle:v.muscle}));
   return computeEffectiveMuscleVolume(entries, coef);
 }
 

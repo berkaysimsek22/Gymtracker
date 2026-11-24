@@ -284,5 +284,39 @@ test('tamamen bilinmeyen bir hareket asla hata fırlatmaz, güvenli varsayılana
   assert.ok(Array.isArray(m.primary)); assert.ok(Array.isArray(m.secondary));
 });
 
+console.log('== BUG: "Kas Grubu Analizi" üst panel (30 set) ile "Etkili Hacim" (26 efektif set) farklı sayı gösteriyordu ==');
+test('"Incline Barbell Press" EFFECTIVE_MUSCLE_MAP\'teki "incline barbell BENCH press" ile eşleşmiyor ve EXERCISE_DB\'de de yok - isim bazlı arama boş döner', () => {
+  // Bu, hatanın KÖKÜ: lookupEffectiveMuscleMap'in önceki hali sadece isme
+  // bakıyordu, classifyExerciseName da EXERCISE_DB'de bulamayınca boş
+  // muscle:'' ile classifyExerciseMuscles'a düşüyordu - o da hiçbir şey
+  // çıkaramıyordu (classifyExerciseMuscles neredeyse tamamen 'muscle'
+  // alanına bakar, isme değil).
+  const m = lookupEffectiveMuscleMap('Incline Barbell Press');
+  assert.deepStrictEqual(m.primary, [], 'muscle etiketi verilmeden bu hareketten hiçbir kas çıkarılamamalı (fallback testi)');
+});
+
+test('DÜZELTME: aynı hareketin KENDİ muscle etiketi ("Pectoral (Üst)") verilince artık pectoral olarak doğru sınıflanıyor', () => {
+  const m = lookupEffectiveMuscleMap('Incline Barbell Press', 'Pectoral (Üst)');
+  assert.deepStrictEqual(m.primary, ['pectoral']);
+});
+
+test('DÜZELTME: ekran görüntüsündeki tam senaryo - Pectoral artık 30 set/30 efektif set gösteriyor, 26 değil', () => {
+  const schedule = [{
+    name: 'Push', type: 'full', day: 'Pazartesi', exercises: [
+      { name: 'Incline DB Press', muscle: 'Göğüs', sets: 8, reps: '8-10', restSec: 90 },
+      { name: 'Weighted Dip', muscle: 'Alt Pectoral · Triceps', sets: 9, reps: '6-10', restSec: 90 },
+      { name: 'Cable Fly', muscle: 'Göğüs', sets: 9, reps: '12-15', restSec: 60 },
+      // Kullanıcının programındaki GERÇEK isim - "Bench" kelimesi olmadığı
+      // için EFFECTIVE_MUSCLE_MAP'teki "incline barbell bench press" ile
+      // eşleşmiyor, ama kendi muscle etiketi "Pectoral (Üst)" taşıyor.
+      { name: 'Incline Barbell Press', muscle: 'Pectoral (Üst)', sets: 4, reps: '6-8', restSec: 150 },
+    ],
+  }];
+  const r = computePlannedEffectiveMuscleVolume(schedule, 0.5);
+  assert.strictEqual(r.pectoral.direct, 30, 'Incline Barbell Press artık sessizce 0 sayılmamalı (8+9+9+4=30)');
+  assert.strictEqual(r.pectoral.effective, 30);
+  assert.strictEqual(r.pectoral.exercises['Incline Barbell Press'].direct, 4);
+});
+
 console.log(`\n${passed} geçti, ${failed} başarısız.`);
 if (failed > 0) process.exit(1);
