@@ -6808,10 +6808,46 @@ function delExFromPreview(ei){
   showWoDayDetail(_woDayDetailIdx);
 }
 
+// Set sayısı değişince, reps alanı "piramit" tarzı azalan/sabit bir set-başı
+// liste ise (ör. "10-8-6" ya da "8,8,6,4" - ayracı fark etmez, sayı adedi
+// MEVCUT set sayısıyla birebir eşleşiyor) onu da yeni set sayısına göre
+// yeniden boyutlandırır. Azaltırken DÜŞÜK tekrarlı (ağır) uçtan tutulur,
+// YÜKSEK tekrarlı (hafif/ısınma benzeri) ilk değer(ler) düşer - "10-8-6" →
+// 2 sete düşünce "8-6" olur (10 düşer). Artırırken aynı adım farkıyla başa
+// yeni (daha yüksek tekrarlı) değer(ler) eklenir. "8-10" gibi ARTAN bir
+// ARALIK ise (her sette aynı hedef demek, pramit değil) dokunulmaz - sadece
+// azalan/sabit diziler bu mantığa uyar.
+function resizeRepsScheme(reps, oldSets, newSets){
+  if(!reps || oldSets===newSets || !(oldSets>0)) return reps;
+  const sep = reps.includes(',') ? ',' : (reps.includes('-') ? '-' : null);
+  if(!sep) return reps;
+  const parts = reps.split(sep).map(s=>s.trim());
+  if(parts.length !== oldSets) return reps;
+  const nums = parts.map(Number);
+  if(nums.some(n=>!Number.isInteger(n))) return reps;
+  for(let i=1;i<nums.length;i++){ if(nums[i] > nums[i-1]) return reps; }
+  let result;
+  if(newSets < oldSets){
+    result = nums.slice(nums.length - newSets);
+  } else {
+    const diffs = [];
+    for(let i=1;i<nums.length;i++) diffs.push(nums[i-1]-nums[i]);
+    const step = diffs.length ? Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length) : 2;
+    const extra = [];
+    let v = nums[0];
+    for(let i=0;i<newSets-oldSets;i++){ v += step; extra.push(v); }
+    result = [...extra.reverse(), ...nums];
+  }
+  return result.join(sep);
+}
 function updateExSetsInPreview(ei, val){
   const day = _woSchedule && _woSchedule[_woDayDetailIdx];
   if(!day || !day.exercises || !day.exercises[ei]) return;
-  day.exercises[ei].sets = Math.max(1, parseInt(val)||1);
+  const ex = day.exercises[ei];
+  const oldSets = ex.sets;
+  const newSets = Math.max(1, parseInt(val)||1);
+  ex.reps = resizeRepsScheme(ex.reps, oldSets, newSets);
+  ex.sets = newSets;
   persistWoPreviewIfLive();
   showWoDayDetail(_woDayDetailIdx);
 }
