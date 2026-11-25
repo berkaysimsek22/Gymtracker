@@ -65,6 +65,7 @@ const parts = [
   extractFunction('persistWoPreviewIfLive'),
   extractFunction('moveExInPreview'),
   extractFunction('delExFromPreview'),
+  extractFunction('resizeRepsScheme'),
   extractFunction('updateExSetsInPreview'),
   extractFunction('addExToPreview'),
 ].join('\n');
@@ -81,7 +82,7 @@ function makeHarness({ schedule, dayIdx = 0, splitMeta = null, profile = { id: '
     '_woSchedule', '_woDayDetailIdx', '_woSplitMeta',
     'activeProfile', 'saveProgram', 'showWoDayDetail', 'confirm', 'alert', 'document',
     parts + `
-    return { persistWoPreviewIfLive, moveExInPreview, delExFromPreview, updateExSetsInPreview, addExToPreview };
+    return { persistWoPreviewIfLive, moveExInPreview, delExFromPreview, resizeRepsScheme, updateExSetsInPreview, addExToPreview };
     `
   );
   const api = factory(
@@ -122,6 +123,60 @@ test('olmayan bir egzersiz indexi hata fırlatmaz', () => {
   const day = sampleDay();
   const h = makeHarness({ schedule: [day] });
   assert.doesNotThrow(() => h.updateExSetsInPreview(99, '5'));
+});
+
+console.log('== resizeRepsScheme ==');
+test('BUG İSTEĞİ: 3 set "10-8-6" -> 2 sete düşünce "8-6" olur (10 düşer, düşük tekrarlı uçtan tutulur)', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('10-8-6', 3, 2), '8-6');
+});
+test('2 set "8-6" -> 3 sete çıkınca aynı adım farkıyla başa "10" eklenir: "10-8-6"', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('8-6', 2, 3), '10-8-6');
+});
+test('2 set "8-6" -> 4 sete çıkınca iki değer eklenir: "12-10-8-6"', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('8-6', 2, 4), '12-10-8-6');
+});
+test('virgülle ayrılmış liste de aynı mantıkla çalışır: "8,8,6,4" -> 3 sete düşünce "8,6,4"', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('8,8,6,4', 4, 3), '8,6,4');
+});
+test('ARTAN bir aralık ("8-10" gibi, her sette aynı hedef) dokunulmaz - piramit değil', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('8-10', 2, 3), '8-10');
+});
+test('sayı adedi mevcut set sayısıyla eşleşmiyorsa (ör. "5-8" ama sets=4) dokunulmaz', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('5-8', 4, 3), '5-8');
+});
+test('AMRAP/sabit tek sayı gibi ayraçsız değerlere dokunulmaz', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('AMRAP', 3, 2), 'AMRAP');
+  assert.strictEqual(h.resizeRepsScheme('15', 3, 2), '15');
+});
+test('sabit tekrarlı piramit ("12,12,12") azalan sayılır, uzatınca aynı sayı devam eder', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('12,12,12', 3, 4), '12,12,12,12');
+});
+test('set sayısı değişmiyorsa reps aynen kalır', () => {
+  const h = makeHarness({ schedule: [sampleDay()] });
+  assert.strictEqual(h.resizeRepsScheme('10-8-6', 3, 3), '10-8-6');
+});
+
+console.log('== updateExSetsInPreview reps\'i de boyutlandırır ==');
+test('ENTEGRASYON: set sayısı 3 -> 2 düşünce reps "8,8,6" -> "8,6" olur', () => {
+  const day = { type: 'full', exercises: [{ name: 'Squat', muscle: 'Quad', sets: 3, reps: '8,8,6', restSec: 150 }] };
+  const h = makeHarness({ schedule: [day] });
+  h.updateExSetsInPreview(0, '2');
+  assert.strictEqual(day.exercises[0].sets, 2);
+  assert.strictEqual(day.exercises[0].reps, '8,6');
+});
+test('ENTEGRASYON: reps formatı piramit değilse (ör. "12-15" aralığı) set değişse de reps dokunulmaz', () => {
+  const day = { type: 'full', exercises: [{ name: 'Cable Fly', muscle: 'Göğüs', sets: 3, reps: '12-15', restSec: 60 }] };
+  const h = makeHarness({ schedule: [day] });
+  h.updateExSetsInPreview(0, '4');
+  assert.strictEqual(day.exercises[0].reps, '12-15');
 });
 
 console.log('== KALICILIK: "Şu Anki Programım" (canlı program) değişiklikleri KAYDEDİLİR ==');
