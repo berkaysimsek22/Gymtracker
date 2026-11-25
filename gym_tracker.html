@@ -6647,11 +6647,16 @@ function showWoDayDetail(i){
     exsHtml = `<div class="wo-ex-item"><div class="n">Çalışma ${h.work}sn / Dinlenme ${h.rest}sn</div><div class="sr">${h.rounds} round</div></div>`;
   } else {
     const exCount = (day.exercises||[]).length;
-    exsHtml = (day.exercises||[]).map((ex,ei)=>`<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${ex.sets}×${ex.reps}</div>${canEditPreview&&_woPreviewEditMode?`<div style="display:flex;align-items:center">
+    exsHtml = (day.exercises||[]).map((ex,ei)=>{
+      const srHtml = canEditPreview&&_woPreviewEditMode
+        ? `<input type="number" min="1" max="10" value="${ex.sets}" onchange="updateExSetsInPreview(${ei}, this.value)" style="width:38px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-weight:700;text-align:center;padding:4px 2px">×${ex.reps}`
+        : `${ex.sets}×${ex.reps}`;
+      return `<div class="wo-ex-item"><div><div class="n">${ex.name}</div><div class="m">${ex.muscle||''}</div></div><div class="sr">${srHtml}</div>${canEditPreview&&_woPreviewEditMode?`<div style="display:flex;align-items:center">
       <button onclick="moveExInPreview(${ei},-1)" ${ei===0?'disabled style="opacity:.25"':''} style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:2px 4px" title="Yukarı taşı">▲</button>
       <button onclick="moveExInPreview(${ei},1)" ${ei===exCount-1?'disabled style="opacity:.25"':''} style="background:none;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:2px 4px" title="Aşağı taşı">▼</button>
       <button onclick="delExFromPreview(${ei})" style="background:none;border:none;color:#ff5c38;font-size:15px;cursor:pointer;padding:2px 6px" title="Sil">🗑</button>
-    </div>`:''}</div>`).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
+    </div>`:''}</div>`;
+    }).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 0">Egzersiz yok</div>';
   }
   const {typeLabel} = _woDayMeta(day);
   const sub = day.type==='amrap' ? `AMRAP ${Math.round(((day.amrap&&day.amrap.timeCapSec)||1200)/60)}dk` : typeLabel==='Full' ? '' : typeLabel;
@@ -6771,12 +6776,25 @@ function sortExercisesCompoundFirst(exercises){
 // sıralamayı (sortExercisesCompoundFirst) KASITLI OLARAK çağırmıyoruz, yoksa
 // kullanıcının kendi tercih ettiği sıra anında geri alınırdı. Ekle/sil hâlâ
 // otomatik sıralıyor, bu ikinci (elle) seçenek sadece kullanıcı istediğinde.
+// _woSchedule, "Şu Anki Programım" görünümünde (_woSplitMeta===null)
+// activeProgram()'ın (programs[uid]) KENDİSİ - buradaki değişiklikler hemen
+// kaydedilmeli. Henüz UYGULANMAMIŞ bir split önizlemesindeyken (_woSplitMeta
+// dolu) ise _woSchedule AYRI bir taslak dizi - "🚀 Uygula" basılana kadar
+// Supabase'e yazılmamalı (aksi halde kullanıcının GERÇEK aktif programı
+// henüz onaylanmamış bir önizlemeyle sessizce ezilir).
+function persistWoPreviewIfLive(){
+  if(_woSplitMeta) return;
+  const p = activeProfile();
+  if(p) saveProgram(p.id);
+}
+
 function moveExInPreview(ei, dir){
   const day = _woSchedule && _woSchedule[_woDayDetailIdx];
   if(!day || !day.exercises) return;
   const target = ei + dir;
   if(target < 0 || target >= day.exercises.length) return;
   [day.exercises[ei], day.exercises[target]] = [day.exercises[target], day.exercises[ei]];
+  persistWoPreviewIfLive();
   showWoDayDetail(_woDayDetailIdx);
 }
 
@@ -6786,6 +6804,15 @@ function delExFromPreview(ei){
   if(!confirm(`"${day.exercises[ei].name}" silinsin mi?`)) return;
   day.exercises.splice(ei,1);
   sortExercisesCompoundFirst(day.exercises);
+  persistWoPreviewIfLive();
+  showWoDayDetail(_woDayDetailIdx);
+}
+
+function updateExSetsInPreview(ei, val){
+  const day = _woSchedule && _woSchedule[_woDayDetailIdx];
+  if(!day || !day.exercises || !day.exercises[ei]) return;
+  day.exercises[ei].sets = Math.max(1, parseInt(val)||1);
+  persistWoPreviewIfLive();
   showWoDayDetail(_woDayDetailIdx);
 }
 
@@ -6802,6 +6829,7 @@ function addExToPreview(){
     tip:document.getElementById('aef-tip')?.value.trim()||null
   });
   sortExercisesCompoundFirst(day.exercises);
+  persistWoPreviewIfLive();
   showWoDayDetail(_woDayDetailIdx);
 }
 
