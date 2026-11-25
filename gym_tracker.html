@@ -6615,11 +6615,17 @@ function renderWoWeekTable(){
   const header = _woSplitMeta ? `<h3 style="font-family:'Inter',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px">${_woSplitMeta.name}</h3><p style="font-size:11px;color:var(--muted);margin:4px 0 14px;line-height:1.6">${_woSplitMeta.tagline}</p>${altToggle}` : '';
   const applyBtn = _woSplitMeta && canEdit() ? `<button class="btn btn-acc" style="width:100%;margin-top:12px" onclick="${_woSplitMeta.isCustom?'applyCustomSplit()':`applyPopularSplit('${_woSplitMeta.id}')`}">🚀 Bu Split'i Uygula</button>` : '';
   const analyzeBtn = `<button class="btn btn-outline btn-sm" style="width:100%;margin-top:12px" onclick="showProgramMuscleAnalysis()">📊 Analizi Gör</button>`;
+  // "Şu Anki Programım" görünümünde (henüz UYGULANMAMIŞ bir split önizlemesi
+  // değil, canlı/aktif program) başka bir split'e geçmek için tek dokunuşluk
+  // kısayol - eskiden sadece "← Split Listesi"yle geri çıkıp oradan
+  // seçilebiliyordu, buton olarak ayrıca da gösteriliyor.
+  const changeSplitBtn = (!_woSplitMeta && canEdit()) ? `<button class="btn btn-outline btn-sm" style="width:100%;margin-top:10px" onclick="renderWoSplit(document.getElementById('woContent'))">🔁 Split'i Değiştir</button>` : '';
   const backAction = _woSplitMeta?.isCustom ? 'renderCustomSplitBuilder()' : `renderWoSplit(document.getElementById('woContent'))`;
   el.innerHTML = `<button class="btn btn-outline btn-sm" style="margin-bottom:12px" onclick="${backAction}">← ${_woSplitMeta?.isCustom?'Gün/Öncelik Seçimi':'Split Listesi'}</button>
     ${header}
     <div class="wo-week-table">${rows}</div>
     ${analyzeBtn}
+    ${changeSplitBtn}
     ${applyBtn}`;
 }
 
@@ -6676,7 +6682,11 @@ function showWoDayDetail(i){
       <div class="aef-field"><label>Koç İpucu</label><input class="aef-input" id="aef-tip" placeholder="ör: Son sette failure"></div>
     </div>
     <button class="btn btn-acc" onclick="addExToPreview()">+ Egzersiz Ekle</button></div>` : '';
-  el.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="renderWoWeekTable()">← Hafta</button>${editToggle}</div>
+  // "Şu Anki Programım"ı (canlı/aktif program) gün detayından çıkarken, önce
+  // haftaya dönüp sonra "← Split Listesi"ne basmaya gerek kalmadan buradan
+  // da doğrudan başka bir split'e geçilebilsin diye.
+  const changeSplitBtnDetail = (!_woSplitMeta && canEdit()) ? `<button class="btn btn-outline btn-sm" onclick="renderWoSplit(document.getElementById('woContent'))">🔁 Split'i Değiştir</button>` : '';
+  el.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-outline btn-sm" onclick="renderWoWeekTable()">← Hafta</button>${editToggle}${changeSplitBtnDetail}</div>
     ${muscleLiveHtml}
     <div class="wo-day-card"><h4>${day.name} <span>${day.day}${sub?' · '+sub:''}</span></h4>${exsHtml}</div>${addForm}`;
 }
